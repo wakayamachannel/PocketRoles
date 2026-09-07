@@ -1,0 +1,11 @@
+To:
+Subject: Re:
+In-Reply-To:
+References:
+FAQ:
+# ここまでがヘッダーです。To: は必須。Subject: は元の件名に「Re: 」を付けたもの。
+# In-Reply-To: と References: は mail.txt の Message-Id / References をそのまま写します（相手のメールソフトで同じスレッドに並ぶため）。
+# FAQ: と「#」で始まる行は送信されません（使った FAQ の id をユーザーが確認するためのメモ）。
+# この下に空行を 1 行入れ、その次の行から本文（UTF-8）。本文が空のままだと送信できません。
+# 送信後は末尾に「Sent: 日時」が自動で追記され、同じファイルは二度と送れません。
+

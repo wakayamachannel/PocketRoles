@@ -1,0 +1,17 @@
+PocketRoles サポート用 Gmail の自動返信（不在通知）文面 — Gmail 設定 →「全般」→「不在通知」に貼り付け
+件名: [PocketRoles] 受け取りました / 已收到 / Received
+
+メールをありがとうございます。PocketRoles サポートです。
+不具合報告・要望・質問はすべて読んで、数日以内にこのアドレスから返事をします。
+（返事が来ない場合は迷惑メールフォルダも確認してください）
+
+感谢来信。这里是 PocketRoles 支持邮箱。
+问题报告、建议和提问我们都会阅读，并在几天内用这个地址回复。
+（如果没有收到回复，请检查垃圾邮件文件夹）
+
+Thank you for your mail. This is PocketRoles support.
+We read every bug report, request and question and reply from this address within a few days.
+(If no reply arrives, please check your spam folder.)
+
+— PocketRoles サポート（もみじちゃ）
+https://github.com/wakayamachannel/PocketRoles

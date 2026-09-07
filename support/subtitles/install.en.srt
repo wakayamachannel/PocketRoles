@@ -1,0 +1,40 @@
+1
+00:00:00,000 --> 00:00:05,000
+How to install PocketRoles (3 minutes)
+1. Extract both zip files you received into the same folder
+
+2
+00:00:05,000 --> 00:00:09,500
+2. Open "PocketRoles Launcher.cmd" and this window appears
+(if Windows warns: More info -> Run anyway)
+
+3
+00:00:09,500 --> 00:00:14,000
+3. Press "Install"
+
+4
+00:00:14,000 --> 00:00:19,000
+It copies your Steam game and installs BepInEx + PocketRoles
+(the first time can take a few minutes)
+
+5
+00:00:19,000 --> 00:00:23,000
+"Install complete" means you are done
+
+6
+00:00:23,000 --> 00:00:28,000
+4. Start Steam, then press "Launch"
+
+7
+00:00:28,000 --> 00:00:50,000
+Only the first launch takes 1-2 minutes (just wait)
+
+8
+00:00:50,000 --> 00:01:30,000
+When the log says "Launched", look at the game:
+PocketRoles in the right window of the menu = success
+
+9
+00:01:30,500 --> 00:01:36,500
+That's it. Other players install nothing.
+Questions: pocketroles.report+help@gmail.com (we reply)

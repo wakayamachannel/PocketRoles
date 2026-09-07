@@ -1,0 +1,28 @@
+# build output
+bin/
+obj/
+tools/**/bin/
+tools/**/obj/
+
+# local machine / private files (never publish)
+report-mail.json
+reports/
+logs/
+launcher-state.json
+launcher.log
+*.user
+.vs/
+
+# release packages (build-release.ps1 output) and game copies are never part of the repository
+dist/
+*.zip
+deepl-key.txt
+
+# support mail: drafts and built .eml previews are private (support/*.md is committed)
+support/drafts/
+*.eml
+clips/
+
+# internal automation (Claude workflow scripts) and daily work logs contain local paths: not published
+workflows/
+support/worklog-*.md

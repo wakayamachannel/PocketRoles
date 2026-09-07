@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 不具合報告をメールで送る / 用邮件报告问题 / Report a bug by mail
+    url: mailto:pocketroles.report@gmail.com?subject=%5BPocketRoles%5D%20bug
+    about: ランチャーの「報告 zip を作る」で作った zip を添付してください。/ 请附上启动器生成的报告 zip。/ Attach the report zip made by the launcher.
+  - name: 導入・遊び方の質問をメールで送る / 用邮件提问 / Ask a question by mail
+    url: mailto:pocketroles.report+help@gmail.com?subject=%5BPocketRoles%5D%20help
+    about: 説明を見ても分からない時はこちら。読んで返事をします。/ 看了说明还是不明白时请发到这里，我们会回复。/ Stuck after reading the README? We read every mail and reply.
+  - name: 要望をメールで送る / 用邮件提出建议 / Send a request by mail
+    url: mailto:pocketroles.report+request@gmail.com?subject=%5BPocketRoles%5D%20request
+    about: 新機能や役職の要望はこちら。/ 新功能或职业建议请发到这里。/ Feature or role requests.

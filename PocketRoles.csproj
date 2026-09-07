@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>PocketRoles</AssemblyName>
+    <RootNamespace>PocketRoles</RootNamespace>
+    <Version>0.4.0</Version>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>bin\</OutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Optimize>true</Optimize>
+    <NoWarn>CS0618;CS0108;CS0109;CS8632;CS0162;CS0649;CS0169;CS0414;CS1998</NoWarn>
+    <!-- Game folder that contains a working BepInEx (core + interop). Override: dotnet build -p:GameDir="C:\path\to\Among Us" -->
+    <GameDir Condition="'$(GameDir)' == ''">$(MSBuildThisFileDirectory)..\Among Us PocketRoles</GameDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Default language tables (Lang.cs); written to BepInEx/PocketRoles/lang/ on first run so users can edit them -->
+    <EmbeddedResource Include="lang\*.json" />
+    <!-- Main-menu info panel icon (src/UI/MenuPanel.cs, loaded via SpriteLoader.LoadEmbedded) -->
+    <EmbeddedResource Include="assets\PocketRoles-256.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="$(GameDir)\BepInEx\core\BepInEx.Core.dll" Private="false" />
+    <Reference Include="$(GameDir)\BepInEx\core\BepInEx.Unity.IL2CPP.dll" Private="false" />
+    <Reference Include="$(GameDir)\BepInEx\core\BepInEx.Unity.Common.dll" Private="false" />
+    <Reference Include="$(GameDir)\BepInEx\core\0Harmony.dll" Private="false" />
+    <Reference Include="$(GameDir)\BepInEx\core\Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="$(GameDir)\BepInEx\core\Il2CppInterop.Common.dll" Private="false" />
+    <Reference Include="$(GameDir)\BepInEx\interop\*.dll" Private="false" />
+  </ItemGroup>
+  <!-- stubs/ holds contract-only stand-ins used for isolated builds of single modules (see DESIGN.md).
+       Real build: excluded. Isolated build: dotnet build -p:UseStubs=true -p:ExcludeStubs="stubs\Rpc.cs;stubs\OptionsDesync.cs" -p:NoCopy=true -->
+  <PropertyGroup>
+    <!-- '|'-separated on the command line (semicolons and commas split -p values), e.g. -p:ExcludeStubs="stubs\Rpc.cs|stubs\OptionsDesync.cs" -->
+    <ExcludeStubsList Condition="'$(ExcludeStubs)' != ''">$(ExcludeStubs.Replace('|', ';'))</ExcludeStubsList>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="stubs\**" />
+    <!-- tools/ holds separate helper projects (ReportFetcher); never part of the plugin build -->
+    <Compile Remove="tools\**" />
+    <EmbeddedResource Remove="tools\**" />
+    <None Remove="tools\**" />
+    <Compile Include="stubs\*.cs" Exclude="$(ExcludeStubsList)" Condition="'$(UseStubs)' == 'true'" />
+  </ItemGroup>
+  <Target Name="CopyToPlugins" AfterTargets="Build" Condition="Exists('$(GameDir)\BepInEx\plugins') And '$(NoCopy)' != 'true'">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GameDir)\BepInEx\plugins" ContinueOnError="WarnAndContinue" Retries="2" RetryDelayMilliseconds="500" />
+    <Message Importance="high" Text="Copied $(TargetFileName) to $(GameDir)\BepInEx\plugins" />
+  </Target>
+</Project>

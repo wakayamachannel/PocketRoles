@@ -1,0 +1,68 @@
+1
+00:00:00,000 --> 00:00:05,000
+How to play PocketRoles (3 minutes)
+Only the host installs it; players stay vanilla
+
+2
+00:00:05,000 --> 00:00:10,000
+PocketRoles in the right window of the menu = ready
+
+3
+00:00:10,000 --> 00:00:25,000
+Create a room as usual: Play -> Online -> Create Game
+
+4
+00:00:25,000 --> 00:00:44,000
+Pick the map and player count. Players install nothing
+
+5
+00:00:44,000 --> 00:00:53,000
+The room code is shown big in the lobby (for guiding people)
+Bottom right: PocketRoles version and region
+
+6
+00:00:53,000 --> 00:01:02,000
+Edit -> POCKETROLES opens the role settings
+
+7
+00:01:02,000 --> 00:01:12,000
+Tabs: Roles / Lobby / Chat / Looks / Host
+Just set counts and chances. Press ? for a description
+
+8
+00:01:12,000 --> 00:01:20,000
+"> Vanilla settings" shows the original game settings
+(kill cooldown, voting time can go beyond the vanilla limits)
+
+9
+00:01:20,000 --> 00:01:36,000
+Chat commands: /h lists them, /show prints the settings
+
+10
+00:01:36,000 --> 00:01:52,000
+/time = lobby time left, /test on = test mode (start alone)
+
+11
+00:01:52,000 --> 00:02:05,000
+Players type /cmd h -> help only they can see
+/cmd n -> their role. Chat is auto-translated (DeepL/Google)
+
+12
+00:02:05,000 --> 00:02:30,000
+Press Start: the intro runs as usual. Role holders get a private notice
+
+13
+00:02:30,000 --> 00:02:50,000
+13 roles: Sheriff, Mayor, Snitch, Jackal, Jester and more
+The lobby timer extends automatically
+
+14
+00:02:50,000 --> 00:03:10,000
+F7 twice = end the game and be back in the lobby in seconds
+F8 ends a meeting, F9 cancels the start countdown
+
+15
+00:03:10,000 --> 00:03:30,000
+Questions: pocketroles.report+help@gmail.com
+GitHub: wakayamachannel/PocketRoles
+
