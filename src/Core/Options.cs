@@ -217,7 +217,7 @@ namespace PocketRoles.Core
             _roleInfoAtMeeting = cfg.Bind("Chat", "RoleInfoAtMeeting", true, "Re-send each player's role description privately at the start of every meeting");
             _welcomeText = cfg.Bind("Chat", "WelcomeText", "",
                 "Custom welcome text sent to joining players (empty = built-in text). \\n = line break; placeholders: {rules} {roles} {settings} {help} {version}. The mandatory mod notice line is always prepended");
-            _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", true, "Append the current role settings to the welcome message");
+            _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", false, "Append the current role settings to the welcome message (off by default: the welcome stays short, the settings summary is always available with /cmd s)");
             _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
 
             _autoRehost = cfg.Bind("Lobby", "AutoRehost", false, "Automatically create a new lobby after an unexpected disconnect (server error, timeout) while hosting");
@@ -288,7 +288,7 @@ namespace PocketRoles.Core
             _allCommands = cfg.Bind("Chat", "AllCommands", true, "Allow chat commands at all. Off = only /mod on works for the host");
             _rulesMode = cfg.Bind("Chat", "RulesMode", "none", new ConfigDescription("Rules line in the welcome message: none (built-in 'no special rules' text) or custom (RulesText, /rules <text>)", new AcceptableValueList<string>(RulesModeChoices)));
             _rulesText = cfg.Bind("Chat", "RulesText", "", "Custom rules text used by the {rules} placeholder when RulesMode = custom (\\n = line break)");
-            _welcomeAllLanguages = cfg.Bind("Chat", "WelcomeAllLanguages", false, "Send the full welcome message in Japanese, Chinese and English to every joining player (paced). Off = lobby language plus one compact trilingual /lang line");
+            _welcomeAllLanguages = cfg.Bind("Chat", "WelcomeAllLanguages", true, "Send the short welcome (2 lines) to every joining player in the player's language first, then in the two other languages (paced). Off = the player's language only plus one compact trilingual /lang line");
 
             // ---- v0.4b chat translation (chat text is sent to Google / DeepL; the DeepL key is read from BepInEx/PocketRoles/deepl-key.txt and never written here)
             _trEnabled = cfg.Bind("Translate", "Enabled", true, "Translate foreign-language chat (combined mode: broadcast in the host's language + private translation per player). ON by default: chat text of every player is sent to the translation provider (Google, or DeepL when BepInEx/PocketRoles/deepl-key.txt holds a key). Turn off with /opt translate off");
@@ -367,7 +367,8 @@ namespace PocketRoles.Core
         public static bool RoleInfoAtMeeting { get => _roleInfoAtMeeting == null || _roleInfoAtMeeting.Value; set { if (_roleInfoAtMeeting != null) _roleInfoAtMeeting.Value = value; } }
         /// <summary>Custom welcome text ("" = built-in). Raw value: "\n" two-character sequences and {placeholders} are expanded by Chat.</summary>
         public static string WelcomeText { get => _welcomeText == null ? "" : (_welcomeText.Value ?? ""); set { if (_welcomeText != null) _welcomeText.Value = value ?? ""; } }
-        public static bool WelcomeIncludeSettings { get => _welcomeIncludeSettings == null || _welcomeIncludeSettings.Value; set { if (_welcomeIncludeSettings != null) _welcomeIncludeSettings.Value = value; } }
+        /// <summary>Append the settings summary to the welcome (off by default; /cmd s shows it on demand).</summary>
+        public static bool WelcomeIncludeSettings { get => _welcomeIncludeSettings != null && _welcomeIncludeSettings.Value; set { if (_welcomeIncludeSettings != null) _welcomeIncludeSettings.Value = value; } }
         public static bool AntiCheatKick { get => _antiCheatKick != null && _antiCheatKick.Value; set { if (_antiCheatKick != null) _antiCheatKick.Value = value; } }
 
         public static bool AutoRehost { get => _autoRehost != null && _autoRehost.Value; set { if (_autoRehost != null) _autoRehost.Value = value; } }
@@ -476,8 +477,8 @@ namespace PocketRoles.Core
         public static string RulesMode { get => GetChoice(_rulesMode, RulesModeChoices); set => SetChoice(_rulesMode, RulesModeChoices, value); }
         /// <summary>Raw custom rules text ("\n" two-character sequences are expanded by Chat).</summary>
         public static string RulesText { get => _rulesText == null ? "" : (_rulesText.Value ?? ""); set { if (_rulesText != null) _rulesText.Value = value ?? ""; } }
-        /// <summary>Send the full welcome in ja + zh + en (paced) instead of the lobby language only.</summary>
-        public static bool WelcomeAllLanguages { get => _welcomeAllLanguages != null && _welcomeAllLanguages.Value; set { if (_welcomeAllLanguages != null) _welcomeAllLanguages.Value = value; } }
+        /// <summary>Send the short welcome in the player's language, then the two others (paced; on by default) instead of one language only.</summary>
+        public static bool WelcomeAllLanguages { get => _welcomeAllLanguages == null || _welcomeAllLanguages.Value; set { if (_welcomeAllLanguages != null) _welcomeAllLanguages.Value = value; } }
 
         // ------------------------------------------------------------------ v0.4b [Translate]
 
@@ -905,11 +906,11 @@ namespace PocketRoles.Core
 
             const string cJa = "チャット", cEn = "Chat";
             _descriptors.Add(Bool("chat.welcomesettings", cJa, cEn, "挨拶に設定を含める", "Welcome includes settings", _welcomeIncludeSettings)
-                .Tip("挨拶メッセージに現在の役職設定を付けます。", "Appends the current role settings to the welcome message.", "在欢迎语中附上当前职业设置。"));
+                .Tip("挨拶に現在の役職設定を付けます（既定オフ。設定は /cmd s でいつでも見られます）。", "Appends the current role settings to the welcome (off by default; /cmd s shows them any time).", "在欢迎语中附上当前职业设置（默认关闭。随时可用 /cmd s 查看）。"));
             _descriptors.Add(Choice("chat.rulesmode", cJa, cEn, "挨拶のルール行", "Rules line", _rulesMode, RulesModeChoices)
                 .Tip("挨拶に載せるルール行（なし / /rules で設定した独自ルール）。", "Rules line in the welcome (none / the custom text set with /rules).", "欢迎语中的规则行（无 / 用 /rules 设置的自定义规则）。"));
             _descriptors.Add(Bool("chat.welcomeall", cJa, cEn, "挨拶を3言語で送る", "Welcome in all languages", _welcomeAllLanguages)
-                .Tip("挨拶を日本語・中国語・英語の3言語で全員に送ります。", "Sends the full welcome in Japanese, Chinese and English.", "用日语、中文、英语三种语言发送完整欢迎语。"));
+                .Tip("短い挨拶（2行）をその人の言語→残り2言語の順に送ります（既定オン）。", "Sends the short welcome (2 lines) in the player's language, then the other two (on by default).", "把简短欢迎语（2行）按该玩家的语言→其余2种语言的顺序发送（默认开启）。"));
             _descriptors.Add(Bool("chat.playercommands", cJa, cEn, "プレイヤーのコマンド", "Player commands", _playerCommands)
                 .Tip("ホスト以外のプレイヤーも /help などのコマンドを使えます。", "Lets non-host players use chat commands such as /help.", "允许非房主玩家使用 /help 等聊天命令。"));
             _descriptors.Add(Bool("chat.allcommands", cJa, cEn, "全コマンド", "All commands", _allCommands)

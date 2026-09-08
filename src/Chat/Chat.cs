@@ -324,11 +324,15 @@ namespace PocketRoles.Chat
             }
             if (Options.WelcomeAllLanguages && !compat)
             {
-                // The full welcome in the player's language first, then the two others (one paced stream).
+                // The short welcome in the player's language first, then the two others (one paced stream); the
+                // trilingual translation notice follows once instead of once per language copy.
                 foreach (string lang in WelcomeLanguageOrder(playerLang))
                 {
                     using (Lang.Scope(lang)) chunks.AddRange(WelcomeChunks(true));
                 }
+                string tr = null;
+                using (Lang.Scope(playerLang)) tr = TranslationNotice();
+                if (tr != null) chunks.AddRange(Split(tr));
             }
             else
             {
@@ -380,13 +384,14 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>
-        /// Upper bound of chat messages one join may trigger (welcome in one or three languages plus the VIP line);
-        /// fallback for <see cref="WelcomeChunkCount"/> when the welcome text cannot be built.
+        /// Upper bound of chat messages one join may trigger (welcome in one or three languages, the translation
+        /// notice, plus the VIP line); fallback for <see cref="WelcomeChunkCount"/> when the welcome text cannot be built.
         /// </summary>
         internal static int MaxWelcomeChunksPerJoin()
         {
             if (Registration.CompatMode) return CompatMaxWelcomeMessages;
             int per = WelcomeCap();
+            // WelcomeCap already counts the translation notice once per copy; the one shared notice fits in that.
             return per * (Options.WelcomeAllLanguages ? Lang.Supported.Length : 1) + 1;
         }
 
@@ -436,8 +441,8 @@ namespace PocketRoles.Chat
 
         /// <summary>
         /// The welcome messages in the current language, capped at <see cref="WelcomeCap"/>. <paramref name="multiLang"/>:
-        /// this welcome is one of three full-language copies (WelcomeAllLanguages) → the trilingual /lang line and the
-        /// short EN line are left out (the other languages follow anyway).
+        /// this welcome is one of three language copies (WelcomeAllLanguages) → the trilingual /lang line and the
+        /// translation notice are left out (the other languages follow anyway; the notice is added once by the caller).
         /// </summary>
         internal static List<string> WelcomeChunks(bool multiLang = false)
         {
@@ -501,39 +506,42 @@ namespace PocketRoles.Chat
                 "English: {0}en ｜ 中文: {0}zh ｜ 日本語: {0}ja", p);
         }
 
-        /// <summary>Translation notice + /lang line joined by newlines ("" when neither applies).</summary>
+        /// <summary>
+        /// Translation notice + /lang line joined by newlines ("" when neither applies). Both are left out of one
+        /// language copy of the multi-language welcome (the caller adds the notice once after the three copies).
+        /// </summary>
         private static string WelcomeExtras(bool multiLang)
         {
+            if (multiLang) return "";
             var lines = new List<string>();
             string tr = TranslationNotice();
             if (tr != null) lines.Add(tr);
-            if (!multiLang)
-            {
-                string ls = LangSwitchLine();
-                if (ls != null) lines.Add(ls);
-            }
+            string ls = LangSwitchLine();
+            if (ls != null) lines.Add(ls);
             return string.Join("\n", lines);
         }
 
         /// <summary>
-        /// The welcome text in the current language: the mandatory mod notice, then either the built-in text (rules
-        /// line, help hint, enabled roles, EN line) or <see cref="Options.WelcomeText"/> with its placeholders ({rules},
-        /// {roles}, {settings}, {help}, {version}) expanded; the current settings are appended when
-        /// <see cref="Options.WelcomeIncludeSettings"/> is on and the text does not place them itself, and a custom
-        /// rules line (/rules) is appended when the custom text does not place {rules} itself.
+        /// The welcome text in the current language: the mandatory mod notice (line 1: role-mod lobby, nothing to
+        /// install, the role shows above your own name), then either the built-in body (the role-help line and, only
+        /// when the host set one, the custom rules line) or <see cref="Options.WelcomeText"/> with its placeholders
+        /// ({rules}, {roles}, {settings}, {help}, {version}) expanded; the current settings are appended when
+        /// <see cref="Options.WelcomeIncludeSettings"/> is on (off by default: /cmd s shows them) and the text does not
+        /// place them itself, and a custom rules line (/rules) is appended when the custom text does not place {rules} itself.
         /// </summary>
         internal static string WelcomeText(bool multiLang = false)
         {
             var sb = new StringBuilder();
             sb.Append(Lang.T("welcome.1",
-                "この部屋はホスト専用MOD「PocketRoles」を使用しています。役職付きの試合になります。",
-                "This lobby uses the host-side mod \"PocketRoles\": the game has extra roles."));
+                "役職MOD部屋です。何も入れなくてOK。役職は試合が始まると自分の名前の上に出ます。",
+                "Role-mod lobby. Nothing to install. Your role appears above your own name when the game starts.",
+                "职业MOD房间。什么都不用装。游戏开始后你的职业会显示在自己名字上方。"));
             string custom = Options.WelcomeText;
             bool includeSettings = Options.WelcomeIncludeSettings;
             string extras = WelcomeExtras(multiLang);
             if (string.IsNullOrWhiteSpace(custom))
             {
-                sb.Append('\n').Append(BuiltInWelcomeBody(includeSettings, multiLang));
+                sb.Append('\n').Append(BuiltInWelcomeBody());
                 if (extras.Length > 0) sb.Append('\n').Append(extras);
                 if (includeSettings) sb.Append('\n').Append(SettingsLines());
                 return sb.ToString();
@@ -576,29 +584,34 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>
-        /// Built-in welcome body: help hint, enabled roles, the rules line and (unless English) a short EN line. The EN line is left
-        /// out when the settings follow (the help hint already names /lang en) so the welcome stays within its cap.
+        /// Built-in welcome body (short, for first-time players): the role-help line and, only when the host set one
+        /// with /rules, the custom rules line. The enabled roles and the settings are not listed here any more
+        /// (/cmd r and /cmd s show them; <see cref="Options.WelcomeIncludeSettings"/> appends the settings again).
         /// </summary>
-        private static string BuiltInWelcomeBody(bool includeSettings, bool multiLang)
+        private static string BuiltInWelcomeBody()
         {
-            bool priv = Registration.ShouldRegister;
             var sb = new StringBuilder();
-            sb.Append(HelpHint());
-            sb.Append('\n');
-            sb.Append(Lang.TF("welcome.3", "有効な役職: {0}", "Enabled roles: {0}", EnabledRoleNames()));
-            // The rules line ({rules}) follows the roles line: notice + help hint and roles + rules pack into fewer messages.
-            sb.Append('\n');
-            sb.Append(RulesLine());
-            // Multi-language welcome: a full English copy follows, no EN line needed. Otherwise the trilingual /lang line
-            // (WelcomeExtras) already tells how to switch, so the EN line only names the mod.
-            if (!Lang.IsEn && !includeSettings && !multiLang)
+            sb.Append(RoleHelpLine());
+            if (HasCustomRules)
             {
                 sb.Append('\n');
-                string en = "EN: Host-side role mod \"PocketRoles\" is active.";
-                if (PlayerCommandsAvailable) en += " " + (priv ? "/cmd h for help." : "/h for help.");
-                sb.Append(en);
+                sb.Append(RulesLine());
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Line 2 of the built-in welcome (≤ 100 chars): how to read a role description in meeting chat (/cmd r &lt;role&gt;),
+        /// the role list (/cmd r) and help (/cmd h). When players cannot use commands, or in the unregistered compat
+        /// lobby, the matching <see cref="HelpHint"/> text is used instead.
+        /// </summary>
+        internal static string RoleHelpLine()
+        {
+            if (!PlayerCommandsAvailable || Registration.CompatMode) return HelpHint();
+            return Lang.T("welcome.2",
+                "役職の説明: 会議のチャットで /cmd r 役職名（例: /cmd r シェリフ）。役職一覧は /cmd r、困ったら /cmd h",
+                "Role help: in meeting chat type /cmd r <role> (e.g. /cmd r sheriff). All roles: /cmd r, help: /cmd h",
+                "职业说明：会议聊天中输入 /cmd r 职业名（例 /cmd r sheriff）。全部职业 /cmd r，帮助 /cmd h");
         }
 
         /// <summary>Non-host players may use chat commands ([Chat] PlayerCommands and AllCommands both on).</summary>
@@ -676,16 +689,21 @@ namespace PocketRoles.Chat
             string sep = Lang.T("roleinfo.sep", " — ", " - ");
             string line = head + sep + info.Desc;
             int limit = MessageChars;
+            // Sheriff / Jackal / Arsonist hold the vanilla Impostor role on their own client (intro, kill button), so
+            // first-time players take themselves for impostors: one line between the name and the description says
+            // what the game shows and what the real role is. Left out of the SafeMode meeting reminder (one message).
+            string desync = info.ImpostorDesync ? DesyncNotice(info.Name) : null;
             string result;
-            if (line.Length <= limit) result = line;
+            if (line.Length <= limit && desync == null) result = line;
             else if (meeting && Rpc.SafeMode)
             {
                 // Unregistered lobby: one chat message per player at a meeting (never a split reminder). The colour
                 // tag counts toward the 100-character limit, so measure the raw head, not the stripped one.
+                if (line.Length <= limit) return line;
                 int room = limit - head.Length - sep.Length - 1;
                 return room < 8 ? head : head + sep + info.Desc.Substring(0, Math.Min(info.Desc.Length, room)) + "…";
             }
-            else result = head + "\n" + info.Desc;
+            else result = head + "\n" + (desync != null ? desync + "\n" : "") + info.Desc;
 
             // v0.4.1 extras (skipped in the SafeMode meeting branch above: one message only there)
             if (role == CustomRole.Lovers)
@@ -699,6 +717,19 @@ namespace PocketRoles.Chat
                 if (!string.IsNullOrEmpty(spelled)) result += "\n" + Lang.TF("roleinfo.witch.spelled", "呪い中: {0}", "Cursed: {0}", spelled);
             }
             return result;
+        }
+
+        /// <summary>
+        /// One line (≤ 100 chars with any role name) for the roles whose own client holds the Impostor role
+        /// (<see cref="RoleInfo.ImpostorDesync"/>): the game says "Impostor", the real role is <paramref name="roleName"/>.
+        /// Plain (uncoloured) name: the message may already carry the coloured head and only one colour tag survives.
+        /// </summary>
+        internal static string DesyncNotice(string roleName)
+        {
+            return Lang.TF("roleinfo.desync",
+                "※本体の表示（イントロ・キルボタン）は「インポスター」ですが、あなたの本当の役職は{0}です。",
+                "Note: the game shows you as Impostor (intro, kill button), but your real role is {0}.",
+                roleName ?? "");
         }
 
         /// <summary>Compact result of the last game (packed lines), or null when nothing is recorded.</summary>

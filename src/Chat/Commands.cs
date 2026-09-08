@@ -12,7 +12,7 @@ namespace PocketRoles.Chat
 {
     /// <summary>
     /// Chat command grammar: "/cmd &lt;command&gt; …" or "/&lt;command&gt; …".
-    /// Everyone: h|help [host], n|now|me, r|role|roles [name], l|last, lang, time.
+    /// Everyone: h|help [host], n|now|me, r|role|roles [name], s|settings (the settings summary, ≤ 4 messages), l|last, lang, time.
     /// Host only: set &lt;role&gt; &lt;count&gt; [chance], opt &lt;key&gt; &lt;value&gt;, show, reset, reload, mod on|off,
     /// welcome &lt;text&gt;|show|reset|settings on|off, test on|off, assign &lt;name|id&gt; &lt;role&gt;|clear|show, end,
     /// rehost on|off, public on|off|now, start, cancel, autostart on|off|&lt;N&gt;, haison, endmeeting, results, region,
@@ -131,6 +131,10 @@ namespace PocketRoles.Chat
                         return true;
                     case "r": case "role": case "roles":
                         ReplyThrottled(sender, isHost, arg1 == null ? RoleListText() : RoleDescText(JoinArgs(tokens, 1)));
+                        return true;
+                    case "s": case "settings": case "設定": case "设置":
+                        // The settings summary left the welcome (v0.4.1): everyone can read it here instead.
+                        ReplyThrottled(sender, isHost, ShowText(), SettingsMessages);
                         return true;
                     case "l": case "last":
                         ReplyThrottled(sender, isHost, Chat.SummaryText() ?? Lang.T("cmd.nolast", "まだ試合の記録がありません。", "No game recorded yet."));
@@ -289,6 +293,7 @@ namespace PocketRoles.Chat
                 case "h": case "help": case "?": case "ヘルプ":
                 case "n": case "now": case "me": case "役職":
                 case "r": case "role": case "roles":
+                case "s": case "settings": case "設定": case "设置":
                 case "l": case "last":
                 case "lang": case "language": case "言語":
                 case "time": case "timer": case "時間":
@@ -546,7 +551,7 @@ namespace PocketRoles.Chat
                 "「/cmd …」は登録済みの部屋ではホストにだけ届きます。「/n」のように書くと全員に見えます。",
                 "\"/cmd ...\" reaches only the host in a registered lobby; a plain \"/n\" is visible to everyone."));
             sb.Append('\n');
-            sb.Append(Lang.T("help.time", "/cmd time ロビーの残り時間", "/cmd time = lobby time left"));
+            sb.Append(Lang.T("help.time", "/cmd time ロビーの残り時間, /cmd s この部屋の設定", "/cmd time = lobby time left, /cmd s = current settings", "/cmd time 房间剩余时间，/cmd s 本房间的设置"));
             sb.Append('\n');
             sb.Append(Lang.TF("help.lang", "言語: {0}（/lang ja|zh|en で変更）", "Language: {0} (/lang ja|zh|en to change)", Lang.DisplayName(Lang.Current)));
             // v0.4b §K: the translation note shares the /lang line (EN needs 5 messages with it, see HelpMessages).
@@ -570,13 +575,19 @@ namespace PocketRoles.Chat
             else if (!Lang.IsEn)
             {
                 sb.Append('\n');
-                sb.Append("EN: h=help, n=my role, r [role]=role info, l=last game, lang en=English.");
+                sb.Append("EN: h=help, n=my role, r [role]=role info, s=settings, l=last game, lang en=English.");
             }
             return sb.ToString();
         }
 
         /// <summary>Messages allowed for the host help page (8 lines ≤ 100 chars; host screen or a remote admin).</summary>
         private const int HostHelpMessages = 8;
+
+        /// <summary>
+        /// Messages allowed for the settings summary a player asks for with /cmd s (one short line per enabled role
+        /// plus the general line pack into 2–3 messages; 4 leaves room for the lobby / host lines).
+        /// </summary>
+        private const int SettingsMessages = 4;
 
         /// <summary>"/h host": the host-only command page (8 lines ≤ 100 chars → 8 messages).</summary>
         private static string HostHelpText()

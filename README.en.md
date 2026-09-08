@@ -163,7 +163,7 @@ Only the host's Among Us is modified. Vanilla clients simply display whatever th
 - **Combined translation by default** (`BroadcastToAll = true` + `TranslateForPlayers = true`): foreign-language chat is translated into the host's language for everyone; the host's words reach players who chose another language privately in that language; nobody gets the same line twice. Translation itself (`Enabled`) is on by default too (chat text is sent to Google, or to DeepL when you put a key into `BepInEx\PocketRoles\deepl-key.txt`); turn it off with "Chat translation" in the settings tab or `/opt translate off`.
 - **High-ping re-creation asks first**: when the ping is high right after the lobby is created, the host sees "Ping is high (N ms). Re-create the lobby?" (Yes / No, or `/rehost yes|no`). Off by default (`MaxHostPing = 0`), because repeated re-creations add ban points ([3.4](#34-bans-and-kicks)).
 - **Settings tab**: the page buttons read Roles / Lobby / Chat / Looks / Host in one row. The three vanilla buttons start folded under "▶ Vanilla settings (game · presets · roles)" and unfold to "▼ Vanilla settings". A button row above the Host page: Start now / Cancel / Haison / End meeting / Test mode / Show settings.
-- **Role delivery fixed**: the black screen without an intro when starting with two or more players is gone (the vanilla role broadcast passes untouched and every client's view is overwritten right after, in one batch). Sheriff and Jackal still see the "Impostor" intro.
+- **Role delivery fixed**: the black screen without an intro when starting with two or more players is gone (the vanilla role broadcast passes untouched and every client's view is overwritten right after, in one batch). Sheriff and Jackal still see the "Impostor" intro (since v0.4.1 their role notice adds the line "Note: the game shows you as Impostor (intro, kill button), but your real role is …").
 - **Test mode**: the start button reads "Start" immediately after `/test on`, and the vanilla "4 players can play, but …" popup is confirmed automatically.
 - **Language files**: keys added by an update are appended to `lang\*.json` at start-up (your edited lines are kept).
 - **Logging**: quiet by default. `/diag on` enables the detailed start trace, `/diag` prints a state snapshot.
@@ -184,7 +184,7 @@ Only the host's Among Us is modified. Vanilla clients simply display whatever th
 | Launcher (installer for friends) | Extract `PocketRoles-Setup-<ver>.zip`, double-click "PocketRoles Launcher.cmd", press "Install": the Steam copy, BepInEx and PocketRoles are set up automatically. "Check for updates" fetches a new release from GitHub, "Launch" starts the modded game, "Create report zip" prepares a bug report. Japanese / Chinese / English | [5](#5-installation-steam), [6](#6-launcher-and-updates) |
 | Title-screen panel | The PocketRoles icon, version, author, GitHub line and description in the right-hand window of the main menu (the small credit line at the bottom right remains as the fallback) | [9](#9-pocketroles-settings-panel-in-the-gear-menu) |
 | Chat translation | Foreign-language chat is translated on the host's screen; optionally broadcast to everyone or delivered privately to players who chose a foreign language. Google (no key) or DeepL (put the key into `BepInEx\PocketRoles\deepl-key.txt`) | [13](#13-languages-japanese--chinese--english) |
-| Language auto-detect / trilingual hint | A player who never used `/lang` and writes in Chinese or English gets that display language automatically and is told so. The welcome carries one line "English: /cmd lang en ｜ 中文: … ｜ 日本語: …"; `WelcomeAllLanguages` sends the whole welcome in three languages | [13](#13-languages-japanese--chinese--english), [14](#14-welcome-message-and-rules-line) |
+| Language auto-detect / trilingual hint | A player who never used `/lang` and writes in Chinese or English gets that display language automatically and is told so. The short welcome (2 lines) arrives by default in the player's language and then in the two others (`WelcomeAllLanguages`; off = one language plus the line "English: /cmd lang en ｜ 中文: … ｜ 日本語: …") | [13](#13-languages-japanese--chinese--english), [14](#14-welcome-message-and-rules-line) |
 | Settings-tab polish | The PocketRoles button sits at the top of the left column; the three vanilla buttons are collapsed under one "Vanilla settings" button. Inside the tab a row of page buttons: Roles / Lobby / Chat / Looks / Host tools. "?" buttons next to role headers and option rows show help in the left info box | [8](#8-settings-tab-lobby-settings-screen) |
 | Permissions (co-hosting) | `BepInEx\PocketRoles\Admin.txt` / `Moderator.txt` / `VIP.txt` / `Banlist.txt` (one player per line, friend code or Puid). `/admin` `/mod` `/vip` add / remove / list, `/kick`, `/ban`. Admins use the settings commands, moderators kick / ban, VIPs get a ★ and a personal greeting | [11](#11-commands) |
 | Extended vanilla ranges | Kill cooldown 0–120 s (arrows step by 2.5 s by default; 0.5-s values via `/vset` or by lowering `[Vanilla] KillCooldownStep`), voting 0–600 s, discussion 0–600 s, emergency cooldown 0–120 s, task counts 0–30 … from the settings screen arrows and `/vset`. Player speed and vision via `/vset` too. Vanilla players receive the same numbers | [8](#8-settings-tab-lobby-settings-screen), [11](#11-commands) |
@@ -422,7 +422,7 @@ If the mod loads but the game version differs from the supported one, the [versi
 1. Start with the launcher's "Launch" ("Launch with mod" in developer mode; or `Among Us.exe` from the modded copy) while Steam runs.
 2. **Online → Create game** (game mode **Classic**, registration on as usual). Pick the region as you always do.
 3. Open the laptop (settings) in the lobby and press the **"PocketRoles"** button on the left to set role counts etc. ([chapter 8](#8-settings-tab-lobby-settings-screen)). Chat works too: `/set sheriff 1`, `/opt sheriff.cooldown 25`; both save to the config immediately. Defaults: Sheriff 1, Jester 1, Madmate 1.
-4. Get players in. Share the **room code** shown at the bottom of the lobby screen on your Discord server, in a group chat, or with friends directly (`/announce` copies it so you can paste it; `/code on` also shows it big at the top-left). If you have no community and want random players, copy it into the **guide room** on a spare phone ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). A few seconds after joining, each player receives a private chat notice that this is a modded lobby, which roles are enabled, the rules and how to switch their language ([chapter 14](#14-welcome-message-and-rules-line)).
+4. Get players in. Share the **room code** shown at the bottom of the lobby screen on your Discord server, in a group chat, or with friends directly (`/announce` copies it so you can paste it; `/code on` also shows it big at the top-left). If you have no community and want random players, copy it into the **guide room** on a spare phone ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). A few seconds after joining, each player receives a short private chat notice in three languages: this is a role-mod lobby (nothing to install, the role appears above your own name) and how to read a role description (`/cmd r <role>`) ([chapter 14](#14-welcome-message-and-rules-line)).
 5. **Chat translation** on the Chat page of the settings tab is on by default (foreign-language chat is translated into your language for everyone and your words reach foreign players in theirs; chat text is sent to Google / DeepL, so turn it off with `/opt translate off` if you do not want that — [chapter 13](#13-languages-japanese--chinese--english)).
 6. While waiting, the top-left corner shows `Lobby mm:ss left`. Press Start when everyone is in, or let auto start do it (`/autostart <n>`). When the lobby time runs low the mod extends the lobby or runs haison automatically, so the lobby never closes on you ([chapter 16](#16-lobby-time-left-auto-start-and-haison)).
 7. Start. A few seconds later each player gets their role name and description in chat, and the role name appears above their own name (small, next to the name in meetings). Players with a regular role only get "this game has extra roles".
@@ -588,7 +588,7 @@ Typed in chat as `/cmd <command> …` or `/<command> …`. Settings can also be 
 - **In a registered lobby `/cmd …` reaches only the host** (use it to ask for your role).
 - Written without `/cmd` (e.g. `/n`) the text is ordinary chat that **everyone sees** (the reply still goes to the sender only). An unknown `/…` from a player without `/cmd` stays ordinary chat.
 - The host's own commands are never sent in either form; the reply appears only on the host's screen.
-- Players may use one command every 2 seconds. A reply is at most 3 messages (a welcome preview 4–5) and arrives **in that player's language**.
+- Players may use one command every 2 seconds. A reply is at most 3 messages (the `/cmd s` settings summary 4, a welcome preview 4–5) and arrives **in that player's language**.
 - Players listed in `Admin.txt` (admins) may use some of the host-only commands, players in `Moderator.txt` (moderators) may `/kick` and `/ban` (v0.4b, see "Permissions" below). Anyone else gets "Host only." for a host command.
 
 ### Command gating (v0.4)
@@ -606,6 +606,7 @@ Typed in chat as `/cmd <command> …` or `/<command> …`. Settings can also be 
 | `n`, `now`, `me`, `役職` | Your role and its description (during a game) |
 | `r`, `role`, `roles` | Role list by team and the roles enabled in this lobby |
 | `r <role>` | Description and current settings of that role |
+| `s`, `settings`, `設定` | The lobby's role settings (same as the host's `/show`; since v0.4.1 they are not part of the welcome any more, so this is where players look; at most 4 messages) |
 | `guess <name> <role>`, `g` | Assassin only (during the voting phase of a meeting). Always type `/cmd guess …` (`/guess` is visible to everyone). Besides a role name, `crew` / `impostor` are accepted. Correct: the target dies on the spot; wrong: you die. Limit per meeting: `assassin.guesses` (default 1) |
 | `l`, `last` | Result of the last game (roles and winners) |
 | `lang`, `language`, `言語` | Show your language |
@@ -629,7 +630,7 @@ Typed in chat as `/cmd <command> …` or `/<command> …`. Settings can also be 
 | `welcome <text>` | Set the welcome text (max 320 characters; `\n` = line break; placeholders `{rules}` `{roles}` `{settings}` `{help}` `{version}`) |
 | `welcome show` | Preview the welcome on the host's screen |
 | `welcome reset` | Back to the built-in welcome |
-| `welcome settings on|off` | Append the current settings to the welcome or not |
+| `welcome settings on|off` | Append the current settings to the welcome or not (default off; players read them with `/cmd s`) |
 | `rules` / `rules show` | State of the welcome rules line |
 | `rules <text>` | Set the rules line (max 200 characters, `\n` = line break; `RulesMode` becomes `custom`) |
 | `rules none` | Back to the built-in "no special rules" line |
@@ -720,12 +721,12 @@ A way to run the lobby together with friends, managed through four text files in
 | `welcome` | on / off | `[Chat] WelcomeMessage` |
 | `roleinfo` | on / off | `[Chat] RoleInfoAtMeeting` |
 | `chat.welcometext` | text | `[Chat] WelcomeText` (same as `/welcome <text>`) |
-| `chat.welcomesettings` | on / off | `[Chat] WelcomeIncludeSettings` |
+| `chat.welcomesettings` | on / off | `[Chat] WelcomeIncludeSettings` (default off; `/cmd s` shows the settings) |
 | `chat.rulesmode` | none / custom | `[Chat] RulesMode` |
 | `chat.rulestext` | text | `[Chat] RulesText` (`/rules <text>` sets this and `rulesmode custom` together) |
 | `chat.playercommands` | on / off | `[Chat] PlayerCommands` |
 | `chat.allcommands` | on / off | `[Chat] AllCommands` |
-| `chat.welcomeall` | on / off | `[Chat] WelcomeAllLanguages` (send the welcome in ja / zh / en) |
+| `chat.welcomeall` | on / off | `[Chat] WelcomeAllLanguages` (send the welcome in the player's language, then the two others; default on) |
 | `translate.enabled` (`translate`, `tr`) | on / off | `[Translate] Enabled` (chat translation) |
 | `translate.provider` | auto / google / deepl | `[Translate] Provider` |
 | `translate.target` | ja / zh / en | `[Translate] TargetLang` (the language the host reads) |
@@ -794,12 +795,12 @@ GameMaster = false              # Game Master: the host gets no role, dies right
 WelcomeMessage = true           # send the modded-lobby notice to joining players
 RoleInfoAtMeeting = true        # re-send the role description at every meeting
 WelcomeText =                   # custom welcome text (empty = built-in). \n = line break; {rules} {roles} {settings} {help} {version}
-WelcomeIncludeSettings = true   # append the current role settings to the welcome
+WelcomeIncludeSettings = false  # append the current role settings to the welcome (off by default; /cmd s shows them any time)
 PlayerCommands = true           # allow players' chat commands (false = ignored with one notice)
 AllCommands = true              # allow chat commands at all (false = the host can only use /mod)
 RulesMode = none                # welcome rules line: none (built-in "no special rules") | custom (RulesText)
 RulesText =                     # the custom rules text (\n = line break; /rules <text>)
-WelcomeAllLanguages = false     # send the welcome in Japanese, Chinese and English (false = lobby language plus one trilingual /lang line)
+WelcomeAllLanguages = true      # send the short welcome (2 lines) in the player's language, then the two others (false = the player's language plus one trilingual /lang line)
 
 [Translate]                     # chat translation (v0.4b). Chat text is sent to Google / DeepL. The DeepL key is never stored here
 Enabled = true                  # translate foreign-language chat (on by default; text is sent to Google / DeepL. "Chat translation" in the settings tab or /opt translate off turns it off)
@@ -965,14 +966,14 @@ Everything PocketRoles sends to players (welcome, role names and descriptions, c
 
 ### Per-player language
 
-Players use `/cmd lang en` (private in a registered lobby) or `/lang en` to change **the messages sent to them**. The welcome contains the hint `/lang en|zh|ja changes your language` plus one trilingual line `English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja` (v0.4b), so people who cannot read the lobby language can switch at once.
+Players use `/cmd lang en` (private in a registered lobby) or `/lang en` to change **the messages sent to them**. The welcome arrives in three languages by default (the player's language first, then the two others); with one language only (`WelcomeAllLanguages = false`) it carries the trilingual line `English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja` (v0.4b) instead, so people who cannot read the lobby language can switch at once.
 
 - Covers the welcome, role notices (start and meetings), command replies, kill / vent / sabotage notices, the notices about auto start / extension / haison / meeting end, test-mode notices, the result summary, delivered translations — everything sent to that player (broadcasts are built per recipient in their language).
 - Remembered by friend code / Puid **until the host closes the game** (within one run it survives a recreated lobby and a rejoin; only choices of players whose friend code and Puid were unknown are dropped per lobby). `/lang reset` restores the default.
 - Accepted names: `en` / `english` / `英語`, `zh` / `zh-CN` / `cn` / `中文` / `简体中文` / `中国語`, `ja` / `jp` / `日本語` …
-- The Japanese and Chinese help pages carry a short English line (`EN: …`); the welcome only when the settings lines are not appended.
+- The Japanese and Chinese help pages carry a short English line (`EN: …`).
 - **Language auto-detect** (v0.4b, `[Translate] AutoDetectLang = true`, "Auto-detect language" in the settings tab): when a player who never used `/lang` writes a chat line of 6+ characters in Chinese or English (as detected by the translation provider), their display language is switched to it **once, automatically**, with a private notice in that language ("Display language switched to English. Type /cmd lang ja to switch back."). The host and players who already chose with `/lang` are left alone. Nothing is detected while chat translation is off.
-- **Welcome in all languages** (`[Chat] WelcomeAllLanguages = true`, "Welcome in all languages" in the settings tab, `/opt chat.welcomeall on`): the whole welcome is sent three times — the player's language first, then the other two (up to three times the messages, delivered in order). The trilingual line and the `EN:` line are left out in that case.
+- **Welcome in all languages** (`[Chat] WelcomeAllLanguages = true`, "Welcome in all languages" in the settings tab, `/opt chat.welcomeall on`; on by default since v0.4.1): the short welcome (2 lines) is sent in the player's language first, then in the other two (2 lines × 3 languages = 6 messages + 1 translation note, delivered in order). The trilingual line is left out in that case. Off = the two lines in the player's language plus the trilingual line.
 
 ### Text files (editable)
 
@@ -982,7 +983,7 @@ Texts are read from `ja.json` / `zh-CN.json` / `en.json` in `BepInEx\PocketRoles
 {
   "role.sheriff.name": "Sheriff",
   "role.sheriff.desc": "You have a kill button to shoot Impostors and the Jackal. …",
-  "welcome.1": "This lobby uses the host-side mod \"PocketRoles\": the game has extra roles.",
+  "welcome.1": "Role-mod lobby. Nothing to install. Your role appears above your own name when the game starts.",
   "haison.notice": "To keep this lobby from expiring, a game starts and ends right away. …",
   "cmd.lang.set": "Language set to {0}."
 }
@@ -1041,28 +1042,24 @@ Translates chat written in a foreign language. **On by default**, in the **combi
 
 ## 14. Welcome message and rules line
 
-Three seconds after joining, a player receives the welcome privately (`WelcomeMessage = true`; several players joining together are served one after another). At most 4 messages of 100 characters (5 when the settings are appended; +1 each for the translation note and the trilingual line, +1 for the VIP line).
+Three seconds after joining, a player receives the welcome privately (`WelcomeMessage = true`; several players joining together are served one after another). Since v0.4.1 the welcome is a **short two-liner** for first-time players and, by default, arrives in the player's language first and then in the two other languages (`WelcomeAllLanguages = true`). Each message holds at most 100 characters; per language at most 4 messages (5 when the settings are appended; +1 each for the translation note and the trilingual line, +1 for the VIP line).
 
-**Built-in welcome** (lobby language English, default settings):
+**Built-in welcome** (default settings, for an English-speaking player; the same two lines follow in Japanese and Chinese):
 
 ```
-This lobby uses the host-side mod "PocketRoles": the game has extra roles.
-Type /cmd h for help (only the host sees it). /lang en|zh|ja changes your language.
-Enabled roles: Sheriff, Madmate, Jester
-No special rules here. Please be respectful and have fun.
+Role-mod lobby. Nothing to install. Your role appears above your own name when the game starts.
+Role help: in meeting chat type /cmd r <role> (e.g. /cmd r sheriff). All roles: /cmd r, help: /cmd h
+(the two lines in Japanese)
+(the two lines in Chinese)
 Auto-translation is on: write in your own language / 翻訳あり / 自动翻译已开启
-English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja
-Sheriff x1 KCD 30s, can kill Madmate
-Madmate x1
-Jester x1
-lang=en registration=on welcome=on
 ```
 
-- Line 4 is the **rules line** (v0.4). The default says "no special rules"; `/rules <text>` replaces it with your own rules.
-- Line 5 is the **translation note** (only while chat translation is on; [chapter 13](#13-languages-japanese--chinese--english)) and line 6 the **trilingual language hint** (only while players may use commands; `/lang en` form in an unregistered lobby) (v0.4b).
-- The settings lines (second half) can be dropped with `WelcomeIncludeSettings` (`/welcome settings on|off`, "Welcome includes settings" in the settings tab). Lines for auto re-host / auto public and auto start / Game Master are added when those are on. Without the settings lines a short `EN: …` hint is added instead (for Japanese / Chinese lobbies).
+- Line 1 says what the lobby is (nothing to install, the role appears above your own name), line 2 how to read a role description. Both are at most 100 characters, so each is one message.
+- The **rules line** is only added (as line 3) when you set your own rules with `/rules <text>` (v0.4.1; the built-in "no special rules" line is no longer part of the welcome).
+- The last line is the **translation note** (only while chat translation is on; [chapter 13](#13-languages-japanese--chinese--english)). It is sent once even in the three-language welcome.
+- The enabled-roles list and the settings dump (`Sheriff x1 KCD 30s, can kill Madmate / … / lang=en registration=on welcome=on`) are no longer part of the welcome (v0.4.1). Players read them with `/cmd s` (the lobby's settings) and `/cmd r` (role list). `WelcomeIncludeSettings = true` (`/welcome settings on`, "Welcome includes settings" in the settings tab; off by default) appends the settings lines as before (same as `/show`; the auto re-host / auto public and auto start / Game Master lines when those are on).
 - A player listed in `VIP.txt` gets "★ Welcome back, VIP ○○! Thanks for playing with us." at the end ([chapter 11](#11-commands)).
-- With `WelcomeAllLanguages = true` the welcome arrives three times — the player's language first, then the other two (without the hint lines and the `EN:` line).
+- With `WelcomeAllLanguages = false` only the two lines in the player's language are sent, plus the **trilingual language hint** `English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja` (only while players may use commands; `/lang en` form in an unregistered lobby) (v0.4b).
 - With player commands disabled (`PlayerCommands = false`) line 2 reads "Chat commands are disabled in this lobby (host setting)." and the trilingual line is left out.
 
 ### Rules line (`/rules`)
@@ -1073,15 +1070,15 @@ lang=en registration=on welcome=on
 | `/rules <text>` | Set the rules (max 200 characters, `\n` = line break). Saved as `[Chat] RulesMode = custom` and `RulesText` |
 | `/rules none` | Back to the built-in line (`RulesMode = none`) |
 
-Example: `/rules Beginners welcome!\nNo insults, no spoilers.` → becomes line 4 of the welcome (`/welcome show` previews it). The built-in line is translated per player; your own text is sent as typed.
+Example: `/rules Beginners welcome!\nNo insults, no spoilers.` → becomes line 3 of the welcome (`/welcome show` previews it). The built-in line is translated per player; your own text is sent as typed.
 
 ### Your own welcome (`/welcome`)
 
-`/welcome <text>` replaces the body (max 320 characters). The first line ("This lobby uses the host-side mod "PocketRoles" …") is the mod-policy notice and **is always prepended; it cannot be removed**.
+`/welcome <text>` replaces the body (everything after line 1; max 320 characters). The first line ("Role-mod lobby. Nothing to install. …") is the modded-lobby notice (mod policy) and **is always prepended; it cannot be removed**.
 
 - `\n` (backslash + n, two characters) = line break.
 - Placeholders: `{rules}` = rules line, `{roles}` = enabled roles, `{settings}` = current settings (same as `/show`), `{help}` = the help / language hint line, `{version}` = mod version.
-- The settings are appended even without `{settings}` while "Welcome includes settings" is on. A custom rules line (`/rules`) is appended even without `{rules}`; the built-in "no special rules" line only appears where you put `{rules}`.
+- The settings are appended even without `{settings}` while "Welcome includes settings" is on (off by default). A custom rules line (`/rules`) is appended even without `{rules}`; the built-in "no special rules" line only appears where you put `{rules}`.
 
 Example:
 
@@ -1349,7 +1346,7 @@ Before a real session you can check what vanilla players see with **a PC (host) 
 
    Forced roles ignore the normal pools: an Impostor-pool role (Vampire / Mafia / Witch / Assassin) on a crewmate makes that player start as an Impostor (Lovers keep their vanilla side: forced on an Impostor they become the Impostor lover). A forced role is consumed by one game (force it again for the next).
 5. Start (Start button or `/start`; on "waiting for sync" press again a few seconds later; the vanilla "4 players can play, but …" popup is confirmed automatically in test mode). Try the **Cancel button / F9 / `/cancel`** during the countdown and watch "Game starting in …" disappear on the phone.
-6. Check on the phone: the intro (a Sheriff sees "Impostor"), the role name above the name, the chat about 8 seconds after the start, the kill button (a Sheriff misfire …), the reply to `/cmd n`, the names in the meeting, the role description at the meeting, refused vents / sabotage.
+6. Check on the phone: the intro (a Sheriff sees "Impostor"), the role name above the name, the chat about 8 seconds after the start (a Sheriff gets the "Note: the game shows you as Impostor …, but your real role is Sheriff." line), the kill button (a Sheriff misfire …), the reply to `/cmd n`, the names in the meeting, the role description at the meeting, refused vents / sabotage.
 7. Call a meeting and press **F8 ×2** (or `/endmeeting`): the vote ends on the phone too and the results appear; `/results` shortens the results screen.
 8. `/end` ends the game. Check the end screen (Victory / Defeat only on the phone) and the summary back in the lobby.
 9. Repeat with other roles or `/test off`.
@@ -1366,7 +1363,7 @@ Trying the v0.4b features (PC + phone, about 10 minutes):
 
 1. **Title-screen panel**: the PC's main menu shows the PocketRoles panel on the right (icon, `v0.4.1 / Among Us 2026.8.18`, GitHub line); clicking the GitHub line opens the browser. It hides while the online menu is open and returns afterwards.
 2. **Settings tab**: in the lobby laptop "PocketRoles" is the top button and "Vanilla settings" expands the three vanilla buttons. Switch the Roles / Lobby / Chat / Looks / Host tools pages; hovering a "?" writes help into the left info box.
-3. **Welcome**: the phone's welcome contains the "Auto-translation is on …" line and the "English: /cmd lang en ｜ 中文: … ｜ 日本語: …" line.
+3. **Welcome**: the phone's welcome arrives as 2 lines × 3 languages (the player's language first, then the two others) with the "Auto-translation is on …" line once at the end, and without the settings dump (`/cmd s` shows it).
 4. **Translation**: from the phone write something **in English** such as `Hello, can I be sheriff?` (with a Japanese or Chinese lobby language) → the PC shows `[訳] <name>: …` / `[译] …` with the translation. The phone receives "Display language switched to English. Type /cmd lang ja to switch back." and mod messages to the phone are in English from then on (auto-detect). Then write in the lobby language on the PC → the phone receives `[Tr] <host name>: …` in English (translate for players). `/cmd lang ja` switches back.
 5. **VIP**: `/vip add <phone name>` on the PC → a new line in `BepInEx\PocketRoles\VIP.txt`. Leave and rejoin with the phone: the welcome gains "★ Welcome back, VIP …", and once a game starts the phone's name carries a ★ (everyone sees it).
 6. **Admin**: `/admin add <phone name>` on the PC → `/cmd h` on the phone ends with "Your level: admin", and `/cmd set sheriff 2` or `/cmd show` work (the PC chat echoes the change). `/cmd test on` answers "Host only.". `/admin remove <name>` undoes it.
@@ -1523,7 +1520,7 @@ Names are sent per client by the host. Right after a death / leave or after the 
 
 - Mod messages arrive as **chat bubbles of the host's character** whose sender name is "PocketRoles" for that moment (vanilla cannot fake a sender, so the host's name is changed briefly). The host sees `[PocketRoles] …`.
 - ≤ 100 characters, full-width digits (０１２…), one colour per message (to pass the official chat validation). Long texts are split and arrive 0.55 s apart; broadcasts are delivered player by player (each in their language).
-- When: 3 s after joining (welcome), about 8 s after the start (role name and description; regular roles get "You are a regular Crewmate / Impostor. This game has extra roles."), 1 s after a meeting starts (reminder), command replies, kill / vent / sabotage notices, the lobby timer / auto start / extension / haison / meeting-end / Game Master notices.
+- When: 3 s after joining (welcome), about 8 s after the start (role name and description; regular roles get "You are a regular Crewmate / Impostor. This game has extra roles."; Sheriff, Jackal and Arsonist get the line "Note: the game shows you as Impostor (intro, kill button), but your real role is …" between the name and the description, v0.4.1), 1 s after a meeting starts (reminder, with the same line), command replies, kill / vent / sabotage notices, the lobby timer / auto start / extension / haison / meeting-end / Game Master notices.
 - While the host is dead it is treated as alive for about 1 s per send (living players cannot see ghost chat); the name tags are re-sent afterwards.
 - `/cmd …` from a player reaches only the host in a registered lobby; `/n` is visible to everyone.
 - Each player picks their language with `/lang`. Someone who writes in Chinese or English gets, once, "Display language switched to …" in that language (auto-detect).
