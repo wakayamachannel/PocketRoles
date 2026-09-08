@@ -494,7 +494,7 @@ namespace PocketRoles.Game
             try
             {
                 if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
-                if (AmongUsClient.Instance.IsGameStarted && Core.Game.InProgress && !Core.Game.AssigningRoles) return; // in-game ghost roles: not part of the start trace
+                if (GameManager.Instance != null && GameManager.Instance.GameHasStarted) return; // in-game ghost roles: not part of the start trace
                 Diagnostics.LogVerbose($"PlayerControl.CoSetRole: #{__instance.PlayerId} role={role} canOverride={canOverride} roleAssigned={__instance.roleAssigned} assigning={Core.Game.AssigningRoles}");
             }
             catch (Exception e)
@@ -661,4 +661,110 @@ namespace PocketRoles.Game
             }
         }
     }
+
+    // ------------------------------------------------------------------ role-selection internals (2026-09-08: plain-crewmate start stall)
+
+    /// <summary>Every vanilla RpcSetRole call (before RoleAssignment's own prefix decides anything).</summary>
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.RpcSetRole))]
+    [HarmonyPriority(Priority.High)]
+    internal static class Diag_RpcSetRoleCallPatch
+    {
+        private static void Prefix(PlayerControl __instance, RoleTypes roleType, bool canOverrideRole)
+        {
+            try
+            {
+                if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                if (GameManager.Instance != null && GameManager.Instance.GameHasStarted) return;
+                Diagnostics.LogVerbose($"PlayerControl.RpcSetRole called: #{__instance.PlayerId} role={roleType} canOverride={canOverrideRole} roleAssigned={__instance.roleAssigned} assigning={Core.Game.AssigningRoles}");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Diag_RpcSetRoleCallPatch: {e}");
+            }
+        }
+    }
+
+    /// <summary>Local role table writes (RoleManager.SetRole) during the start.</summary>
+    [HarmonyPatch(typeof(RoleManager), nameof(RoleManager.SetRole))]
+    internal static class Diag_RoleManagerSetRolePatch
+    {
+        private static void Prefix(PlayerControl targetPlayer, RoleTypes roleType)
+        {
+            try
+            {
+                if (targetPlayer == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                if (GameManager.Instance != null && GameManager.Instance.GameHasStarted) return;
+                Diagnostics.LogVerbose($"RoleManager.SetRole: #{targetPlayer.PlayerId} role={roleType} roleAssigned={targetPlayer.roleAssigned} assigning={Core.Game.AssigningRoles}");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Diag_RoleManagerSetRolePatch: {e}");
+            }
+        }
+    }
+
+    /// <summary>Team passes of the vanilla role selection (candidate count, team, cap, default role).</summary>
+    [HarmonyPatch(typeof(LogicRoleSelectionNormal), nameof(LogicRoleSelectionNormal.AssignRolesForTeam))]
+    internal static class Diag_AssignRolesForTeamPatch
+    {
+        private static string Default(Il2CppSystem.Nullable<RoleTypes> d)
+        {
+            try { return d == null ? "null" : (d.HasValue ? d.Value.ToString() : "none"); }
+            catch (Exception) { return "?"; }
+        }
+
+        private static void Prefix(Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo> players, RoleTeamTypes team, int teamMax, Il2CppSystem.Nullable<RoleTypes> defaultRole)
+        {
+            try
+            {
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                Diagnostics.LogVerbose($"AssignRolesForTeam (pre): team={team} teamMax={teamMax} candidates={(players == null ? -1 : players.Count)} default={Default(defaultRole)}");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Diag_AssignRolesForTeamPatch prefix: {e}");
+            }
+        }
+
+        private static void Postfix(Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo> players, RoleTeamTypes team)
+        {
+            try
+            {
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                var sb = new StringBuilder();
+                foreach (var pc in PlayerControl.AllPlayerControls)
+                {
+                    if (pc == null || pc.Data == null) continue;
+                    sb.Append(" #").Append(pc.PlayerId).Append('=').Append(pc.Data.Role == null ? "null" : pc.Data.Role.Role.ToString()).Append(pc.roleAssigned ? "*" : "");
+                }
+                Diagnostics.LogVerbose($"AssignRolesForTeam (post): team={team} candidatesLeft={(players == null ? -1 : players.Count)} roles:{sb}");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Diag_AssignRolesForTeamPatch postfix: {e}");
+            }
+        }
+    }
+
+
+    /// <summary>Guaranteed / chance role lists handed to the vanilla selection.</summary>
+    [HarmonyPatch(typeof(LogicRoleSelectionNormal), nameof(LogicRoleSelectionNormal.AssignRolesFromList))]
+    internal static class Diag_AssignRolesFromListPatch
+    {
+        private static void Prefix(Il2CppSystem.Collections.Generic.List<NetworkedPlayerInfo> players, int teamMax, Il2CppSystem.Collections.Generic.List<RoleTypes> roleList, int rolesAssigned)
+        {
+            try
+            {
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                var sb = new StringBuilder();
+                if (roleList != null) foreach (var r in roleList) sb.Append(' ').Append(r);
+                Diagnostics.LogVerbose($"AssignRolesFromList: candidates={(players == null ? -1 : players.Count)} teamMax={teamMax} rolesAssigned={rolesAssigned} list:{sb}");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Diag_AssignRolesFromListPatch: {e}");
+            }
+        }
+    }
+
 }

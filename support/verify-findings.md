@@ -71,3 +71,11 @@ OK だったもの: 起動（ランチャー・ウィンドウモード）、ロ
 | 31 | guide モジュール（未検証）: コード大表示の位置（LeftTop, DistanceFromEdge (0.55, 1.45)）が本体のコード表示と重ならないか、/announce のクリップボード（ClipboardHelper）が動くか、/move の 30 秒後作り直し（AutoRecreateRegistered=on）で全員退出→新コード案内になるか。短時間に何度も作り直すと ban points（#18） | ロビーで /code, /announce, /move |
 | 32 | polish モジュール（未検証）: 折りたたみ表記のはみ出し、展開時の 3 ボタンが左の説明欄と重ならないか、ホストページ 6 ボタン（英語表記の幅）、歯車メニューの案内部屋ヒントの位置 | 設定画面を開く |
 | 29 | 軽微 | 設定画面「▼ バニラ設定」展開時、3 つ目の「ロールの設定」ボタンがパネル下端で切れる（縦の余白不足） | 展開時はボタン高さを詰めるか、折りたたみバーを 1 段上げる |
+| 33 | 修正済み | メインメニューの「BY もみじちゃ」が文字化け（ゲームフォルダの cfg の値だけが CP932 二重変換で壊れていた。配布物は無関係） | cfg を修正。cfg/JSON/.cs は PowerShell 5.1 の Get-Content/Set-Content で触らない |
+| 34 | 修正済み | メニュー右窓の説明文「MOD」「OK」が枠からはみ出す（代替フォントの幅を測れない） | 文言を変更して英単語を外した |
+| 35 | 仕様変更 | 部屋コードの大表示は不要（ユーザー判断） | [Guide] ShowCodeOverlay 既定オフ、/code on で表示 |
+| 36 | 修正中 | 最終監査で確認された 19 件（Dleks 作成画面、翻訳 TargetLang、ランチャーの展開済み zip・vdf の文字コード・コピー修復・OneDrive、全角数字、キルクール 0 秒、テストモードの SoloWinner、AntiCheat の帰属、100 文字超え、cos.enabled オフ時のリセット、ReportFetcher の設定パス、README の KillCooldownStep と F7 文言、LICENSE 全文） | 4 系統で並列修正 → ビルド → 録画兼再検証 |
+| 37 | 保留 | DeepL 失敗時の再試行と Google 代替の表示（監査 #8）、/cos reload のカーソル再読込（#10） | v0.4.1 |
+| 38 | 未検証 | 最終 DLL の 2 人以上での役職配布（MultiBatch, urgent）は実機ログの証拠がない（監査 #4） | スマホで 2 人テスト（登録部屋、/test on、開始 → イントロで役職表示、ログに "role views sent at once"） |
+| 39 | 修正済み | **重大**: 本体 2026.8.18（オプション V11）の SelectRoles は特殊役職しか配らず、素のクルー／インポスターには RpcSetRole を送らない（クルーの割り当てパスが default=none）。そのためホストが素のクルーになると roleAssigned が立たず、CoSetRole から起動されるイントロが来ない（真っ暗、裏では試合進行）。これまでの検証は本体設定でジャッジ等が必ず出ていたため未発見 | SelectRoles の postfix で、roleAssigned が false のプレイヤー全員に MOD から RpcSetRole(Crewmate/Impostor, canOverride=false) を送る（パススルー中なので本体の処理がそのまま走る）。ソロで イントロ → StartGame を確認。2 人テストで再確認する |
+| 40 | 仕様追加 | 本体の特殊役職（サイエンティスト・ジャッジ等）が MOD 役職と並行して出ていた（ユーザー指摘） | [Roles] VanillaRoles 既定オフ: SelectRoles の間だけ出現率を 0 にして復元。/opt roles.vanilla on で併用 |

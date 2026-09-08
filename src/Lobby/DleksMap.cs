@@ -29,6 +29,9 @@ namespace PocketRoles.Lobby
         /// <summary>Dleks is the chosen map (survives the lobby; the option itself stays MapId 0 until the start).</summary>
         public static bool Selected { get; private set; }
 
+        /// <summary>Dleks was picked on the create-game screen: the choice must survive the creation of our own lobby.</summary>
+        private static bool _createScreenChoice;
+
         private static bool Enabled => Options.EnableDleks;
 
         // ------------------------------------------------------------------ helpers
@@ -153,13 +156,23 @@ namespace PocketRoles.Lobby
                 }
             }
             if (!Enabled) Selected = false;
+            _createScreenChoice = false;
         }
 
-        /// <summary>New lobby joined / created: forget the selection unless the options still carry MapId 3.</summary>
+        /// <summary>
+        /// New lobby joined / created: forget the selection unless the options still carry MapId 3 or Dleks was just
+        /// picked on the create-game screen for the lobby we are creating.
+        /// </summary>
         internal static void OnGameJoined()
         {
             if (!Selected) return;
             if (CurrentMapId() == DleksIndex) return;
+            if (_createScreenChoice && AmHost())
+            {
+                _createScreenChoice = false;
+                PocketRolesPlugin.Logger.LogInfo("DleksMap: lobby created with Dleks picked");
+                return;
+            }
             Selected = false;
             PocketRolesPlugin.Logger.LogInfo("DleksMap: new lobby, Dleks deselected");
         }
@@ -167,6 +180,7 @@ namespace PocketRoles.Lobby
         /// <summary>Select / deselect Dleks from a picker.</summary>
         internal static void SetSelected(bool on)
         {
+            if (!on) _createScreenChoice = false;
             if (Selected == on) return;
             Selected = on;
             PocketRolesPlugin.Logger.LogInfo($"DleksMap: {(on ? "Dleks selected" : "Dleks deselected")}");
@@ -222,6 +236,7 @@ namespace PocketRoles.Lobby
                     dleksButton.Button.SelectButton(true);
                     picker.selectedMapId = DleksIndex;
                     SetSelected(true);
+                    _createScreenChoice = LobbyBehaviour.Instance == null; // picked outside the lobby = create-game screen
                     SetMapId(0, "picker: Dleks");
                     Flip(picker.MapImage, true);
                     Flip(picker.MapName, true);

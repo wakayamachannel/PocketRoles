@@ -290,15 +290,16 @@ namespace PocketRoles.Game
                     }
                 }
                 byte exiledId = Core.Game.LastExiled;
+                // A suppressed end (test mode) falls through to the resync below like any other exile.
                 if (Core.Game.SoloWinner == CustomRole.Jester && Core.Game.SoloWinnerId != 255)
                 {
                     WinConditions.EndGame(WinConditions.WinKind.Jester, Core.Game.SoloWinnerId);
-                    return;
+                    if (!Core.Game.InProgress) return;
                 }
                 if (exiledId != 255 && Core.Game.RoleOf(exiledId) == CustomRole.Terrorist && Core.Game.TasksDone(exiledId))
                 {
                     WinConditions.EndGame(WinConditions.WinKind.Terrorist, exiledId);
-                    return;
+                    if (!Core.Game.InProgress) return;
                 }
                 // Win checks are paused during the meeting / exile screen; decide now that the exiled player is dead,
                 // so clients whose own view says "game over" get the end screen instead of waiting on a black screen.

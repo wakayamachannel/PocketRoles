@@ -54,7 +54,17 @@ elseif ($env:POCKETROLES_GAMEDIR) { $script:Modded = $env:POCKETROLES_GAMEDIR }
 elseif ($script:DevMode) {
     $script:Modded = Join-Path (Split-Path -Parent $script:Src) 'Among Us PocketRoles'
     if (-not (Test-Path (Join-Path $script:Modded 'Among Us.exe'))) { $script:Modded = Join-Path $script:Desktop 'Among Us PocketRoles' }
-} else { $script:Modded = Join-Path $script:Desktop 'Among Us PocketRoles' }
+} else {
+    $script:Modded = Join-Path $script:Desktop 'Among Us PocketRoles'
+    # OneDrive folder backup redirects the Desktop into the cloud: keep the ~1 GB game copy out of it (shortcut / report zip stay on the Desktop).
+    # Only for the default path (no -GameDir / POCKETROLES_GAMEDIR / -DesktopDir) and only if nothing was installed there already.
+    if (-not $DesktopDir -and $env:OneDrive) {
+        $od = $env:OneDrive.TrimEnd('\') + '\'
+        if ($script:Desktop.StartsWith($od, [StringComparison]::OrdinalIgnoreCase) -and -not (Test-Path (Join-Path $script:Modded 'Among Us.exe'))) {
+            $script:Modded = Join-Path $env:LOCALAPPDATA 'PocketRoles\Among Us PocketRoles'
+        }
+    }
+}
 $script:SteamOverride = if ($SteamDir) { $SteamDir } elseif ($env:POCKETROLES_STEAMDIR) { $env:POCKETROLES_STEAMDIR } else { '' }
 $script:Cache    = if ($CacheDir) { $CacheDir } else { Join-Path $env:TEMP 'PocketRolesLauncher' }
 $script:Dotnet   = Join-Path $env:USERPROFILE '.dotnet\dotnet.exe'
@@ -141,6 +151,7 @@ $script:Strings = @{
     in_step3 = '[3/5] PocketRoles の最新版を取得...'
     in_mod_skip = 'PocketRoles {0} は導入済み — スキップ'
     in_mod_local = 'ランチャーと同じフォルダの zip を使います: {0}'
+    in_mod_localdir = 'ランチャーと同じフォルダに展開済みの PocketRoles を使います: {0}'
     in_mod_norelease = 'GitHub にまだリリースが公開されていません。公開されたら「更新を確認」を押してください。'
     in_mod_fail = 'PocketRoles を取得できませんでした。後で「更新を確認」を押すと続きから入れられます。'
     in_mod_done = 'PocketRoles {0} を配置しました'
@@ -260,6 +271,7 @@ $script:Strings = @{
     in_step3 = '[3/5] 获取最新的 PocketRoles...'
     in_mod_skip = 'PocketRoles {0} 已安装 — 跳过'
     in_mod_local = '使用启动器同目录下的 zip: {0}'
+    in_mod_localdir = '使用启动器同目录下已解压的 PocketRoles: {0}'
     in_mod_norelease = 'GitHub 上尚未发布版本。发布后请点击“检查更新”。'
     in_mod_fail = '无法获取 PocketRoles。稍后点击“检查更新”即可继续安装。'
     in_mod_done = '已安装 PocketRoles {0}'
@@ -379,6 +391,7 @@ $script:Strings = @{
     in_step3 = '[3/5] Fetching the latest PocketRoles...'
     in_mod_skip = 'PocketRoles {0} already installed — skipped'
     in_mod_local = 'Using the zip next to the launcher: {0}'
+    in_mod_localdir = 'Using the PocketRoles files extracted next to the launcher: {0}'
     in_mod_norelease = 'No release published on GitHub yet. Press "Check for updates" once it is out.'
     in_mod_fail = 'Could not fetch PocketRoles. Press "Check for updates" later to finish the install.'
     in_mod_done = 'PocketRoles {0} installed'
@@ -573,7 +586,8 @@ function Find-SteamAmongUs {
         $vdf = Join-Path $r 'steamapps\libraryfolders.vdf'
         if (Test-Path $vdf) {
             try {
-                foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) { $libs += ($m.Groups[1].Value -replace '\\\\', '\') }
+                # libraryfolders.vdf is BOM-less UTF-8; PS 5.1 Get-Content would decode it with the ANSI code page (non-ASCII library paths break)
+                foreach ($m in [regex]::Matches([IO.File]::ReadAllText($vdf, [Text.Encoding]::UTF8), '"path"\s+"([^"]+)"')) { $libs += ($m.Groups[1].Value -replace '\\\\', '\') }
             } catch { }
         }
     }
@@ -693,6 +707,8 @@ function Get-LatestRelease {
         if (-not $asset -or -not $r.version) { $r.error = 'asset'; return $r }
         $r.assetUrl = [string]$asset.browser_download_url
         $r.assetName = [string]$asset.name
+        # identifies this exact build (a re-published zip with the same version number still gets installed)
+        $r.assetKey = 'gh:' + [string]$asset.name + ':' + [string]$asset.size + ':' + [string]$asset.updated_at
         $r.ok = $true
     } catch [Net.WebException] {
         $resp = $_.Exception.Response
@@ -720,11 +736,40 @@ function Find-LocalModZip {
     return $best
 }
 
+# はじめに.txt の手順どおり PocketRoles-<ver>.zip を展開してある場合 (BepInEx\plugins\PocketRoles.dll がランチャーの隣にある)
+function Find-LocalModDll {
+    $dll = Join-Path $script:Here 'BepInEx\plugins\PocketRoles.dll'
+    if (-not (Test-Path $dll)) { return $null }
+    if ([IO.Path]::GetFullPath($dll) -eq [IO.Path]::GetFullPath($script:DllPath)) { return $null }   # launcher lives inside the modded copy
+    return $dll
+}
+
 function Install-ModZip([string]$zip) {
     if (-not (Test-ZipHas $zip 'BepInEx/plugins/PocketRoles.dll')) { Log (T 'in_zip_bad' $zip 'PocketRoles.dll'); return $false }
     Log (T 'in_extract' (Split-Path -Leaf $zip))
     $n = Expand-ZipOver $zip $script:Modded @('BepInEx\config\')
     Log (T 'in_extract_done' $n)
+    return (Finish-ModInstall)
+}
+
+# extracted mod folder next to the launcher → modded copy (same layout as the zip: plugins\PocketRoles.dll + PocketRoles\lang\*.json)
+function Install-ModDir([string]$dll) {
+    Log (T 'in_mod_localdir' $script:Here)
+    try {
+        Ensure-Dir (Join-Path $script:Modded 'BepInEx\plugins')
+        Copy-Item $dll $script:DllPath -Force -ErrorAction Stop
+        $langSrc = Join-Path $script:Here 'BepInEx\PocketRoles\lang'
+        if (Test-Path $langSrc) {
+            $langDst = Join-Path $script:Modded 'BepInEx\PocketRoles\lang'
+            Ensure-Dir $langDst
+            Copy-Item (Join-Path $langSrc '*.json') $langDst -Force -ErrorAction Stop
+        }
+    } catch { Log (T 'err' $_.Exception.Message); return $false }
+    return (Finish-ModInstall)
+}
+
+# common tail of a mod install: drop the old plugin, record the version
+function Finish-ModInstall {
     $old = Join-Path $script:Modded 'BepInEx\plugins\HostRoles.dll'
     if (Test-Path $old) { Remove-FileQuiet $old; Log 'HostRoles.dll (old plugin) removed' }
     $v = Get-DllVersionString $script:DllPath
@@ -744,11 +789,17 @@ function Install-ModRelease($rel) {
 function Copy-GameFiles([string]$src, [string]$dst) {
     Ensure-Dir $dst
     Log (T 'in_copying' $src $dst)
-    $rcArgs = @(('"' + $src + '"'), ('"' + $dst + '"'), '/E', '/XO', '/XD', 'BepInEx', 'dotnet', '/XF', 'winhttp.dll', 'doorstop_config.ini', 'steam_appid.txt', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:2', '/W:2')
+    # no /XO: a file left half-written by an interrupted copy has a NEWER timestamp than the source and would never be repaired
+    $rcArgs = @(('"' + $src + '"'), ('"' + $dst + '"'), '/E', '/XD', 'BepInEx', 'dotnet', '/XF', 'winhttp.dll', 'doorstop_config.ini', 'steam_appid.txt', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:2', '/W:2')
     $p = Start-Process -FilePath 'robocopy.exe' -ArgumentList $rcArgs -WindowStyle Hidden -PassThru
     [void](Wait-Proc $p)
     if ($p.ExitCode -ge 8) { Log (T 'in_copy_fail' $p.ExitCode); return $false }
+    # a killed robocopy also exits with a code < 8: verify with a list-only pass (bit 1 set = files still to copy) before recording completion
+    $chk = Start-Process -FilePath 'robocopy.exe' -ArgumentList ($rcArgs + '/L') -WindowStyle Hidden -PassThru
+    [void](Wait-Proc $chk)
+    if ($chk.ExitCode -ge 8 -or ($chk.ExitCode -band 1)) { Log (T 'in_copy_fail' ('incomplete ' + $chk.ExitCode)); return $false }
     Log (T 'in_copy_done' $p.ExitCode)
+    Update-State @{ copiedGameVersion = (Get-GameVersion $dst) }   # Step-CopyGame skips the copy only when this matches
     return $true
 }
 
@@ -782,7 +833,9 @@ function Step-CopyGame {
     Log (T 'in_steam_found' $script:Steam)
     $sv = Get-GameVersion $script:Steam
     $mv = Get-GameVersion $script:Modded
-    if ((Test-Path (Join-Path $script:Modded 'Among Us.exe')) -and $sv -and $mv -and ($sv -eq $mv)) { Log (T 'in_copy_skip' $mv); return $true }
+    # globalgamemanagers is written early in the copy, so also require the completion marker recorded by Copy-GameFiles (interrupted copy = re-run; robocopy only copies what differs)
+    $st = Load-State
+    if ((Test-Path (Join-Path $script:Modded 'Among Us.exe')) -and $sv -and $mv -and ($sv -eq $mv) -and $st -and ($st.copiedGameVersion -eq $mv)) { Log (T 'in_copy_skip' $mv); return $true }
     if (-not (Copy-GameFiles $script:Steam $script:Modded)) { return $false }
     if (-not (Test-Path (Join-Path $script:Modded 'Among Us.exe'))) { Log (T 'in_copy_fail' 'no exe'); return $false }
     return $true
@@ -826,20 +879,48 @@ function Step-BepInEx {
     return $true
 }
 
+# The installed build is current when its version is newer than the source, or equal AND it came from that very
+# source (launcher-state.json modSource). A zip re-published under the same version number is therefore installed.
+function Test-ModCurrent([System.Version]$installed, [System.Version]$available, [string]$sourceKey) {
+    if (-not $installed -or -not $available) { return $false }
+    if ($installed -gt $available) { return $true }
+    if ($installed -lt $available) { return $false }
+    $st = Load-State
+    return [bool]($st -and $sourceKey -and ($st.modSource -eq $sourceKey))
+}
+
+function Get-FileSourceKey([string]$prefix, [string]$path) {
+    try { $fi = Get-Item -LiteralPath $path; return $prefix + ':' + $fi.Name + ':' + [string]$fi.Length + ':' + $fi.LastWriteTimeUtc.ToString('yyyyMMddHHmmss') } catch { return $prefix + ':' + $path }
+}
+
 function Step-Mod {
     $installed = Normalize-Version (Get-DllVersionString $script:DllPath)
     $rel = Get-LatestRelease
     if ($rel.ok) {
-        if ($installed -and ($installed -ge $rel.version)) { Log (T 'in_mod_skip' $installed); return $true }
-        return (Install-ModRelease $rel)
+        if (Test-ModCurrent $installed $rel.version $rel.assetKey) { Log (T 'in_mod_skip' $installed); return $true }
+        $ok = Install-ModRelease $rel
+        if ($ok) { Update-State @{ modSource = $rel.assetKey } }
+        return $ok
     }
     Log-ReleaseError $rel
     $local = Find-LocalModZip
     if ($local) {
         $lv = Normalize-Version (Split-Path -Leaf $local)
-        if ($installed -and $lv -and ($installed -ge $lv)) { Log (T 'in_mod_skip' $installed); return $true }
+        $key = Get-FileSourceKey 'zip' $local
+        if (Test-ModCurrent $installed $lv $key) { Log (T 'in_mod_skip' $installed); return $true }
         Log (T 'in_mod_local' $local)
-        return (Install-ModZip $local)
+        $ok = Install-ModZip $local
+        if ($ok) { Update-State @{ modSource = $key } }
+        return $ok
+    }
+    $localDll = Find-LocalModDll
+    if ($localDll) {
+        $lv = Normalize-Version (Get-DllVersionString $localDll)
+        $key = Get-FileSourceKey 'dll' $localDll
+        if (Test-ModCurrent $installed $lv $key) { Log (T 'in_mod_skip' $installed); return $true }
+        $ok = Install-ModDir $localDll
+        if ($ok) { Update-State @{ modSource = $key } }
+        return $ok
     }
     if ($installed) { Log (T 'in_mod_skip' $installed); return $true }
     if ($rel.status -eq 404) { Log (T 'in_mod_norelease') } else { Log (T 'in_mod_fail') }
@@ -905,12 +986,12 @@ function Invoke-CheckUpdate {
     $inst = Normalize-Version $instText
     if (-not $instText) { $instText = (T 'v_none') }
     Log (T 'up_latest' $rel.version $instText)
-    if ($inst -and ($inst -ge $rel.version)) { Log (T 'up_uptodate' $instText); return $true }
+    if (Test-ModCurrent $inst $rel.version $rel.assetKey) { Log (T 'up_uptodate' $instText); return $true }
     $q = if ($script:DevMode) { T 'up_available_dev' $rel.version $instText } else { T 'up_available' $rel.version $instText }
     if (-not (Ask-YesNo $q)) { Log (T 'up_skipped'); return $false }
     if (Game-Running) { Log (T 'game_running'); return $false }
     $ok = Install-ModRelease $rel
-    if ($ok) { Log (T 'up_done' (Get-DllVersionString $script:DllPath)) }
+    if ($ok) { Update-State @{ modSource = $rel.assetKey }; Log (T 'up_done' (Get-DllVersionString $script:DllPath)) }
     Refresh-Status
     return $ok
 }

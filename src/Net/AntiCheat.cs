@@ -68,7 +68,26 @@ namespace PocketRoles.Net
             return true;
         }
 
-        /// <summary>Registers a forged RPC from the given client; returns true if the client was kicked.</summary>
+        /// <summary>One-shot host-chat notice per targeted player: a forged RPC addressed to them was dropped.</summary>
+        internal static void NotifyTargeted(int ownerClientId, string playerName, byte callId)
+        {
+            if (!Notified.Add(ownerClientId)) return;
+            try
+            {
+                Chat.Chat.Local(Chat.Chat.Title, Lang.TF("anticheat.forged.target",
+                    "{0} 宛ての不正な通信(RPC {1})を検出し、無視しました（送信元は特定できません）。",
+                    "Forged RPC {1} addressed to {0} was dropped (sender unknown).", playerName, callId));
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"AntiCheat notify: {e}");
+            }
+        }
+
+        /// <summary>
+        /// Registers a forged RPC from the given client; returns true if the client was kicked. Currently unused: no
+        /// inbound RPC identifies its sender, so nothing can attribute a strike to a client (see the HandleRpc patches).
+        /// </summary>
         internal static bool Strike(int clientId, string playerName, byte callId, string where)
         {
             Strikes.TryGetValue(clientId, out int n);
@@ -136,8 +155,12 @@ namespace PocketRoles.Net
                         PocketRolesPlugin.Logger.LogWarning($"AntiCheat: dropped forged RPC {callId} addressed to the host's own player (sender unknown)");
                     return false;
                 }
+                // A GameData RPC carries no sender id and a cheater can address one to ANY player's net object, so the
+                // owner of the targeted PlayerControl is the victim, not the sender: drop it, never strike / kick the owner.
                 string name = __instance.Data != null ? __instance.Data.PlayerName : ("#" + __instance.PlayerId);
-                AntiCheat.Strike(owner, name, callId, "PlayerControl");
+                if (AntiCheat.ShouldLogUnknownSender())
+                    PocketRolesPlugin.Logger.LogWarning($"AntiCheat: dropped forged PlayerControl RPC {callId} addressed to '{name}' (client {owner}, sender unknown)");
+                AntiCheat.NotifyTargeted(owner, name, callId);
                 return false;
             }
             catch (Exception e)

@@ -6,11 +6,11 @@
 
 - **玩家什么都不用装** — 模组只装在房主的一台 PC 上。其他人保持原版，像平时一样玩
 - **13 种职业，三种语言悄悄告知** — 警长、市长、告密者、豺狼、小丑……职业说明以 日本語 / 中文 / English 只发给本人，外语聊天自动翻译（并用模式）
-- **让房主轻松的工具** — 房间剩余时间常驻显示并自动延长、自动开始、废村（F7）、强制结束会议（F8）、取消开始（F9）、房间代码大字显示、给朋友用的安装器
+- **让房主轻松的工具** — 房间剩余时间常驻显示并自动延长、自动开始、废村（F7）、强制结束会议（F8）、取消开始（F9）、房间代码大字显示（`/code` 开启，默认关闭）、给朋友用的安装器
 
 | ![主菜单面板](docs/img/menu-panel.png) | ![房间剩余时间与房间代码](docs/img/lobby-timer.png) | ![设置标签页](docs/img/settings-tabs.png) |
 |---|---|---|
-| 标题画面的 PocketRoles 面板 | 房间剩余时间和大字的“职业房 ABCDEF” | 房间电脑里的设置标签页（职业 / 房间 / 聊天 / 外观 / 房主） |
+| 标题画面的 PocketRoles 面板 | 房间剩余时间显示 | 房间电脑里的设置标签页（职业 / 房间 / 聊天 / 外观 / 房主） |
 | ![聊天中的职业通知](docs/img/roles-chat.png) | ![聊天翻译](docs/img/translate.png) | |
 | 玩家收到的职业通知（只有本人可见） | 中文聊天被翻译成日文发给所有人 | |
 
@@ -27,16 +27,16 @@
 1. 从 **[GitHub Releases](https://github.com/wakayamachannel/PocketRoles/releases)** 下载两个 zip：`PocketRoles-Setup-0.4.0.zip`（启动器）和 `PocketRoles-0.4.0.zip`（模组本体）。
 2. **把两个 zip 解压到同一个文件夹**（例如 `文档\PocketRoles`，放在不会删除的地方。有网络时只用 Setup zip 也可以 — 启动器会自动下载本体）。
 3. **双击“PocketRoles Launcher.cmd”**。出现蓝色的“Windows 已保护你的电脑”时，点“更多信息”→“仍要运行”（这是因为没有使用代码签名证书，不是病毒）。
-4. 点击 **“安装”**。启动器会把 Steam 版 Among Us 复制到桌面的“Among Us PocketRoles”，并自动安装 BepInEx 和 PocketRoles（需要几分钟。Steam 版本身不会被修改）。
+4. 点击 **“安装”**。启动器会把 Steam 版 Among Us 复制到桌面的“Among Us PocketRoles”，并自动安装 BepInEx 和 PocketRoles（需要几分钟。Steam 版本身不会被修改）。如果桌面由 OneDrive 备份，则改为复制到 `%LOCALAPPDATA%\PocketRoles\Among Us PocketRoles`（避免把 1 GB 同步到云端；启动器参数 `-GameDir` 可以选择任意文件夹）。
 5. **先启动 Steam，再点“启动”**。首次启动到标题画面需要 1〜2 分钟（中途出现黑色窗口也请不要关闭）。标题画面右侧窗口显示 PocketRoles 面板即安装完成。之后 **在线 → 创建房间** 就能启用职业。
 
 详细步骤和手动安装见 [第 5 章](#5-安装步骤steam)，启动器的用法见 [第 6 章](#6-启动器与更新)，玩法见 [第 7 章](#7-游玩方法)。
 
 ## 如何招人（引导房）
 
-有职业的房间是“已注册的模组房间”，**不会出现在公开列表中**（Innersloth 的政策，[第 3 章](#3-innersloth-模组政策与公开房间须知必读)）。因此用 **一部副手机** 开一个“引导房”来招人：
+根据 2026 年 7 月起的官方规则，使用 MOD 的房间必须向服务器注册（MOD 房间注册，PocketRoles 会自动完成）。已注册的房间 **不会出现在公开列表里**，请用房间代码或引导房加入（[第 3 章](#3-innersloth-模组政策与公开房间须知必读)）。因此用 **一部副手机** 开一个“引导房”来招人：
 
-1. **在 PC 上创建职业房**（和平时一样，注册保持开启）。房间左上角会 **大字显示房间代码**，例如“职业房 QWERTY”。在聊天里输入 `/announce`，代码会复制到剪贴板，并显示下面的步骤。
+1. **在 PC 上创建职业房**（和平时一样，注册保持开启）。房间代码显示在房间画面下方（原版的房间代码栏）；输入 `/code on` 也可以在左上角 **大字显示**，例如“职业房 QWERTY”（默认关闭）。在聊天里输入 `/announce`，代码会复制到剪贴板，并显示下面的步骤。
 2. **在副手机的 Among Us（原版）里把名字改成“职业→QWERTY”**（代码换成自己房间的）。
 3. **用副手机创建一个公开房间**（无模组的普通房间）。在聊天里写“有职业的房间是 QWERTY”。
 4. 从公开列表进来的人看到名字里的代码后，**转到 PC 的职业房**。重建房间导致代码变化时，改一下手机的名字（`/announce` 可以再次复制）。
@@ -64,13 +64,14 @@
 | 出现“Windows 已保护你的电脑” | “更多信息”→“仍要运行”。还是打不开的话：右键文件 → 属性 → 勾选“解除锁定” |
 | 游戏启动不了 / 一直是黑窗口 | 首次启动等 1〜3 分钟。确认 Steam 已运行、Among Us 没有重复启动、杀毒软件没有隔离 `winhttp.dll`（请发报告 zip，[第 28 章](#28-如何报告问题)） |
 | 玩家需要做什么？ | 什么都不用装，用房间代码加入即可。聊天里可用 `/cmd h`（帮助）、`/cmd n`（自己的职业）、`/cmd lang zh`（语言）（[第 26 章](#26-原版玩家看到的是什么)） |
-| 房间不在公开列表里 | 已注册的模组房间不会被列出。用上面的引导房招人，或直接告诉对方房间代码（[第 25 章](#25-便利房关闭注册与引导房)） |
+| 房间不在公开列表里 | 职业 MOD 的房间按官方规则不会出现在公开列表里（属正常现象）。请告诉对方房间代码，或用上面的引导房（[第 25 章](#25-便利房关闭注册与引导房)） |
+| 没有原版职业（科学家、工程师、法官等） | 默认只分配 PocketRoles 的职业，不发放原版特殊职业。想同时使用时，在设置标签“职业”里打开“同时分配原版特殊职业”，或输入 `/opt roles.vanilla on`（按原版职业设置出现） |
 | 在哪里改设置？ | 房间电脑里的“PocketRoles”按钮。也可以用聊天的 `/set` `/opt` 或齿轮菜单（[第 8 章](#8-设置标签页房间设置界面)） |
 | 想切换语言 | 玩家：`/cmd lang zh` 等。房间默认语言：设置标签页的“语言”。启动器：右上角的“语言”（[第 13 章](#13-语言日本語--中文--english)） |
 | 聊天翻译与 DeepL 密钥 | 默认开启（可在设置标签页的“聊天翻译”关闭）。用 DeepL 的话，把密钥写在 `BepInEx\PocketRoles\deepl-key.txt` 的第一行（[第 13 章](#13-语言日本語--中文--english)） |
 | 游戏更新后模组不能用了 | 启动器的“检查更新”。在适配版发布之前模组会自动停用（[第 24 章](#24-游戏版本检查)） |
 | 如何报告问题 | 启动器的“生成报告 zip”→ 作为附件发到 `pocketroles.report@gmail.com`（[第 28 章](#28-如何报告问题)） |
-| 会违反规定吗？会被封号吗？ | 按 Innersloth 的政策，创建房间时会注册为模组房间（+25）。保持注册的情况下，仅使用模组不会被封号（[第 3 章](#3-innersloth-模组政策与公开房间须知必读)） |
+| 会违反规定吗？会被封号吗？ | 按 Innersloth 的政策，创建房间时会自动进行 MOD 房间注册（官方规则・职业必需）。保持注册的情况下，仅使用模组不会被封号（[第 3 章](#3-innersloth-模组政策与公开房间须知必读)） |
 | Epic 版 / 主机 / 手机能当房主吗？ | 房主只能是 Windows + Steam 版。玩家用任何平台都可以（[第 4 章](#4-所需环境)） |
 
 ---
@@ -82,7 +83,7 @@
 - 设置在 **房间设置界面的“PocketRoles”标签页**（职业 / 房间 / 聊天 / 外观 / 房主 分页，带“?”帮助；原版的 3 个按钮折叠为“▶ 原版设置（游戏・预设・职业）”）和 **齿轮菜单的“PocketRoles 设置”面板** 中完成（也可以用聊天命令 `/set` `/opt` 或配置文件）
 - 显示语言：**日本語 / 简体中文 / English**。每位玩家可用 `/lang` 单独切换（也会根据发言语言自动识别），文本可在 `lang\*.json` 中编辑
 - **聊天自动翻译**（默认开启，**并用模式**）：把外语聊天翻译成房主的语言发给所有人，把房主的话按各自的语言单独发给外语玩家（使用 Google，或 DeepL 的 API 密钥）
-- **引导房辅助**：房间代码大字显示（`/code`）、复制代码并显示步骤（`/announce`）、从便利房引导到职业房（`/move`）
+- **引导房辅助**：房间代码大字显示（`/code on`，默认关闭）、复制代码并显示步骤（`/announce`）、从便利房引导到职业房（`/move`）
 - 房主工具：房间剩余时间显示、自动开始、废村（刷新房间）、开始取消按钮、强制结束会议、快捷键（F7 / F8 / F9）、房主分页的操作按钮、游戏主持（观战）模式、镜像 Skeld（Dleks）、延迟过高时询问是否重建
 - **协作管理（权限）**：管理员 / 版主 / VIP / 封禁，通过 `Admin.txt` 等文件和 `/admin` `/kick` `/ban` 管理。管理员可使用设置命令，版主可踢人
 - **原版设置范围扩展**：击杀冷却、投票 / 讨论时间、紧急会议冷却、任务数可以超出原版上下限（设置界面的箭头和 `/vset`。原版玩家也会收到同样的数值）
@@ -137,8 +138,8 @@
 - v0.4 的房主工具（自动开始、废村、结束会议、快捷键等）**全部使用原版机制**（开始倒计时、游戏结束、投票截止），所以玩家一方只会看到聊天提示和正常的游戏流程。
 - 原版设置范围扩展（v0.4b）同样直接使用原版的设置同步。房主在设置界面选择的数值（例如击杀冷却 5 秒）会原样显示在玩家的房间设置列表中。
 - 聊天翻译（v0.4b）由房主的电脑把文本发送到 Google / DeepL 进行翻译。默认开启，以 **并用模式** 运行（外语聊天翻译成房主的语言发给所有人，房主的话单独翻译给外语玩家）。不想把文本发到外部时，可在设置标签页“聊天”分页的“聊天翻译”或用 `/opt translate off` 关闭（[第 13 章](#13-语言日本語--中文--english)）。
-- 只有 **已注册（+25）的房间** 才能分配职业。未注册的房间（便利房）中，只要向单个玩家发送一条消息房主就会被服务器断开，因此那里的职业和私密通知全部停用，只在原版对局之上保留房主工具（[第 25 章](#25-便利房关闭注册与引导房)）。
-- 房主屏幕左上角（ping 显示处）显示 `PocketRoles v0.4.0 (host) · 亚洲` 这样带当前区域名的一行，在线房间中还显示 `房间剩余 mm:ss` 和大字的房间代码（`职业房 ABCDEF`，用于抄到引导房），游戏内的模组标记也会显示。标题画面右侧的大窗口中显示 **PocketRoles 面板**（图标、`v0.4.0 / Among Us 2026.8.18`、作者名、可点击的 GitHub 行、“仅房主安装即可游玩职业的 MOD”“参与者保持原版即可”）（[第 9 章](#9-齿轮菜单的pocketroles-设置面板)）。
+- 只有 **开启了 MOD 房间注册的房间** 才能分配职业。未注册的房间（便利房）中，只要向单个玩家发送一条消息房主就会被服务器断开，因此那里的职业和私密通知全部停用，只在原版对局之上保留房主工具（[第 25 章](#25-便利房关闭注册与引导房)）。
+- 房主屏幕左上角（ping 显示处）显示 `PocketRoles v0.4.0 (host) · 亚洲` 这样带当前区域名的一行，在线房间中还显示 `房间剩余 mm:ss`（`/code on` 后还会大字显示房间代码 `职业房 ABCDEF`，默认关闭），游戏内的模组标记也会显示。标题画面右侧的大窗口中显示 **PocketRoles 面板**（图标、`v0.4.0 / Among Us 2026.8.18`、作者名、可点击的 GitHub 行、“仅房主安装即可游玩职业”“参与者无需安装即可加入”）（[第 9 章](#9-齿轮菜单的pocketroles-设置面板)）。
 - 仅支持 **经典模式**（躲猫猫 / Seek Fools 模式下模组不做任何事）。
 
 原版玩家实际看到的效果汇总在 [第 26 章](#26-原版玩家看到的是什么)。
@@ -149,7 +150,7 @@
 
 ### v0.4e（v0.4.0 的收尾：引导房、便利房、翻译并用）
 
-- **引导房辅助**（[第 25 章](#25-便利房关闭注册与引导房)）：房间左上角大字显示房间代码（`职业房 ABCDEF`，`/code` 切换，设置标签页“大字显示房间代码”）。`/announce`（`/guide`）把代码复制到剪贴板，并显示用副手机做引导房的 4 个步骤。`/move [代码]` 在便利房里用三种语言向所有人发送职业房的引导（`/opt guide.autoreg on` 时 30 秒后重建为注册房间）。齿轮菜单里也有引导房提示。
+- **引导房辅助**（[第 25 章](#25-便利房关闭注册与引导房)）：房间左上角大字显示房间代码（`职业房 ABCDEF`。默认关闭，`/code on` 开启，`/code` 切换，设置标签页“大字显示房间代码”）。`/announce`（`/guide`）把代码复制到剪贴板，并显示用副手机做引导房的 4 个步骤。`/move [代码]` 在便利房里用三种语言向所有人发送职业房的引导（`/opt guide.autoreg on` 时 30 秒后重建为注册房间）。齿轮菜单里也有引导房提示。
 - **便利房（关闭注册）的整理**：实机测试发现，未注册的房间中只要向单个玩家发送一条消息，房主就会被服务器断开（"DC because Hacking"）。因此未注册的房间 **不分配职业，按原版进行**（只有房主工具和面向所有人的提示）。要玩职业请用注册开启（默认）的房间。
 - **翻译并用为默认**（`BroadcastToAll = true` + `TranslateForPlayers = true`）：外语聊天翻译成房主的语言发给所有人；房主的话按各自的语言单独发给选择了其他语言的玩家；同一个人不会收到两份。翻译本身（`Enabled`）也默认开启（聊天文本会发送到 Google；如果在 `BepInEx\PocketRoles\deepl-key.txt` 放了密钥则发送到 DeepL）。可在设置标签页的“聊天翻译”或用 `/opt translate off` 关闭。
 - **延迟过高时先询问**：创建房间后延迟过高时，房主屏幕会弹出“延迟较高（N ms）。要重新创建房间吗？”（是 / 否，也可用 `/rehost yes|no`）。默认关闭（`MaxHostPing = 0`），因为短时间内反复重建会累加 ban points（[3.4](#34-关于封禁与踢出)）。
@@ -178,7 +179,7 @@
 | 语言自动识别 / 三语提示 | 未使用 `/lang` 的玩家用中文或英文发言时，自动切换其显示语言并提示。欢迎语中加入一行“English: /cmd lang en ｜ 中文: … ｜ 日本語: …”。`WelcomeAllLanguages` 可以用三种语言发送欢迎语 | [13](#13-语言日本語--中文--english), [14](#14-加入时的欢迎语与规则行) |
 | 设置标签页整理 | PocketRoles 按钮移到左列最上方，原版的 3 个按钮合并为一个“原版设置”按钮。标签页内有“职业 / 房间 / 聊天 / 外观 / 房主工具”分页按钮。职业标题和设置项旁的“?”按钮会在左侧说明栏显示帮助 | [8](#8-设置标签页房间设置界面) |
 | 权限（协作管理） | `BepInEx\PocketRoles\Admin.txt` / `Moderator.txt` / `VIP.txt` / `Banlist.txt`（每行一人，好友代码或 Puid）。`/admin` `/mod` `/vip` 的 add / remove / list、`/kick`、`/ban`。管理员可用设置命令，版主可踢人 / 封禁，VIP 名字带 ★ 并有专属问候 | [11](#11-命令一览) |
-| 原版设置范围扩展 | 击杀冷却 0〜120 秒（0.5 秒步长）、投票 0〜600 秒、讨论 0〜600 秒、紧急会议冷却 0〜120 秒、任务数 0〜30 等，通过设置界面的箭头和 `/vset` 设置。移动速度和视野也可用 `/vset` 扩展。原版玩家会收到同样的数值 | [8](#8-设置标签页房间设置界面), [11](#11-命令一览) |
+| 原版设置范围扩展 | 击杀冷却 0〜120 秒（箭头默认步长 2.5 秒；0.5 秒单位的值可用 `/vset` 或调低 `[Vanilla] KillCooldownStep`）、投票 0〜600 秒、讨论 0〜600 秒、紧急会议冷却 0〜120 秒、任务数 0〜30 等，通过设置界面的箭头和 `/vset` 设置。移动速度和视野也可用 `/vset` 扩展。原版玩家会收到同样的数值 | [8](#8-设置标签页房间设置界面), [11](#11-命令一览) |
 | `/h` 显示权限 | 帮助末尾显示“你的权限：普通 / VIP / 版主 / 管理员 / 房主” | [11](#11-命令一览) |
 | 问题报告完善 | 启动器的报告 zip（日志、配置、环境信息。不包含 DeepL 密钥）、报告邮箱、GitHub Issue 模板、支持邮箱 | [28](#28-如何报告问题) |
 
@@ -233,7 +234,7 @@
 
 ## 3. Innersloth 模组政策与公开房间须知（必读）
 
-### 3.1 创建房间时必须“注册”（+25 标记）
+### 3.1 创建房间时必须进行“MOD 房间注册”
 
 Innersloth 的 Among Us Mod Policy（<https://www.innersloth.com/among-us-mod-policy/>，Last Modified July 30, 2026）中有以下条款：
 
@@ -241,8 +242,8 @@ Innersloth 的 Among Us Mod Policy（<https://www.innersloth.com/among-us-mod-po
 
 （凡是在官方服务器上改变 Among Us 功能的模组，都必须在创建房间时注册。功能改变包括但不限于修改游戏玩法、自定义职业行为、作弊，以及改变其他玩家体验的任何部分。）
 
-PocketRoles 添加了职业并改变其他玩家的体验，因此在官方服务器上使用时 **必须在创建房间时注册**。
-房主专用模组的注册方式是在协议版本号上加 25，即“host authority mode”（+25 标记），Innersloth 的官方资料 <https://github.com/Innersloth-LLC/AmongUsModdingInformation> 中有说明。PocketRoles **默认会这样做**（设置 `RegisterAsModdedLobby = true`。只在自己创建房间时附加，加入别人的房间时不附加）。
+PocketRoles 添加了职业并改变其他玩家的体验，因此在官方服务器上使用时 **必须在创建房间时进行 MOD 房间注册（即所谓的 +25）**。
+房主专用模组的注册方式是在协议版本号上加 25，即“host authority mode”，Innersloth 的官方资料 <https://github.com/Innersloth-LLC/AmongUsModdingInformation> 中有说明。PocketRoles **默认会这样做**（设置 `RegisterAsModdedLobby = true`。只在自己创建房间时附加，加入别人的房间时不附加）。
 
 注册后：
 
@@ -252,15 +253,15 @@ PocketRoles 添加了职业并改变其他玩家的体验，因此在官方服�
 ### 3.2 已注册的房间不会出现在公开房间列表中
 
 Innersloth 帮助中心（<https://innersloth.zendesk.com/hc/en-us/articles/6711746215700-Are-there-mods-for-Among-Us>）写道："modded games are not able to be found via public lobby search, so if you're hosting a modded game, you'll need to invite friends directly"（模组房间无法通过公开房间搜索找到，如果你在开模组房，需要直接邀请好友）。
-已注册（+25）的 PocketRoles 房间 **不会出现** 在原版的公开房间列表中（已用手机版确认），设为“公开”也一样。请把 **房间代码** 告诉参与者，或使用 [引导房](#25-便利房关闭注册与引导房)（用副手机开一个原版公开房，名字写成“职业→代码”）。
+已注册的 PocketRoles 房间 **不会出现** 在原版的公开房间列表中（已用手机版确认），设为“公开”也一样。请把 **房间代码** 告诉参与者，或使用 [引导房](#25-便利房关闭注册与引导房)（用副手机开一个原版公开房，名字写成“职业→代码”）。
 
 参考：日本的模组（TOH-Y、TOH-K、SuperNewRoles 等）在 2023 年因“原版玩家不知情地进入模组房间”的问题收到 Innersloth 的通知，此后在官方服务器上禁用了公开房间。
 
-技术补充（分析 2026.8.18 客户端的结果）：原版“查找房间”界面的筛选器中有一个模组用的项目（ModFilter），它是给“所有人都安装同一模组”的 GUID 注册型模组用的。原版客户端不会附加这个筛选器，因此已注册（+25）的房主专用模组房间会被服务器从列表中排除。客户端一侧没有既保持注册又出现在列表中的办法。
+技术补充（分析 2026.8.18 客户端的结果）：原版“查找房间”界面的筛选器中有一个模组用的项目（ModFilter），它是给“所有人都安装同一模组”的 GUID 注册型模组用的。原版客户端不会附加这个筛选器，因此已注册的房主专用模组房间会被服务器从列表中排除。客户端一侧没有既保持注册又出现在列表中的办法。
 
 ### 3.3 关闭注册 = 无职业的“便利房”
 
-以 `RegisterAsModdedLobby = false`（`/opt register off`、设置标签页中的“模组注册(+25)”、齿轮面板的“注册(+25)”）创建的房间会出现在公开列表里，但 **不会分配职业**。
+以 `RegisterAsModdedLobby = false`（`/opt register off`、设置标签页中的“MOD房间注册（官方规则・职业必需）”、齿轮面板的“MOD房间注册”）创建的房间会出现在公开列表里，但 **不会分配职业**。
 
 - 未注册的房间中，服务器会把“只发给某一个玩家的消息”视为作弊并 **断开房主**（实机确认："DC because Hacking"）。职业的私密通知无法成立，因此 PocketRoles 在未注册的房间里停用职业、名字标签和所有私密消息，只在原版对局之上保留房主工具（剩余时间、自动开始、废村、结束会议、面向所有人的翻译等）。这相当于 AUR 那样的“实用工具模组”用法，不改变游戏玩法，所以政策上不需要注册。
 - 也没有 `/cmd` 私密频道，玩家的命令所有人都能看到。
@@ -275,7 +276,7 @@ Innersloth 表示，只要不妨碍他人的体验，仅使用模组不会封号
 **注意 ban points（短时间内退出）**：官方服务器会把“创建房间后马上退出”“对局中途退出”“短时间内反复重建房间”等行为计为“故意断线”（ban points。实机测试中累计到 3.5 时显示“因故意断开连接而受到限制”，一段时间内无法创建房间）。这与模组功能无关，原版房主也一样。重建房间（自动重建、`/move`、延迟过高时的重建）只在必要时使用，优先用废村（同一房间重置时间）。
 ### 3.5 与以前使用的 AUR 的区别
 
-AUR（Among Us Revamped）是不包含职业和单独设置发送（desync）的房主 **实用工具模组**，也没有附加 +25 标记。PocketRoles 是“改变其他玩家体验的模组”，在政策上的定位不同。v0.4 的房主工具（废村、取消按钮、游戏主持等）使用与 AUR / EHR / SuperNewRoles 相同的原版机制。
+AUR（Among Us Revamped）是不包含职业和单独设置发送（desync）的房主 **实用工具模组**，也没有进行 MOD 房间注册。PocketRoles 是“改变其他玩家体验的模组”，在政策上的定位不同。v0.4 的房主工具（废村、取消按钮、游戏主持等）使用与 AUR / EHR / SuperNewRoles 相同的原版机制。
 
 ### 3.6 请勿盈利
 
@@ -311,7 +312,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 2. 解压到一个不会删除的文件夹（例如 `文档\PocketRoles`）。**把 `PocketRoles-<版本>.zip`（模组本体）也放进同一个文件夹（解压与否都可以）**，没有网络也能安装。桌面快捷方式会指向这个文件夹，之后请不要移动或删除。
 3. **双击“PocketRoles Launcher.cmd”**。首次运行如果出现“Windows 已保护你的电脑”（SmartScreen），请点 **“更多信息”→“仍要运行”**。这是因为没有使用签名证书，不是病毒。
 4. 点击启动器的 **“安装”**。它会自动完成以下步骤（需要几分钟，进度显示在下方）：
-   1. 查找 Steam 版 Among Us（找不到时会让你选择文件夹），复制到 `桌面\Among Us PocketRoles`（1 GB 左右）
+   1. 查找 Steam 版 Among Us（找不到时会让你选择文件夹），复制到 `桌面\Among Us PocketRoles`（1 GB 左右）。如果桌面由 OneDrive 备份，则改为复制到 `%LOCALAPPDATA%\PocketRoles\Among Us PocketRoles`（参数 `-GameDir` 可以选择任意文件夹）
    2. 从 builds.bepinex.dev 下载 BepInEx 6.0.0-be.735（win-x86）并解压
    3. 从 GitHub 的最新发布获取 `PocketRoles-<ver>.zip` 并放置（把 `PocketRoles-<ver>.zip` 放在启动器同一文件夹中即可离线安装）。如果有旧的 `HostRoles.dll` 会删除
    4. 在桌面创建“PocketRoles Launcher”快捷方式
@@ -325,7 +326,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 1. 把 `C:\Program Files (x86)\Steam\steamapps\common\Among Us` 整个复制到另一个文件夹（例如 `桌面\Among Us PocketRoles`）。
 2. 把上面的 BepInEx zip 解压到复制的文件夹中（`Among Us.exe` 同级目录下应有 `winhttp.dll`、`doorstop_config.ini` 和 `BepInEx\` 文件夹）。
 3. **在 Steam 已启动的状态下**，把复制出来的 `Among Us.exe` **运行一次**。首次运行时 BepInEx 会生成 `BepInEx\interop`，出现标题画面需要 **1〜3 分钟**。出现标题画面后可以关闭。
-4. 把 GitHub Releases 的 `PocketRoles-<ver>.zip` 解压到复制的文件夹中（包含 `BepInEx\plugins\PocketRoles.dll`、`BepInEx\PocketRoles\lang\*.json`、README 和 LICENSE）。**如果还留有旧版的 `HostRoles.dll`，请删除**（同样的补丁会被应用两次）。
+4. 把 GitHub Releases 的 `PocketRoles-<ver>.zip` 解压到复制的文件夹中（包含 `BepInEx\plugins\PocketRoles.dll`、`BepInEx\PocketRoles\lang\*.json`、README、LICENSE 和 NOTICE）。**如果还留有旧版的 `HostRoles.dll`，请删除**（同样的补丁会被应用两次）。
 5. 运行复制出来的 `Among Us.exe`（不要从 Steam 库启动，而是直接运行复制目录中的 exe，同时保持 Steam 运行）。屏幕左上角出现 `PocketRoles v0.4.0`、标题画面右侧窗口出现 PocketRoles 面板即表示模组已加载。也可以通过 `BepInEx\LogOutput.log` 中的 `PocketRoles v0.4.0 loaded` 来确认。
 
 首次启动时会生成 `BepInEx\config\jp.pocketroles.mod.cfg`（配置）、`BepInEx\PocketRoles\lang\`（语言文件）、`BepInEx\PocketRoles\{hats,visors,nameplates,music,images}\` 和 `README.txt`（外观自定义用）。权限文件 `Admin.txt` / `Moderator.txt` / `VIP.txt` / `Banlist.txt` 会在第一次创建房间时生成在 `BepInEx\PocketRoles\` 中。使用 DeepL 时的 `deepl-key.txt` 需要自己创建（[第 13 章](#13-语言日本語--中文--english)）。如果同一文件夹中有旧 HostRoles 的配置 `jp.hostroles.mod.cfg` 而新配置文件尚不存在，内容会自动复制过来（设置原样继承）。
@@ -415,7 +416,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 1. 用启动器的“启动”（开发模式为“带 mod 启动”。或模组副本中的 `Among Us.exe`）启动游戏（Steam 运行中）。
 2. **在线 → 创建房间**（游戏模式选 **经典**，注册保持开启）。区域照常选择。
 3. 打开房间里的笔记本电脑（设置界面），点击左侧的 **“PocketRoles”** 按钮设置职业人数等（[第 8 章](#8-设置标签页房间设置界面)）。用聊天命令 `/set sheriff 1` 或 `/opt sheriff.cooldown 25` 也能做同样的事，两种方式都会立即保存到配置文件。初始设置为警长 1、小丑 1、内鬼狂粉 1。
-4. 招人。房间左上角 **大字显示着房间代码**（`职业房 ABCDEF`），告诉朋友，或抄到副手机的 **引导房** 里（`/announce` 复制代码。[第 25 章](#25-便利房关闭注册与引导房)）。加入的玩家几秒后会收到 **只发给本人** 的聊天消息，说明这是模组房间、启用了哪些职业、规则以及切换语言的方法（[第 14 章](#14-加入时的欢迎语与规则行)）。
+4. 招人。把房间画面下方显示的 **房间代码** 告诉朋友，或抄到副手机的 **引导房** 里（`/announce` 复制代码；`/code on` 可以在左上角大字显示。[第 25 章](#25-便利房关闭注册与引导房)）。加入的玩家几秒后会收到 **只发给本人** 的聊天消息，说明这是模组房间、启用了哪些职业、规则以及切换语言的方法（[第 14 章](#14-加入时的欢迎语与规则行)）。
 5. 设置标签页“聊天”分页的 **聊天翻译** 默认开启（外语聊天会翻译成你的语言发给所有人，外语玩家会收到你的话的对应语言翻译。聊天文本会发送到 Google / DeepL，不需要的话用 `/opt translate off` 关闭。[第 13 章](#13-语言日本語--中文--english)）。
 6. 等待期间屏幕左上角会显示 `房间剩余 mm:ss`。人数齐了就按 Start，或交给自动开始（`/autostart <人数>`）。剩余时间不多时模组会自动延长 / 废村，不用担心房间关闭（[第 16 章](#16-房间剩余时间自动开始与废村)）。
 7. 开始游戏。开始几秒后，每位玩家会通过聊天收到职业名称和说明，自己的名字上方会显示职业名（会议中在名字旁边小字显示）。普通职业的玩家只会收到“本局有特殊职业”的提示。
@@ -454,7 +455,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 - **房间**：自动重开房、自动公开、自动公开延迟(秒)（0〜60）、重开房最大次数（1〜10）、延迟过高时重开房(ms)（0〜300，0 = 不重开；会先询问）、自动开始、自动开始人数（4〜15）、开始倒计时(秒)（1〜30）、大厅倒计时动作（extend / haison / notify）、剩余时间警告(秒)（30〜300，步长 10）、警告到延长的秒数（0〜60）、自动选择最快区域、提供镜像 Skeld(Dleks)
 - **聊天**：欢迎语包含设置、欢迎语规则行（none / custom）、用三种语言发送欢迎语、玩家命令、全部命令、**聊天翻译**、翻译服务（auto / google / deepl）、翻译目标语言（ja / zh / en）、房主屏幕显示翻译、翻译发送给所有人、为外语玩家翻译、自动识别语言、翻译最少字数（1〜50）、每分钟翻译上限（1〜120，步长 5）
 - **外观（仅房主）**：自定义外观、大厅音乐（custom / vanilla / mute）、大厅音乐音量（0〜1）、大厅墙画、飞船装饰、菜单背景、鼠标光标
-- **房主**（房主工具）：上方是 **操作按钮行**（立即开始 / 取消 / 废村 / 结束会议 / 测试模式 / 显示设置。只有当前状态下可用的按钮才会启用）。标题“常规”= 模组注册(+25)、语言（ja / zh / en）、加入时的欢迎语、会议时发送职业说明、非法RPC时踢出、忽略版本不匹配、显示制作信息。标题“房主工具”= 游戏主持、启用快捷键、废村键(按两次)、结束会议键(按两次)、取消开始键（各自从 F1〜F12 中选择）、**大字显示房间代码、/move 后重建为注册房**（引导房，[第 25 章](#25-便利房关闭注册与引导房)）、**允许管理员更改设置、版主可踢人/封禁、VIP 名字加★**（权限）、**原版设置范围扩展、击杀冷却最小(秒)、击杀冷却最大(秒)、击杀冷却步长(秒)、投票时间最小(秒)、投票时间最大(秒)、讨论时间最大(秒)、紧急会议冷却最大(秒)、任务数最大**（见下方“原版设置范围扩展”）
+- **房主**（房主工具）：上方是 **操作按钮行**（立即开始 / 取消 / 废村 / 结束会议 / 测试模式 / 显示设置。只有当前状态下可用的按钮才会启用）。标题“常规”= MOD房间注册（官方规则・职业必需）、语言（ja / zh / en）、加入时的欢迎语、会议时发送职业说明、非法RPC时踢出、忽略版本不匹配、显示制作信息。标题“房主工具”= 游戏主持、启用快捷键、废村键(按两次)、结束会议键(按两次)、取消开始键（各自从 F1〜F12 中选择）、**大字显示房间代码、/move 后重建为注册房**（引导房，[第 25 章](#25-便利房关闭注册与引导房)）、**允许管理员更改设置、版主可踢人/封禁、VIP 名字加★**（权限）、**原版设置范围扩展、击杀冷却最小(秒)、击杀冷却最大(秒)、击杀冷却步长(秒)、投票时间最小(秒)、投票时间最大(秒)、讨论时间最大(秒)、紧急会议冷却最大(秒)、任务数最大**（见下方“原版设置范围扩展”）
 - 数值用 `−` / `+` 按钮调整，开关用复选框，选项用 `<` / `>` 切换。
 - 更改会 **立即保存到配置文件**，并在房主的聊天中显示“设置已更改：警长 人数 = 1”之类的提示。
 - 用聊天命令 `/opt` 或齿轮面板修改的值，下次打开标签页时也会反映出来。
@@ -471,7 +472,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 
 | 项目 | 原版范围 | 扩展后的默认范围 | 设置键（设置标签页项目） |
 |---|---|---|---|
-| 击杀冷却 | 10〜60 秒，步长 2.5 | **0〜120 秒，步长 0.5** | `KillCooldownMin`（0〜60）/ `KillCooldownMax`（10〜600）/ `KillCooldownStep`（0.5〜10） |
+| 击杀冷却 | 10〜60 秒，步长 2.5 | **0〜120 秒**，箭头步长默认 2.5（把 `KillCooldownStep` 调低到 0.5 或用 `/vset` 即可设置 0.5 秒单位的值） | `KillCooldownMin`（0〜60）/ `KillCooldownMax`（10〜600）/ `KillCooldownStep`（0.5〜10，默认 2.5） |
 | 投票时间 | 15〜300 秒 | **0〜600 秒**（0 = 没有投票阶段） | `VotingTimeMin`（0〜300）/ `VotingTimeMax`（15〜3600） |
 | 讨论时间 | 0〜120 秒 | **0〜600 秒** | `DiscussionTimeMax`（0〜3600） |
 | 紧急会议冷却 | 0〜60 秒 | **0〜120 秒** | `EmergencyCooldownMax`（0〜600） |
@@ -499,7 +500,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | 自动开始 | 人数凑齐后自动开始 | `[Lobby] AutoStart` |
 | 大厅音乐：自定义 / 原版 / 静音 | 每次点击切换 | `[Cosmetics] LobbyMusic` |
 | 外观(v0.3) | 外观自定义的总开关 | `[Cosmetics] Enabled` |
-| 注册(+25) | 模组注册（关闭违反政策。从下一个创建的房间起生效） | `[General] RegisterAsModdedLobby` |
+| MOD房间注册 | MOD 房间注册（即所谓的 +25。官方规则要求、职业必需。关闭违反政策。从下一个创建的房间起生效） | `[General] RegisterAsModdedLobby` |
 | 语言：日语 / 简体中文 / 英语 | 房间默认语言（每次点击切换，面板的显示也随之变化） | `[General] Language` |
 | 大厅倒计时动作：延长 / 废村 / 仅通知 | 房间即将超时时的动作 | `[Lobby] TimerMode` |
 | 启用快捷键 | 启用 F7 / F8 / F9 | `[Hotkeys] Enabled` |
@@ -518,7 +519,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `v0.4.0 / Among Us 2026.8.18` | 模组版本和对应的游戏版本 |
 | `作者：もみじちゃ` | `[Credits] Author`（为空则不显示） |
 | `GitHub: github.com/wakayamachannel/PocketRoles（点击打开）` | `[Credits] RepoUrl`。点击后打开浏览器（为空则不显示） |
-| “仅房主安装即可游玩职业的 MOD”“参与者保持原版即可” | 按房间默认语言显示 |
+| “仅房主安装即可游玩职业”“参与者无需安装即可加入” | 按房间默认语言显示 |
 
 - 打开在线 / 账户 / 输入代码 / 游戏模式 / 创建房间 / 制作人员等子菜单期间会隐藏，回到主画面后重新显示。
 - `[Credits] ShowInMenu = false`（设置标签页“显示制作信息”，`/opt credits.show off`）会同时隐藏面板和署名行。
@@ -640,7 +641,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `cos reload` | 重新读取外观图片和音乐并重新应用 |
 | `cos music custom|vanilla|mute` | 切换大厅音乐（不带参数显示当前状态） |
 | `vset <项目> <值>` | 把原版设置设为菜单范围之外的值（`/vset killcd 5`、`/vset vote 0`、`/vset short 12`、`/vset speed 4`）。仅在房间中。`/vset show` 显示当前值。项目和范围见 [第 8 章](#8-设置标签页房间设置界面) |
-| `code` / `code on|off` | 切换房间左上角的 **房间代码大字显示**（`[Guide] ShowCodeOverlay`），并在聊天中显示当前代码 |
+| `code` / `code on|off` | 切换房间左上角的 **房间代码大字显示**（`[Guide] ShowCodeOverlay`，默认关闭），并在聊天中显示当前代码 |
 | `announce`, `guide` | 把房间代码 **复制到剪贴板**，并显示用副手机做引导房的 4 个步骤（[第 25 章](#25-便利房关闭注册与引导房)）。在未注册的房间里复制的是用 `/move <代码>` 设置的职业房代码 |
 | `move` / `migrate` / `move <代码>` / `move cancel` | 在便利房（关闭注册）里，用三种语言告诉所有人“有职业的房间是 ○○”。`/move <代码>` 指定代码（`[Guide] RoleRoomCode`），不带代码时提示“看引导房房主的名字”。`[Guide] AutoRecreateRegistered = true` 时 30 秒后把本房间重建为注册房间（`/move cancel` 取消）。在已注册的房间里输入则显示 `/announce` 的步骤 |
 | `diag` / `diag on|off` | 把开始按钮、测试模式、废村、对局状态和画面的快照输出到聊天和日志（黑屏时用于报告）。`on` 在日志中开启开局流程的详细追踪，`off` 停止 |
@@ -728,7 +729,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `lobby.autopublicdelay` | 0〜60 | `[Lobby] AutoPublicDelay` |
 | `lobby.rehostmax` | 1〜10 | `[Lobby] RehostMaxAttempts` |
 | `lobby.maxping`（`maxping`） | 0〜300（0 = 关闭） | `[Lobby] MaxHostPing`（延迟高于此值时 **询问** 是否重建房间） |
-| `guide.overlay` | on / off | `[Guide] ShowCodeOverlay`（房间代码大字显示。与 `/code` 相同） |
+| `guide.overlay` | on / off | `[Guide] ShowCodeOverlay`（房间代码大字显示。默认关闭。与 `/code` 相同） |
 | `guide.code` | 房间代码（4 / 6 个字母） | `[Guide] RoleRoomCode`（与 `/move <代码>` 相同。留空则清除） |
 | `guide.autoreg` | on / off | `[Guide] AutoRecreateRegistered`（`/move` 30 秒后重建为注册房间） |
 | `lobby.autostart` | on / off | `[Lobby] AutoStart` |
@@ -764,7 +765,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 [General]
 Enabled = true                  # 启用 / 停用模组（/mod on|off）
 Language = ja                   # 房间默认语言：ja | zh | en（玩家可用 /lang 单独更改）
-RegisterAsModdedLobby = true    # 创建房间时用 +25 标记注册（Innersloth 政策要求。off 违反政策）
+RegisterAsModdedLobby = true    # MOD 房间注册（即所谓的 +25）。官方规则要求、职业必需。off 违反政策
 IgnoreVersionMismatch = false   # 即使游戏版本与支持版本（2026.8.18）不同也运行模组（风险自负）
 GameMaster = false              # 游戏主持：房主不持有职业，开场动画后立即死亡，只观战 / 主持
 
@@ -799,7 +800,7 @@ VipMarker = true                # 给 VIP.txt 中的玩家名字加★，加入�
 ExtendedRanges = true           # 允许原版数值设置超出原版上下限
 KillCooldownMin = 0             # 设置界面可选的最小击杀冷却（秒，0〜60。原版 10）
 KillCooldownMax = 120           # 最大（秒，10〜600。原版 60）
-KillCooldownStep = 0.5          # 每次点击箭头的步长（秒，0.5〜10。原版 2.5）
+KillCooldownStep = 2.5          # 每次点击箭头的步长（秒，0.5〜10。与原版相同为 2.5。设为 0.5 则以 0.5 秒为单位；/vset 不受步长限制）
 VotingTimeMin = 0               # 投票时间最小值（秒，0〜300。原版 15。0 = 无投票）
 VotingTimeMax = 600             # 投票时间最大值（秒，15〜3600。原版 300）
 DiscussionTimeMax = 600         # 讨论时间最大值（秒，0〜3600。原版 120）
@@ -825,9 +826,9 @@ AutoRegion = false              # 开房前测量官方 3 个区域的响应时�
 EnableDleks = true              # 在地图选择中提供镜像 Skeld（Dleks）
 
 [Guide]                         # 引导房辅助（v0.4e）
-ShowCodeOverlay = true          # 在房间中于房主屏幕左上角大字显示房间代码（/code）
+ShowCodeOverlay = false         # 默认关闭。/code on 后在房间中于房主屏幕左上角大字显示房间代码
 RoleRoomCode =                  # 从便利房用 /move 引导到的职业房代码（空 = 请看引导房房主的名字）
-AutoRecreateRegistered = false  # /move 30 秒后把本房间重建为注册(+25)房间
+AutoRecreateRegistered = false  # /move 30 秒后把本房间重建为已注册的职业房
 
 [Hotkeys]
 Enabled = true                  # 使用快捷键（聊天输入中无效）
@@ -1009,7 +1010,7 @@ English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja
 警长 x1 击杀CD30秒 可杀狂粉
 内鬼狂粉 x1
 小丑 x1
-语言=zh 注册(+25)=on 欢迎语=on
+语言=zh MOD注册=on 欢迎语=on
 ```
 
 - 第 4 行是 **规则行**（v0.4）。默认是“无规则”的文字，可用 `/rules <文字>` 替换为自己的规则。
@@ -1076,7 +1077,7 @@ English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja
 
 - `/public now` 可以立即设为公开（仅在线房间中）。
 - 游戏版本不一致（[第 24 章](#24-游戏版本检查)）期间不会自动公开。
-- 已注册（+25）的房间即使设为公开也 **不会显示在列表中**（[3.2](#32-已注册的房间不会出现在公开房间列表中)）。想出现在列表里时，请用关闭注册的“便利房”（无职业）加引导房（[第 25 章](#25-便利房关闭注册与引导房)）。
+- 已注册的房间即使设为公开也 **不会显示在列表中**（[3.2](#32-已注册的房间不会出现在公开房间列表中)）。想出现在列表里时，请用关闭注册的“便利房”（无职业）加引导房（[第 25 章](#25-便利房关闭注册与引导房)）。
 
 只输入 `/rehost`、`/public` 会显示当前状态。也可以在设置标签页的“大厅”分组中更改。
 
@@ -1155,7 +1156,7 @@ English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja
 
 | 按键（默认） | 动作 | 按法 |
 |---|---|---|
-| **F7** | 大厅中为废村（刷新房间），游戏中为立即结束本局并回到同一房间（[16.4](#164-废村haison廃村f7-2)） | **3 秒内按两次**。第一次按下时画面上方显示“F7: 再按一次即执行（废村（刷新房间））” |
+| **F7** | 大厅中为废村（刷新房间），游戏中为立即结束本局并回到同一房间（[16.4](#164-废村haison廃村f7-2)） | **3 秒内按两次**。第一次按下时显示“在 3 秒内再按一次 F7 即可废村（刷新房间）”（画面上方的提示和房主本地的聊天中都会显示） |
 | **F8** | 截止会议投票（[第 18 章](#18-强制结束会议)） | **3 秒内按两次**。非投票中（讨论 / 投票）时不做任何事 |
 | **F9** 或 **Esc** | 取消开始倒计时 | 按一次。仅倒计时期间（Esc 只在倒计时期间响应）。F9 在聊天输入中也有效（v0.4c） |
 
@@ -1363,9 +1364,9 @@ Harmony 补丁应用失败时（游戏内部变化较大时）模组也会自动
 | 发给玩家的私密消息（职业通知、欢迎语、`/cmd` 回复） | 送达（`/cmd …` 只有房主可见） | **不发送**（服务器会把私密消息视为作弊并断开房主。实机确认） |
 | 聊天翻译 | 并用（广播 + 单独翻译） | 仅广播 |
 | 房主工具（剩余时间、自动开始、废村、结束会议、取消、快捷键、外观） | 可用 | 可用 |
-| 屏幕左上角显示 | `职业房 ABCDEF` | `便利房 ABCDEF`（`/move <代码>` 设置后下方显示 `职业→代码`） |
+| 屏幕左上角显示（`/code on` 时） | `职业房 ABCDEF` | `便利房 ABCDEF`（`/move <代码>` 设置后下方显示 `职业→代码`） |
 
-创建关闭注册的房间时，房主的聊天中会显示“未注册（便利房）的房间：本局按原版进行，没有自定义职业；职业需要注册(+25)的房间。”切换从下一个创建的房间起生效，`/opt register on` 可以恢复。
+创建关闭注册的房间时，房主的聊天中会显示“未注册（便利房）的房间：本局按原版进行，没有自定义职业；职业需要已注册（开启 MOD 房间注册）的房间。”切换从下一个创建的房间起生效，`/opt register on` 可以恢复。
 
 ### 25.2 引导房（推荐：一部副手机）
 
@@ -1383,7 +1384,7 @@ Harmony 补丁应用失败时（游戏内部变化较大时）模组也会自动
 3. 用副手机创建 **公开** 房间（无模组，游戏设置随意）。在聊天里写“有职业的房间是 QWERTY，输入代码来玩吧”。引导房放着不管也没关系（超时后再重建）。
 4. 有人来了就在 PC 的职业房正常游玩。**废村（F7）不会改变代码。** 自动重建或重建导致代码变化时，再次 `/announce` 复制并改手机的名字。
 
-- 房间左上角的大字代码可以用 `/code` 隐藏（`[Guide] ShowCodeOverlay`，设置标签页“大字显示房间代码”）。打开设置界面（房间电脑）期间和对局中会自动隐藏。
+- 房间左上角的大字代码默认关闭，用 `/code on` 显示（`/code off` 隐藏。`[Guide] ShowCodeOverlay`，设置标签页“大字显示房间代码”）。显示期间，打开设置界面（房间电脑）时和对局中也会自动隐藏。
 - 齿轮菜单“PocketRoles 设置”面板的下方也有同样的提示。
 - 副手机请保持 Among Us 在前台（切换到其他应用可能导致房间掉线）。
 
@@ -1615,7 +1616,7 @@ build.cmd
 - `lang\*.json` 和 `assets\PocketRoles-256.png`（标题画面的图标）作为嵌入资源包含在 DLL 中，语言文件在首次启动时写出到 `BepInEx\PocketRoles\lang\`。想修改文本时不必重新构建 DLL，编辑写出的文件即可。
 - 运行确认：启动模组副本中的 `Among Us.exe`，确认 `BepInEx\LogOutput.log` 中有 `PocketRoles v0.4.0 loaded` 且没有 Harmony 补丁错误。
 
-生成发布 zip：`powershell -NoProfile -ExecutionPolicy Bypass -File build-release.ps1`（`-SkipBuild` 跳过构建）。会生成 `dist\PocketRoles-<ver>.zip`（`BepInEx\plugins\PocketRoles.dll`、`BepInEx\PocketRoles\lang\*.json`、3 种 README、LICENSE）、`dist\PocketRoles-Setup-<ver>.zip`（`PocketRolesLauncher.ps1`、`PocketRoles Launcher.cmd`、`assets\PocketRoles.ico`、`はじめに.txt`）和 `SHA256SUMS.txt`。版本取自 `PocketRoles.csproj` 的 `<Version>`。把这两个 zip 附加到 GitHub Releases 后，启动器的“检查更新”“安装”就能获取最新版本（会查找名为 `PocketRoles-<ver>.zip` 的资源）。
+生成发布 zip：`powershell -NoProfile -ExecutionPolicy Bypass -File build-release.ps1`（`-SkipBuild` 跳过构建）。会生成 `dist\PocketRoles-<ver>.zip`（`BepInEx\plugins\PocketRoles.dll`、`BepInEx\PocketRoles\lang\*.json`、3 种 README、LICENSE、NOTICE）、`dist\PocketRoles-Setup-<ver>.zip`（`PocketRolesLauncher.ps1`、`PocketRoles Launcher.cmd`、`assets\PocketRoles.ico`、`はじめに.txt`）和 `SHA256SUMS.txt`。版本取自 `PocketRoles.csproj` 的 `<Version>`。把这两个 zip 附加到 GitHub Releases 后，启动器的“检查更新”“安装”就能获取最新版本（会查找名为 `PocketRoles-<ver>.zip` 的资源）。
 
 源代码结构（`src\`）：
 
@@ -1638,7 +1639,7 @@ build.cmd
 
 ## 30. 许可证
 
-本项目以 **GNU General Public License v3.0 or later (GPL-3.0-or-later)** 发布。全文：<https://www.gnu.org/licenses/gpl-3.0.html>（另见随附的 `LICENSE`）。
+本项目以 **GNU General Public License v3.0 or later (GPL-3.0-or-later)** 发布。全文见随附的 `LICENSE`（与 <https://www.gnu.org/licenses/gpl-3.0.html> 相同）；版权声明和 Among Us / Innersloth 的免责声明见 `NOTICE`。
 
 > This mod is not affiliated with Among Us or Innersloth LLC, and the content contained therein is not endorsed or otherwise sponsored by Innersloth LLC. Portions of the materials contained herein are property of Innersloth LLC. © Innersloth LLC.
 

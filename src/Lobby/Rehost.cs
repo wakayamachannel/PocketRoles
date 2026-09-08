@@ -667,9 +667,9 @@ namespace PocketRoles.Lobby
                     bool registered = false;
                     try { registered = Net.Registration.Hosting && Net.Registration.Registered; } catch (Exception) { }
                     Chat.Chat.Local(Chat.Chat.Title, TF3("guide.move.done",
-                        "役職ありの部屋として作り直しました（登録(+25)={1}）。新しい部屋コード: {0}  /announce で案内部屋用にコピーできます。",
-                        "Re-created as the role lobby (registered(+25)={1}). New room code: {0}  /announce copies it for the guide room.",
-                        "已重建为职业房（注册(+25)={1}）。新房间代码：{0}  用 /announce 可复制到引导房。",
+                        "役職ありの部屋として作り直しました（MOD登録={1}）。新しい部屋コード: {0}  /announce で案内部屋用にコピーできます。",
+                        "Re-created as the role lobby (registration={1}). New room code: {0}  /announce copies it for the guide room.",
+                        "已重建为职业房（MOD注册={1}）。新房间代码：{0}  用 /announce 可复制到引导房。",
                         code, registered ? "on" : "off"));
                     return;
                 }

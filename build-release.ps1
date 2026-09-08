@@ -73,7 +73,7 @@ if (Test-Path $stage) { [IO.Directory]::Delete($stage, $true) }
 $modStage = Join-Path $stage 'mod'
 Copy-Into $dll (Join-Path $modStage 'BepInEx\plugins')
 foreach ($j in (Get-ChildItem (Join-Path $root 'lang') -Filter *.json -File)) { Copy-Into $j.FullName (Join-Path $modStage 'BepInEx\PocketRoles\lang') }
-foreach ($n in @('README.md', 'README.zh-CN.md', 'README.en.md', 'LICENSE')) { $p = Join-Path $root $n; if (Test-Path $p) { Copy-Into $p $modStage } }
+foreach ($n in @('README.md', 'README.zh-CN.md', 'README.en.md', 'LICENSE', 'NOTICE')) { $p = Join-Path $root $n; if (Test-Path $p) { Copy-Into $p $modStage } }
 $modZip = Join-Path $dist ('PocketRoles-' + $ver + '.zip')
 New-ZipFromDir $modStage $modZip
 
@@ -99,7 +99,7 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    初回はタイトル画面まで 1〜2 分かかります (途中で黒い窓が出ても閉じないでください)。
    タイトル画面の右の窓に PocketRoles のパネルが出たら完了。「オンライン → 部屋を作る」で役職が有効になります。
 ・参加者は何も入れなくて OK。mod を入れるのは部屋を作るホストだけです。
-・役職ありの部屋は公開一覧に出ません。ロビーの左上に大きく出る部屋コードを友達に伝えるか、
+・役職ありの部屋は公開一覧に出ません。ロビー画面の下に出る部屋コード (「/code on」で左上に大きく表示もできます) を友達に伝えるか、
    サブのスマホで名前を「役職→コード」にしたバニラの公開部屋 (案内部屋) を作って呼びます。
    チャットで「/announce」と打つとコードがコピーされ、手順が出ます (説明書「人の集め方」)。
 ・画面右上の「言語」で 日本語 / 中文 / English を切り替えられます。
@@ -122,7 +122,7 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    首次启动到标题画面需要 1〜2 分钟 (中途出现黑色窗口也请不要关闭)。
    标题画面右侧窗口出现 PocketRoles 面板即安装完成。“在线 → 创建房间”后职业就会启用。
 ・其他玩家不需要安装任何东西，只有建房的房主需要 mod。
-・有职业的房间不会出现在公开列表里。把房间左上角大字显示的代码告诉朋友，
+・有职业的房间不会出现在公开列表里。把房间画面下方显示的代码 (输入“/code on”可在左上角大字显示) 告诉朋友，
    或者用副手机把名字改成“职业→代码”，开一个原版公开房 (引导房) 来招人。
    在聊天里输入“/announce”会复制代码并显示步骤 (见说明书“如何招人”)。
 ・右上角的“语言”可以切换 日本語 / 中文 / English。
@@ -146,7 +146,7 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    The first launch takes 1-2 minutes to reach the title screen (if a black window appears in between, do not close it).
    When the PocketRoles panel shows in the right-hand window of the title screen you are done. "Online -> Create game" and the roles are active.
 - Other players install nothing; only the host who creates the room needs the mod.
-- A lobby with roles never appears in the public list. Tell your friends the code shown big at the top-left of the lobby,
+- A lobby with roles never appears in the public list. Tell your friends the code shown at the bottom of the lobby screen ("/code on" also shows it big at the top-left),
    or host a vanilla PUBLIC lobby on a spare phone with the name "Roles->CODE" (a guide room) to bring people in.
    Type "/announce" in chat to copy the code and see the steps (README, "Getting players in").
 - "Language" at the top-right switches between 日本語 / 中文 / English.

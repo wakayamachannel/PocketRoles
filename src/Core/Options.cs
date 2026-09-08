@@ -65,6 +65,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<string> _creditAuthor;
         private static ConfigEntry<string> _creditRepoUrl;
         private static ConfigEntry<bool> _showCredits;
+        private static ConfigEntry<bool> _vanillaRoles;
 
         // v0.3 [Cosmetics] (host screen only)
         private static ConfigEntry<bool> _cosEnabled;
@@ -203,8 +204,8 @@ namespace PocketRoles.Core
             _enabled = cfg.Bind("General", "Enabled", true, "Enable PocketRoles (host only). Can be toggled in the lobby with /mod on|off");
             _language = cfg.Bind("General", "Language", "ja", new ConfigDescription("Default language for player-facing text: ja (Japanese), zh (Simplified Chinese) or en (English). Players can pick their own with /lang; texts are editable in BepInEx/PocketRoles/lang/*.json", new AcceptableValueList<string>("ja", "zh", "en")));
             _register = cfg.Bind("General", "RegisterAsModdedLobby", true,
-                "Register the lobby as modded (+25 host-authority protocol flag) when hosting. REQUIRED by Innersloth's Among Us Mod Policy (2026-07-30) for any mod that changes gameplay / roles on official servers. " +
-                "Turning this off is a policy violation, disables the private /cmd command channel and exposes the host to the full server anti-cheat. Registered lobbies may not appear in the vanilla public lobby list (players join by room code).");
+                "Mod-lobby registration (the so-called +25, the host-authority protocol flag): register the lobby as modded when hosting. REQUIRED by Innersloth's Among Us Mod Policy (2026-07-30) for any mod that changes gameplay / roles on official servers. " +
+                "Turning this off is a policy violation, disables the private /cmd command channel and exposes the host to the full server anti-cheat. Registered lobbies do not appear in the vanilla public lobby list (players join by room code or through the guide room).");
             _ignoreVersion = cfg.Bind("General", "IgnoreVersionMismatch", false,
                 "Keep the mod active even when the game version differs from the one PocketRoles was built for (" + PocketRolesPlugin.SupportedGameVersion + "). Off = the mod stays inert on a mismatch (safe default)");
             _welcome = cfg.Bind("Chat", "WelcomeMessage", true, "Send a private notice to every player who joins explaining that this lobby uses a host-side role mod");
@@ -212,7 +213,7 @@ namespace PocketRoles.Core
             _welcomeText = cfg.Bind("Chat", "WelcomeText", "",
                 "Custom welcome text sent to joining players (empty = built-in text). \\n = line break; placeholders: {rules} {roles} {settings} {help} {version}. The mandatory mod notice line is always prepended");
             _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", true, "Append the current role settings to the welcome message");
-            _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Kick a player after repeated forged host-only RPCs (SetRole/SetName/MurderPlayer/...). Off = drop and log only");
+            _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
 
             _autoRehost = cfg.Bind("Lobby", "AutoRehost", false, "Automatically create a new lobby after an unexpected disconnect (server error, timeout) while hosting");
             _autoPublic = cfg.Bind("Lobby", "AutoPublic", false, "Automatically make the lobby public a few seconds after it is created / re-hosted");
@@ -221,11 +222,12 @@ namespace PocketRoles.Core
             _maxHostPing = cfg.Bind("Lobby", "MaxHostPing", 0, new ConfigDescription("Offer to re-create the lobby (same settings) while it is still empty when the host's ping to the game server stays above this many ms for 5 s right after the lobby is created (official regions mix near and far servers). The host is ASKED on screen first (Yes/No, once per lobby, or /rehost yes|no) because short-lived lobbies count as deliberate disconnects (ban points). 0 = off; at most 3 re-creations in a row, then the lobby is kept (/opt maxping <ms>)", new AcceptableValueRange<int>(0, 300)));
             _compatAllowRisky = cfg.Bind("Compat", "AllowRiskyRoles", false,
                 "Unregistered-compatible mode (RegisterAsModdedLobby=false, the lobby shows in the vanilla public list): also assign roles whose kills come from a non-Impostor (Sheriff, Jackal). " +
-                "Without host authority (+25) the official server may reject those kills. Off = Sheriff and Jackal are skipped in compat mode (/opt compat.risky on|off)");
+                "Without mod-lobby registration (host authority) the official server may reject those kills. Off = Sheriff and Jackal are skipped in compat mode (/opt compat.risky on|off)");
 
             _creditAuthor = cfg.Bind("Credits", "Author", "もみじちゃ", "Name shown in the lobby credits line (empty = none)");
             _creditRepoUrl = cfg.Bind("Credits", "RepoUrl", "https://github.com/wakayamachannel/PocketRoles", "Repository / homepage URL shown in the credits line (empty = none)");
             _showCredits = cfg.Bind("Credits", "ShowInMenu", true, "Show the PocketRoles credits line in the menu");
+            _vanillaRoles = cfg.Bind("Roles", "VanillaRoles", false, "Also hand out the vanilla special roles (Scientist, Engineer, Shapeshifter, Noisemaker, Phantom, Tracker, Detective, Viper, Judge) in role games, as set in the vanilla role settings. Off (default) = only Crewmates and Impostors, from which the PocketRoles roles are drawn (the vanilla role rates are zeroed for the assignment only)");
             if (_migrated)
             {
                 // The v0.2 file shipped with empty [Credits] values; the copied file must not hide the new defaults.
@@ -243,6 +245,14 @@ namespace PocketRoles.Core
 
             // ---- v0.3 cosmetics (only the host's own screen; nothing is transmitted)
             _cosEnabled = cfg.Bind("Cosmetics", "Enabled", true, "Enable the host-only cosmetics (custom hats/visors/nameplates, lobby music, lobby decor, menu background, cursor) loaded from BepInEx/PocketRoles/. Other players never see them");
+            // Off (settings tab, /opt cos.enabled off or the gear menu alike): the overrides already written into the
+            // loaded hat/visor/nameplate view data must be undone now; nothing re-touches them once Enabled is false.
+            _cosEnabled.SettingChanged += (_, __) =>
+            {
+                if (_cosEnabled.Value) return;
+                try { PocketRoles.Cosmetics.CosmeticOverrides.Reset(); }
+                catch (Exception e) { PocketRolesPlugin.Logger?.LogError($"Options: cos.enabled off: {e}"); }
+            };
             _cosMusic = cfg.Bind("Cosmetics", "LobbyMusic", "custom", new ConfigDescription("Lobby music: custom (play a file from BepInEx/PocketRoles/music when present, else vanilla), vanilla (game theme), mute (no lobby music)", new AcceptableValueList<string>(LobbyMusicChoices)));
             _cosMusicFile = cfg.Bind("Cosmetics", "LobbyMusicFile", "", "File name inside BepInEx/PocketRoles/music to play (WAV or OGG; empty = the first file found)");
             _cosMusicVolume = cfg.Bind("Cosmetics", "LobbyMusicVolume", 0.07f, new ConfigDescription("Gain applied to the custom lobby music (0..1). The vanilla theme plays at about 0.07, so normalised tracks need a low value", new AcceptableValueRange<float>(0f, 1f)));
@@ -303,9 +313,9 @@ namespace PocketRoles.Core
             _vanTaskMax = cfg.Bind("Vanilla", "TaskCountMax", 30, new ConfigDescription("Highest common / short / long task count offered by the settings screen (vanilla: 2 / 5 / 3)", new AcceptableValueRange<int>(1, 60)));
 
             // ---- v0.4e guide room (a second, vanilla, PUBLIC lobby on a sub-phone whose host name / chat carry this room's code)
-            _guideShowCodeOverlay = cfg.Bind("Guide", "ShowCodeOverlay", true, "Show the room code large on the host's screen while hosting a lobby (top-left; /code toggles it). Hidden in game");
-            _guideRoleRoomCode = cfg.Bind("Guide", "RoleRoomCode", "", "Room code of the registered (+25) role lobby announced by /move from an unregistered 便利ホスト lobby (empty = 'the code is shown in the guide room host name'). /move <CODE> sets it");
-            _guideAutoRecreateRegistered = cfg.Bind("Guide", "AutoRecreateRegistered", false, "/move: 30 s after the announcement, re-create the current unregistered lobby as a registered (+25) role lobby (everyone has to rejoin with the new code). Off = announce only");
+            _guideShowCodeOverlay = cfg.Bind("Guide", "ShowCodeOverlay", false, "Show the room code large on the host's screen while hosting a lobby (top-left; off by default because vanilla already shows the code at the bottom; /code on turns it on). Hidden in game");
+            _guideRoleRoomCode = cfg.Bind("Guide", "RoleRoomCode", "", "Room code of the registered role lobby (mod-lobby registration on) announced by /move from an unregistered 便利ホスト lobby (empty = 'the code is shown in the guide room host name'). /move <CODE> sets it");
+            _guideAutoRecreateRegistered = cfg.Bind("Guide", "AutoRecreateRegistered", false, "/move: 30 s after the announcement, re-create the current unregistered lobby as a registered role lobby (mod-lobby registration on; everyone has to rejoin with the new code). Off = announce only");
 
             foreach (var r in Roles.All)
             {
@@ -355,6 +365,8 @@ namespace PocketRoles.Core
         public static string CreditAuthor { get => _creditAuthor == null ? "" : (_creditAuthor.Value ?? ""); set { if (_creditAuthor != null) _creditAuthor.Value = value ?? ""; } }
         public static string CreditRepoUrl { get => _creditRepoUrl == null ? "" : (_creditRepoUrl.Value ?? ""); set { if (_creditRepoUrl != null) _creditRepoUrl.Value = value ?? ""; } }
         public static bool ShowCredits { get => _showCredits == null || _showCredits.Value; set { if (_showCredits != null) _showCredits.Value = value; } }
+        /// <summary>[Roles] VanillaRoles: hand out the vanilla special roles alongside the custom ones (default off = crew/impostor only).</summary>
+        public static bool VanillaRolesEnabled { get => _vanillaRoles != null && _vanillaRoles.Value; set { if (_vanillaRoles != null) _vanillaRoles.Value = value; } }
 
         // ------------------------------------------------------------------ v0.3 [Cosmetics]
 
@@ -685,6 +697,11 @@ namespace PocketRoles.Core
         {
             _descriptors.Clear();
 
+            _descriptors.Add(Bool("roles.vanilla", "全般", "General", "本体の特殊役職も配る", "Also assign vanilla special roles", _vanillaRoles)
+                .Tip("オン = サイエンティスト・エンジニア・ジャッジなど本体の役職も本体の設定どおりに出ます。オフ（既定）= クルーとインポスターだけにして、そこから PocketRoles の役職を配ります。",
+                    "On = vanilla roles (Scientist, Engineer, Judge, ...) are assigned as set in the vanilla role settings. Off (default) = only Crewmates and Impostors, from which the PocketRoles roles are drawn.",
+                    "开 = 科学家、工程师、法官等原版职业按原版设置出现。关（默认）= 只有船员和内鬼，PocketRoles 的职业从中分配。"));
+
             foreach (var r in Roles.All)
             {
                 string sJa = r.NameJa, sEn = r.NameEn, color = r.Color;
@@ -735,8 +752,8 @@ namespace PocketRoles.Core
             }
 
             const string gJa = "全般", gEn = "General";
-            _descriptors.Add(Bool("register", gJa, gEn, "MOD登録(+25)", "Register lobby (+25)", _register)
-                .Tip("ロビーをMOD部屋として登録します（Innersloth の規約で必須。公開一覧に出ない場合があります）。", "Registers the lobby as modded (required by Innersloth's policy; it may not show in the public list).", "将房间注册为模组房间（Innersloth 政策要求；可能不会显示在公开列表）。"));
+            _descriptors.Add(Bool("register", gJa, gEn, "MOD部屋登録（公式ルール・役職に必須）", "Mod-lobby registration (official rule, required for roles)", _register)
+                .Tip("2026年7月からの公式ルールで、MODを使う部屋はサーバーに登録する必要があります。登録した部屋は公開一覧に出ないので、部屋コードか案内部屋から入ってもらいます。", "Since July 2026 the official servers require lobbies that use mods to register. Registered lobbies do not appear in the public list, so players join by room code or through the guide room.", "根据 2026 年 7 月起的官方规则，使用 MOD 的房间必须向服务器注册。已注册的房间不会出现在公开列表里，请用房间代码或引导房加入。"));
             _descriptors.Add(new OptionDescriptor
             {
                 Key = "lang", SectionJa = gJa, SectionEn = gEn, NameJa = "言語", NameEn = "Language", Kind = OptionKind.Choice,
@@ -807,7 +824,7 @@ namespace PocketRoles.Core
             _descriptors.Add(Bool("guide.overlay", hJa, hEn, "部屋コードを大きく表示", "Big room-code overlay", _guideShowCodeOverlay)
                 .Tip("ロビー中、ホストの画面左上に部屋コードを大きく表示します（/code で切替。案内部屋の名前に書き写す用）。", "Shows the room code large at the top-left of the host's lobby screen (/code toggles it; copy it into the guide room's name).", "在大厅中于房主屏幕左上角大字显示房间代码（/code 切换；用于抄写到引导房的名字）。"));
             _descriptors.Add(Bool("guide.autoreg", hJa, hEn, "/move 後に登録部屋へ作り直す", "/move: re-create as registered", _guideAutoRecreateRegistered)
-                .Tip("/move の 30 秒後に、この便利ホスト部屋を登録(+25)の役職部屋として作り直します（全員がコードで入り直し）。", "30 s after /move, re-creates this unregistered lobby as a registered (+25) role lobby (everyone rejoins with the new code).", "/move 30 秒后，把这个未注册房间重建为已注册(+25)的职业房（所有人用新代码重新加入）。"));
+                .Tip("/move の 30 秒後に、この便利ホスト部屋を MOD 登録ありの役職部屋として作り直します（全員がコードで入り直し）。", "30 s after /move, re-creates this unregistered lobby as a registered role lobby (everyone rejoins with the new code).", "/move 30 秒后，把这个未注册房间重建为已注册的职业房（所有人用新代码重新加入）。"));
             // v0.4b vanilla extended ranges (also host-tools page)
             _descriptors.Add(Bool("vanilla.ranges", hJa, hEn, "バニラ設定の範囲拡張", "Vanilla extended ranges", _vanExtendedRanges)
                 .Tip("バニラの数値設定をバニラの上限・下限を超えて設定できるようにします。", "Lets the vanilla numeric settings go beyond their vanilla limits.", "允许原版数值设置超出原版上下限。"));
@@ -989,7 +1006,7 @@ namespace PocketRoles.Core
                 case "enabled": case "mod": return SetBool(_enabled, value, "enabled", out message);
                 case "welcome": return SetBool(_welcome, value, "welcome", out message);
                 case "roleinfo": return SetBool(_roleInfoAtMeeting, value, "roleinfo", out message);
-                case "register": case "modded": case "+25": return SetBool(_register, value, "register(+25)", out message);
+                case "register": case "modded": case "+25": return SetBool(_register, value, "register", out message);
                 case "kick": case "anticheatkick": return SetBool(_antiCheatKick, value, "kick", out message);
                 case "general.ignoreversion": case "ignoreversion": return SetBool(_ignoreVersion, value, "general.ignoreversion", out message);
                 case "lobby.autorehost": case "autorehost": case "rehost": return SetBool(_autoRehost, value, "lobby.autorehost", out message);
@@ -1003,6 +1020,7 @@ namespace PocketRoles.Core
                 case "credits.author": return SetString(_creditAuthor, value, "credits.author", out message);
                 case "credits.url": case "credits.repourl": return SetString(_creditRepoUrl, value, "credits.url", out message);
                 case "credits.show": return SetBool(_showCredits, value, "credits.show", out message);
+                case "roles.vanilla": case "vanillaroles": case "vanilla.roles": return SetBool(_vanillaRoles, value, "roles.vanilla", out message);
                 // v0.4 lobby
                 case "lobby.autostart": case "autostart": return SetBool(_autoStart, value, "lobby.autostart", out message);
                 case "lobby.autostartplayers": case "autostartplayers": case "autostart.players": return SetInt(_autoStartPlayers, value, 4, 15, "lobby.autostartplayers", out message);
@@ -1152,7 +1170,7 @@ namespace PocketRoles.Core
                 lines.Add(line);
             }
             if (!any) lines.Add(Lang.T("opt.none", "有効な役職はありません（/set <役職> <人数> で設定）", "No custom roles enabled (/set <role> <count>)"));
-            lines.Add(Lang.TF("opt.general", "言語={0} 登録(+25)={1} 挨拶={2}", "lang={0} register(+25)={1} welcome={2}",
+            lines.Add(Lang.TF("opt.general", "言語={0} MOD登録={1} 挨拶={2}", "lang={0} registration={1} welcome={2}",
                 Language, HostAuthorityMode ? "on" : "off", WelcomeMessage ? "on" : "off"));
             if (AutoRehost || AutoPublic)
             {

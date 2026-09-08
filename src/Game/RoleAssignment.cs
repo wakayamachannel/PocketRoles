@@ -57,7 +57,7 @@ namespace PocketRoles.Game
             return r;
         }
 
-        private static bool IsImpostorRole(RoleTypes r)
+        internal static bool IsImpostorRole(RoleTypes r)
         {
             return r == RoleTypes.Impostor || r == RoleTypes.Shapeshifter || r == RoleTypes.Phantom || r == RoleTypes.Viper || r == RoleTypes.ImpostorGhost;
         }
@@ -374,9 +374,9 @@ namespace PocketRoles.Game
                 {
                     PocketRolesPlugin.Logger.LogInfo("Assign: unregistered lobby (compat mode) — vanilla roles only, no custom roles and no per-client role views");
                     Chat.Chat.Local(Chat.Chat.Title, Lang.T("compat.roles.off",
-                        "登録オフ（便利ホスト）の部屋なので役職なしのバニラで進行します。役職ありは登録(+25)の部屋で。",
-                        "Unregistered (便利ホスト) lobby: this game runs vanilla without custom roles; roles need a registered (+25) lobby.",
-                        "未注册（便利房）的房间：本局按原版进行，没有自定义职业；职业需要注册(+25)的房间。"));
+                        "登録オフ（便利ホスト）の部屋なので役職なしのバニラで進行します。役職ありは MOD 登録ありの部屋で。",
+                        "Unregistered (便利ホスト) lobby: this game runs vanilla without custom roles; roles need a registered lobby (mod-lobby registration on).",
+                        "未注册（便利房）的房间：本局按原版进行，没有自定义职业；职业需要已注册（开启 MOD 房间注册）的房间。"));
                     return;
                 }
                 Core.Game.AssigningRoles = true;
@@ -386,6 +386,11 @@ namespace PocketRoles.Game
                     if (pc.Data == null) continue;
                     Core.Game.OriginalNames[pc.PlayerId] = pc.Data.PlayerName ?? string.Empty;
                 }
+                // [Roles] VanillaRoles = false (default): the vanilla special roles (Scientist, Engineer, Judge, ...) are
+                // not handed out in a role game — only Crewmates and Impostors, from which the custom roles are drawn.
+                // Done by zeroing the host's role rates for this SelectRoles call only (restored in the postfix; the
+                // change is local to the host and never synced, the clients only ever see the resulting RpcSetRole).
+                if (!Options.VanillaRolesEnabled) SuppressVanillaRoles();
             }
             catch (Exception e)
             {
@@ -397,11 +402,18 @@ namespace PocketRoles.Game
         {
             try
             {
+                RestoreVanillaRoles();
                 if (!Core.Game.IsHostActive || Core.Game.HaisonActive || Registration.CompatMode)
                 {
                     Core.Game.AssigningRoles = false;
                     return;
                 }
+                // 2026.8.18 (options V11): SelectRoles hands out only the special roles — the crew pass runs with
+                // default=none and a plain Crewmate never receives RpcSetRole, so its roleAssigned stays false and,
+                // for the host, the intro (started from its own CoSetRole) never comes (black screen, 2026-09-08).
+                // Give every still-unassigned player its plain role here while the passthrough is active: the vanilla
+                // RpcSetRole bookkeeping runs exactly as for a special role and the per-client views follow below.
+                AssignPlainRoles();
                 Core.Game.AssigningRoles = false;
                 RoleAssignment.DispatchInitialRoles();
             }
@@ -410,6 +422,91 @@ namespace PocketRoles.Game
                 Core.Game.AssigningRoles = false;
                 PocketRolesPlugin.Logger.LogError($"Assign_SelectRoles postfix: {e}");
             }
+        }
+
+        /// <summary>Vanilla special roles whose rates are zeroed while [Roles] VanillaRoles is off (ghost roles excluded).</summary>
+        private static readonly RoleTypes[] VanillaSpecialRoles =
+        {
+            RoleTypes.Scientist, RoleTypes.Engineer, RoleTypes.Shapeshifter, RoleTypes.Noisemaker, RoleTypes.Phantom,
+            RoleTypes.Tracker, RoleTypes.Detective, RoleTypes.Viper, RoleTypes.Judge,
+        };
+        private static readonly Dictionary<RoleTypes, (int count, int chance)> _savedRates = new Dictionary<RoleTypes, (int, int)>();
+
+        /// <summary>
+        /// Sends the plain role (Crewmate, or Impostor when the local table already says so) to every player the vanilla
+        /// selection left without RpcSetRole (roleAssigned == false). Called before AssigningRoles is cleared so the
+        /// RpcSetRole prefix records the vanilla role and lets the vanilla code run.
+        /// </summary>
+        private static void AssignPlainRoles()
+        {
+            try
+            {
+                int sent = 0;
+                var missing = new StringBuilder();
+                foreach (var pc in Core.Game.AllPlayers())
+                {
+                    if (pc == null || pc.Data == null || pc.Data.Disconnected) continue;
+                    if (pc.roleAssigned) continue;
+                    RoleTypes current = pc.Data.Role != null ? pc.Data.Role.Role : RoleTypes.Crewmate;
+                    RoleTypes plain = RoleAssignment.IsImpostorRole(current) ? RoleTypes.Impostor : RoleTypes.Crewmate;
+                    pc.RpcSetRole(plain, false);
+                    sent++;
+                    missing.Append(" #").Append(pc.PlayerId).Append('=').Append(plain);
+                }
+                if (sent > 0)
+                    PocketRolesPlugin.Logger.LogInfo($"Assign: plain role sent to {sent} player(s) the vanilla selection left unassigned:{missing}");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Assign.AssignPlainRoles: {e}");
+            }
+        }
+
+        private static void SuppressVanillaRoles()
+        {
+            _savedRates.Clear();
+            try
+            {
+                var ro = GameOptionsManager.Instance?.CurrentGameOptions?.RoleOptions;
+                if (ro == null) return;
+                int zeroed = 0;
+                foreach (var r in VanillaSpecialRoles)
+                {
+                    try
+                    {
+                        int n = ro.GetNumPerGame(r), c = ro.GetChancePerGame(r);
+                        if (n <= 0 && c <= 0) continue;
+                        _savedRates[r] = (n, c);
+                        ro.SetRoleRate(r, 0, 0);
+                        zeroed++;
+                    }
+                    catch (Exception) { }
+                }
+                if (zeroed > 0) PocketRolesPlugin.Logger.LogInfo($"Assign: vanilla special roles suppressed for this game ({zeroed} role rate(s) zeroed; [Roles] VanillaRoles = off)");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"Assign: vanilla role suppression failed: {e.Message}");
+            }
+        }
+
+        private static void RestoreVanillaRoles()
+        {
+            if (_savedRates.Count == 0) return;
+            try
+            {
+                var ro = GameOptionsManager.Instance?.CurrentGameOptions?.RoleOptions;
+                if (ro != null)
+                    foreach (var kv in _savedRates)
+                    {
+                        try { ro.SetRoleRate(kv.Key, kv.Value.count, kv.Value.chance); } catch (Exception) { }
+                    }
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"Assign: vanilla role restore failed: {e.Message}");
+            }
+            _savedRates.Clear();
         }
     }
 

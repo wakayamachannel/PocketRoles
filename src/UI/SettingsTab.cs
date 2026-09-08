@@ -57,7 +57,10 @@ namespace PocketRoles.UI
         /// <summary>The vanilla button caption's localScale as cloned (the fit in <see cref="ApplyVanillaLabel"/> is relative to it).</summary>
         private static Vector3 _vanillaLabelScale = Vector3.one;
         /// <summary>Height factor of the vanilla group button while expanded (a header bar above the three vanilla buttons).</summary>
-        private const float ExpandedBarHeight = 0.55f;
+        private const float ExpandedBarHeight = 0.4f;
+        /// <summary>Uniform scale of the three vanilla buttons while expanded and their pitch in slot units (verify finding #29: the third button was clipped by the panel bottom at full size).</summary>
+        private const float ExpandedButtonScale = 0.75f;
+        private const float ExpandedPitch = 0.6f;
 
         // ------------------------------------------------------------------ host action row (ホスト page, verify findings "ホスト支援")
 
@@ -1532,8 +1535,12 @@ namespace PocketRoles.UI
                 {
                     if (v == null) continue;
                     if (v.gameObject.activeSelf != on) v.gameObject.SetActive(on);
-                    // slot 1 + the bar (0.55 of a slot) + i: collapsed positions do not matter (hidden) but stay sane
-                    v.transform.localPosition = _slotTop + _slotDelta * (on ? 1f + ExpandedBarHeight + i : 1f + i);
+                    // expanded: smaller buttons packed under the bar so all three stay inside the panel
+                    // (top edge of slot 1 + bar + pitch * (i + 0.5)); collapsed positions do not matter (hidden) but stay sane
+                    v.transform.localScale = on ? _slotScale * ExpandedButtonScale : _slotScale;
+                    v.transform.localPosition = on
+                        ? _slotTop + _slotDelta * (0.5f + ExpandedBarHeight + ExpandedPitch * (i + 0.5f))
+                        : _slotTop + _slotDelta * (1f + i);
                 }
                 catch (Exception) { }
             }

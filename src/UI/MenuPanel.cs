@@ -88,8 +88,8 @@ namespace PocketRoles.UI
             return "<b>" + title + "</b>  <size=58%>" + shown + "</size>";
         }
 
-        internal static string Desc1() => Lang.T("menu.panel.desc1", "ホストだけ導入で役職が遊べる MOD", "Roles for everyone; only the host installs it", "仅房主安装即可游玩职业的 MOD");
-        internal static string Desc2() => Lang.T("menu.panel.desc2", "参加者はバニラのままで OK", "Players can join with vanilla Among Us", "参与者保持原版即可");
+        internal static string Desc1() => Lang.T("menu.panel.desc1", "ホストだけ導入で役職が遊べる", "Roles for everyone; only the host installs it", "仅房主安装即可游玩职业");
+        internal static string Desc2() => Lang.T("menu.panel.desc2", "参加者は何も入れずに遊べる", "Players can join with vanilla Among Us", "参与者无需安装即可加入");
 
         // ------------------------------------------------------------------ build
 

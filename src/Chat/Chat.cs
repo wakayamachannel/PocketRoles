@@ -446,7 +446,7 @@ namespace PocketRoles.Chat
             if (chunks.Count > max)
             {
                 chunks.RemoveRange(max, chunks.Count - max);
-                chunks[max - 1] = chunks[max - 1] + "…";
+                chunks[max - 1] = Truncated(chunks[max - 1]);
             }
             return chunks;
         }
@@ -807,6 +807,38 @@ namespace PocketRoles.Chat
         {
             chunk = LimitColorTags(chunk);
             return Lang.FullWidthDigits(chunk);
+        }
+
+        /// <summary>
+        /// The last kept chunk of a capped reply with a "…" marker, still ≤ <see cref="MessageChars"/>: a chunk that
+        /// <see cref="Split"/> filled to the limit is cut back (never inside a rich-text tag; the single colour tag
+        /// Sanitize left is closed again when its closing tag fell off) before the marker is appended.
+        /// </summary>
+        internal static string Truncated(string chunk)
+        {
+            const string marker = "…";
+            const string close = "</color>";
+            if (chunk == null) chunk = "";
+            int limit = MessageChars;
+            if (chunk.Length + marker.Length <= limit) return chunk + marker;
+            string head = CutOutsideTags(chunk, limit - marker.Length);
+            string tail = marker;
+            if (head.IndexOf("<color", StringComparison.OrdinalIgnoreCase) >= 0 && head.IndexOf(close, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                head = CutOutsideTags(chunk, limit - marker.Length - close.Length);
+                if (head.IndexOf("<color", StringComparison.OrdinalIgnoreCase) >= 0) tail = close + marker;
+            }
+            return head.TrimEnd() + tail;
+        }
+
+        /// <summary>The first <paramref name="count"/> characters, moved back to the '&lt;' when the cut lands inside a tag.</summary>
+        private static string CutOutsideTags(string s, int count)
+        {
+            if (count <= 0) return "";
+            if (count >= s.Length) return s;
+            int open = s.LastIndexOf('<', count - 1);
+            if (open >= 0 && s.IndexOf('>', open) >= count) count = open;
+            return s.Substring(0, count);
         }
 
         /// <summary>Leaves the first &lt;color&gt;…&lt;/color&gt; pair; strips every other colour tag.</summary>

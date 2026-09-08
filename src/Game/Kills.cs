@@ -93,7 +93,7 @@ namespace PocketRoles.Game
                 if (opts != null)
                 {
                     float cd = opts.GetFloat(FloatOptionNames.KillCooldown);
-                    if (cd > 0f) return cd;
+                    if (cd >= 0f) return cd; // 0 s is a valid lobby value (VanillaRanges), not "unset"
                 }
             }
             catch (Exception e)

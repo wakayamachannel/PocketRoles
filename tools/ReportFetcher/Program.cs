@@ -508,12 +508,12 @@ namespace PocketRoles.Tools
         private static string FindConfig()
         {
             string exeDir = AppContext.BaseDirectory;
-            var candidates = new[]
-            {
-                Path.Combine(exeDir, "report-mail.json"),
-                Path.Combine(exeDir, "..", "..", "..", "..", "report-mail.json"),   // tools/ReportFetcher/bin/Release → project root
-                Path.Combine(Directory.GetCurrentDirectory(), "report-mail.json"),
-            };
+            var candidates = new List<string> { Path.Combine(exeDir, "report-mail.json") };
+            // walk up from tools\ReportFetcher\bin\<Config>\<tfm>\ to the project root (depth varies with the target framework)
+            var dir = new DirectoryInfo(exeDir);
+            for (int i = 0; i < 6 && dir != null; i++, dir = dir.Parent)
+                candidates.Add(Path.Combine(dir.FullName, "report-mail.json"));
+            candidates.Add(Path.Combine(Directory.GetCurrentDirectory(), "report-mail.json"));
             foreach (var c in candidates) if (File.Exists(c)) return Path.GetFullPath(c);
             return null;
         }

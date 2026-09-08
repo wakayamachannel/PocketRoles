@@ -80,6 +80,10 @@ namespace PocketRoles.Chat
                 bool explicitCmd = IsExplicitCmd(t);
                 string body = StripPrefix(t);
                 string[] tokens = body.Split(new[] { ' ', '\t', '　' }, StringSplitOptions.RemoveEmptyEntries);
+                // Japanese IME / copied examples: "/set sheriff １ ５０", "/kick #３", "/autostart ８人" (the mod's own
+                // replies show every digit full-width). Only number-like tokens are mapped, so a player name or role
+                // text containing full-width digits still matches as typed. `body` stays as is for the welcome/rules text.
+                for (int i = 0; i < tokens.Length; i++) tokens[i] = HalfWidthNumber(tokens[i]);
                 string cmd = tokens.Length > 0 ? tokens[0].ToLowerInvariant() : null;
 
                 // ---- command gating (v0.4 §A3). Decided before any reply so a disabled command never answers.
@@ -404,6 +408,30 @@ namespace PocketRoles.Chat
             return s;
         }
 
+        /// <summary>
+        /// Maps the full-width digits and the number punctuation of one token (０-９ ＃ ％ ． －) to ASCII, but only when
+        /// the whole token is number-like (digits, '#', '%', '.', '-', a trailing '人'); any other token is returned as is.
+        /// </summary>
+        private static string HalfWidthNumber(string token)
+        {
+            if (string.IsNullOrEmpty(token)) return token;
+            var sb = new StringBuilder(token.Length);
+            foreach (char c in token)
+            {
+                char m;
+                if (c >= '０' && c <= '９') m = (char)('0' + (c - '０'));
+                else if (c == '＃') m = '#';
+                else if (c == '％') m = '%';
+                else if (c == '．') m = '.';
+                else if (c == '－') m = '-';
+                else m = c;
+                bool numberLike = (m >= '0' && m <= '9') || m == '#' || m == '%' || m == '.' || m == '-' || m == '人';
+                if (!numberLike) return token;
+                sb.Append(m);
+            }
+            return sb.ToString();
+        }
+
         private static string JoinArgs(string[] tokens, int from)
         {
             var sb = new StringBuilder();
@@ -462,7 +490,7 @@ namespace PocketRoles.Chat
             if (chunks.Count > maxMessages)
             {
                 chunks.RemoveRange(maxMessages, chunks.Count - maxMessages);
-                chunks[maxMessages - 1] = chunks[maxMessages - 1] + "…";
+                chunks[maxMessages - 1] = Chat.Truncated(chunks[maxMessages - 1]);
             }
             if (sender.AmOwner)
             {
@@ -1385,7 +1413,7 @@ namespace PocketRoles.Chat
             }
             string here = Rehost.CurrentRoomCode();
             if (LobbyRegistered())
-                return TF3("cmd.move.registered", "この部屋はすでに登録(+25)の役職部屋です（コード {0}）。案内部屋の手順は /announce で表示します。", "This lobby already is the registered (+25) role lobby (code {0}); /announce shows the guide-room steps.", "本房间已经是注册(+25)的职业房（代码 {0}）；/announce 显示引导房步骤。", here);
+                return TF3("cmd.move.registered", "この部屋はすでに MOD 登録ありの役職部屋です（コード {0}）。案内部屋の手順は /announce で表示します。", "This lobby already is the registered role lobby (code {0}); /announce shows the guide-room steps.", "本房间已经是已注册的职业房（代码 {0}）；/announce 显示引导房步骤。", here);
             string role = Options.RoleRoomCode;
             bool auto = Options.AutoRecreateRegistered;
 
@@ -1444,7 +1472,7 @@ namespace PocketRoles.Chat
                     }
                 }, MoveTag);
                 reply.Append('\n');
-                reply.Append(TF3("cmd.move.auto", "{0} 秒後に登録(+25)の部屋として作り直します（全員がコードで入り直し）。/move cancel で中止。", "In {0} s the lobby is re-created as registered (+25); everyone rejoins with the new code. /move cancel aborts.", "{0} 秒后将重建为注册(+25)房间（所有人用新代码重新加入）。/move cancel 可取消。", (int)MoveDelay));
+                reply.Append(TF3("cmd.move.auto", "{0} 秒後に MOD 登録ありの役職部屋として作り直します（全員がコードで入り直し）。/move cancel で中止。", "In {0} s the lobby is re-created as a registered role lobby; everyone rejoins with the new code. /move cancel aborts.", "{0} 秒后将重建为已注册的职业房（所有人用新代码重新加入）。/move cancel 可取消。", (int)MoveDelay));
             }
             else
             {

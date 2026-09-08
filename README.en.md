@@ -6,11 +6,11 @@
 
 - **Players install nothing** — the mod runs on the host's PC only. Everyone else joins vanilla and plays as usual
 - **13 roles, whispered in 3 languages** — Sheriff, Mayor, Snitch, Jackal, Jester … Role descriptions reach each player privately in Japanese / Chinese / English, and foreign-language chat is auto-translated (combined mode)
-- **Tools that make hosting easy** — lobby time left always visible with auto-extend, auto start, haison (F7), force-end a meeting (F8), cancel a start (F9), a big room-code display, and an installer for friends
+- **Tools that make hosting easy** — lobby time left always visible with auto-extend, auto start, haison (F7), force-end a meeting (F8), cancel a start (F9), an optional big room-code display (`/code on`, off by default), and an installer for friends
 
 | ![Main-menu panel](docs/img/menu-panel.png) | ![Lobby timer and room code](docs/img/lobby-timer.png) | ![Settings tab](docs/img/settings-tabs.png) |
 |---|---|---|
-| The PocketRoles panel on the title screen | Lobby time left and the big "Role room ABCDEF" code | The settings tab in the lobby computer (Roles / Lobby / Chat / Looks / Host) |
+| The PocketRoles panel on the title screen | The lobby time-left display | The settings tab in the lobby computer (Roles / Lobby / Chat / Looks / Host) |
 | ![Role notice in chat](docs/img/roles-chat.png) | ![Chat translation](docs/img/translate.png) | |
 | The role notice a player receives (private) | Chinese chat translated into Japanese for everyone | |
 
@@ -25,16 +25,16 @@ Other languages: **[日本語 (README.md)](README.md)** / **[简体中文 (READM
 1. Download the two zips from **[GitHub Releases](https://github.com/wakayamachannel/PocketRoles/releases)**: `PocketRoles-Setup-0.4.0.zip` (the launcher) and `PocketRoles-0.4.0.zip` (the mod).
 2. **Extract both into the same folder** (e.g. `Documents\PocketRoles`, somewhere you will keep. With an internet connection the Setup zip alone works — the launcher fetches the mod).
 3. **Double-click "PocketRoles Launcher.cmd"**. If the blue "Windows protected your PC" screen appears, click "More info" → "Run anyway" (it appears because no code-signing certificate is used; it is not malware).
-4. Press **"Install"**. The launcher copies your Steam Among Us to "Among Us PocketRoles" on the Desktop and installs BepInEx and PocketRoles automatically (a few minutes; your Steam copy is not modified).
+4. Press **"Install"**. The launcher copies your Steam Among Us to "Among Us PocketRoles" on the Desktop and installs BepInEx and PocketRoles automatically (a few minutes; your Steam copy is not modified). On a PC whose Desktop is backed up by OneDrive the copy goes to `%LOCALAPPDATA%\PocketRoles\Among Us PocketRoles` instead (so 1 GB is not synced to the cloud; the launcher argument `-GameDir` lets you pick any folder).
 5. **Start Steam, then press "Launch"**. The first launch takes 1–2 minutes to reach the title screen (if a black window appears in between, do not close it). When the PocketRoles panel shows in the right-hand window of the title screen you are done. **Online → Create game** and the roles are active.
 
 Details and manual installation: [chapter 5](#5-installation-steam). The launcher: [chapter 6](#6-launcher-and-updates). Playing: [chapter 7](#7-playing).
 
 ## Getting players in (the guide room)
 
-A lobby with roles is a registered modded lobby and therefore **never appears in the public list** (Innersloth's policy, [chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)). So you create a "guide room" with **one spare phone**:
+Since July 2026 the official servers require lobbies that use mods to register (mod-lobby registration; PocketRoles does it automatically). Registered lobbies **do not appear in the public list**, so players join by room code or through the guide room ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)). So you create a "guide room" with **one spare phone**:
 
-1. **Create the role lobby on the PC** (as usual, registration stays on). The room code appears **big** at the top-left of the lobby, e.g. "Role room QWERTY". Type `/announce` in chat: the code is copied to the clipboard and the steps below are shown.
+1. **Create the role lobby on the PC** (as usual, registration stays on). The room code is at the bottom of the lobby screen (the vanilla room-code panel); `/code on` also shows it **big** at the top-left, e.g. "Role room QWERTY" (off by default). Type `/announce` in chat: the code is copied to the clipboard and the steps below are shown.
 2. **On the spare phone (vanilla Among Us) set your name to "Roles→QWERTY"** (your own code, of course).
 3. **Create a PUBLIC lobby on the phone** (a normal lobby, no mod). Write "Roles: QWERTY" in its chat.
 4. People who join from the public list read the code in your name and **move to the role lobby on the PC**. When the code changes (after a re-host) fix the phone's name (`/announce` copies it again).
@@ -62,13 +62,14 @@ No mail client? Webmail such as Gmail in the browser is fine (attach the zip fro
 | "Windows protected your PC" appeared | "More info" → "Run anyway". If it still does not open: right-click the file → Properties → tick "Unblock" |
 | The game does not start / stays on a black window | The first launch takes 1–3 minutes. Check that Steam is running, that Among Us is not running twice, and that your antivirus did not quarantine `winhttp.dll` (send a report zip, [chapter 28](#28-reporting-bugs)) |
 | What do the players have to do? | Nothing to install — just join with the room code. In chat they can use `/cmd h` (help), `/cmd n` (their role), `/cmd lang en` (language) ([chapter 26](#26-what-vanilla-players-see)) |
-| My lobby is not in the public list | Registered modded lobbies are never listed. Use the guide room above or hand out the room code directly ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)) |
+| My lobby is not in the public list | The official rules keep role-mod lobbies out of the public list (by design). Hand out the room code or use the guide room above ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)) |
+| No vanilla roles (Scientist, Engineer, Judge, ...) appear | By default only PocketRoles roles are handed out and the vanilla special roles are suppressed. To use both, turn on "Also assign vanilla special roles" in the Roles tab or type `/opt roles.vanilla on` (they then follow the vanilla role settings) |
 | Where do I change settings? | The "PocketRoles" button in the lobby computer; also `/set` `/opt` in chat or the gear menu ([chapter 8](#8-settings-tab-lobby-settings-screen)) |
 | Changing the language | Players: `/cmd lang zh` etc. The lobby default: "Language" in the settings tab. The launcher: "Language" at the top-right ([chapter 13](#13-languages-japanese--chinese--english)) |
 | Chat translation and the DeepL key | On by default ("Chat translation" in the settings tab turns it off). For DeepL put the key on one line in `BepInEx\PocketRoles\deepl-key.txt` ([chapter 13](#13-languages-japanese--chinese--english)) |
 | The game updated and the mod stopped working | "Check for updates" in the launcher. Until a compatible release exists the mod disables itself ([chapter 24](#24-game-version-check)) |
 | How do I report a bug? | "Create report zip" in the launcher → attach it to a mail to `pocketroles.report@gmail.com` ([chapter 28](#28-reporting-bugs)) |
-| Is it against the rules? Can I get banned? | The lobby is registered as modded (+25) exactly as Innersloth's policy requires. Registered use alone does not get you banned ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)) |
+| Is it against the rules? Can I get banned? | Mod-lobby registration (official rule, required for roles) is done automatically when you create the lobby, exactly as Innersloth's policy requires. Registered use alone does not get you banned ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)) |
 | Can I host on Epic / console / mobile? | Hosting needs Windows + the Steam version. Players can be on any platform ([chapter 4](#4-requirements)) |
 
 ---
@@ -80,7 +81,7 @@ No mail client? Webmail such as Gmail in the browser is fine (attach the zip fro
 - Settings live in the **"PocketRoles" tab of the lobby settings screen** (pages Roles / Lobby / Chat / Looks / Host with "?" help; the three vanilla buttons are folded into "▶ Vanilla settings (game · presets · roles)") and the **"PocketRoles settings" panel of the gear menu** (chat commands `/set` `/opt` and the config file work too)
 - Languages: **Japanese / Simplified Chinese / English**. Each player can pick their own with `/lang` (the language they write in is detected as well); every text is editable in `lang\*.json`
 - **Chat translation** (on by default, combined mode): foreign-language chat is translated into the host's language for everyone, and the host's words reach foreign players privately in their language (Google, or DeepL with your API key)
-- **Guide-room helpers**: big room-code display (`/code`), copy the code and show the steps (`/announce`), send players from a vanilla room to the role room (`/move`)
+- **Guide-room helpers**: big room-code display (`/code on`, off by default), copy the code and show the steps (`/announce`), send players from a vanilla room to the role room (`/move`)
 - Host tools: lobby time left, auto start, haison (lobby refresh), a cancel button for the start countdown, force-ending meetings, hotkeys (F7 / F8 / F9), an action-button row on the Host page, Game Master (spectator) mode, mirrored Skeld (Dleks), a confirmation to re-create a high-ping lobby
 - **Permissions (co-hosting)**: admins / moderators / VIPs / bans managed through `Admin.txt` etc. and `/admin` `/kick` `/ban`. Admins may use the settings commands, moderators may kick
 - **Extended vanilla ranges**: kill cooldown, voting / discussion time, emergency cooldown and task counts beyond the vanilla limits (the arrows of the settings screen and `/vset`; vanilla players receive the same numbers)
@@ -135,7 +136,7 @@ Only the host's Among Us is modified. Vanilla clients simply display whatever th
 - The v0.4 host tools (auto start, haison, ending meetings, hotkeys …) **only use vanilla mechanisms** (the start countdown, the end-game message, the vote deadline), so players see nothing but chat notices and normal game flow.
 - The extended vanilla ranges (v0.4b) use the normal vanilla settings sync too: the value the host picks in the settings screen (say a 5-second kill cooldown) shows up unchanged in every player's lobby settings list.
 - Chat translation (v0.4b) sends chat text from the host's PC to Google / DeepL. It is on by default and runs in **combined mode** (foreign-language chat translated into the host's language for everyone, the host's words translated privately for foreign players). If you do not want text sent out, turn it off with "Chat translation" on the Chat page of the settings tab or `/opt translate off` ([chapter 13](#13-languages-japanese--chinese--english)).
-- Roles can only be handed out in a **registered (+25) lobby**. In an unregistered lobby (the "vanilla room") a single private message gets the host disconnected by the server, so roles and private notices are disabled there and only the host tools remain on top of a vanilla game ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)).
+- Roles can only be handed out in a **lobby with mod-lobby registration on**. In an unregistered lobby (the "vanilla room") a single private message gets the host disconnected by the server, so roles and private notices are disabled there and only the host tools remain on top of a vanilla game ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)).
 - The host's ping display (top left) shows `PocketRoles v0.4.0 (host)` and, in an online lobby, `Lobby mm:ss left`; the in-game mod stamp is shown as well. The title screen shows a **PocketRoles panel** in the big right-hand window (icon, `v0.4.0 / Among Us 2026.8.18`, author, a clickable GitHub line, "Roles for everyone; only the host installs it" / "Players can join with vanilla Among Us") ([chapter 9](#9-pocketroles-settings-panel-in-the-gear-menu)).
 - Only **Classic** mode is supported (the mod does nothing in Hide n Seek / Seek Fools).
 
@@ -147,7 +148,7 @@ Only the host's Among Us is modified. Vanilla clients simply display whatever th
 
 ### v0.4e (finishing v0.4.0: guide room, vanilla room, combined translation)
 
-- **Guide-room helpers** ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)): the room code in big letters at the top-left of the lobby (`Role room ABCDEF`, toggled with `/code`, "Big room-code overlay" in the settings tab). `/announce` (`/guide`) copies the code to the clipboard and prints the four steps for the spare-phone guide room. `/move [code]` sends everyone in a vanilla room the way to the role room in three languages (`/opt guide.autoreg on` re-creates the lobby as registered 30 s later). A guide-room hint in the gear menu.
+- **Guide-room helpers** ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)): the room code in big letters at the top-left of the lobby (`Role room ABCDEF`; off by default, `/code on` turns it on, `/code` toggles, "Big room-code overlay" in the settings tab). `/announce` (`/guide`) copies the code to the clipboard and prints the four steps for the spare-phone guide room. `/move [code]` sends everyone in a vanilla room the way to the role room in three languages (`/opt guide.autoreg on` re-creates the lobby as registered 30 s later). A guide-room hint in the gear menu.
 - **Vanilla room (registration off) clarified**: live testing showed that in an unregistered lobby the server disconnects the host ("DC because Hacking") as soon as one message is addressed to a single player. Unregistered lobbies therefore run **vanilla, without roles** (host tools and broadcast notices only). Roles need a registered lobby (the default).
 - **Combined translation by default** (`BroadcastToAll = true` + `TranslateForPlayers = true`): foreign-language chat is translated into the host's language for everyone; the host's words reach players who chose another language privately in that language; nobody gets the same line twice. Translation itself (`Enabled`) is on by default too (chat text is sent to Google, or to DeepL when you put a key into `BepInEx\PocketRoles\deepl-key.txt`); turn it off with "Chat translation" in the settings tab or `/opt translate off`.
 - **High-ping re-creation asks first**: when the ping is high right after the lobby is created, the host sees "Ping is high (N ms). Re-create the lobby?" (Yes / No, or `/rehost yes|no`). Off by default (`MaxHostPing = 0`), because repeated re-creations add ban points ([3.4](#34-bans-and-kicks)).
@@ -176,7 +177,7 @@ Only the host's Among Us is modified. Vanilla clients simply display whatever th
 | Language auto-detect / trilingual hint | A player who never used `/lang` and writes in Chinese or English gets that display language automatically and is told so. The welcome carries one line "English: /cmd lang en ｜ 中文: … ｜ 日本語: …"; `WelcomeAllLanguages` sends the whole welcome in three languages | [13](#13-languages-japanese--chinese--english), [14](#14-welcome-message-and-rules-line) |
 | Settings-tab polish | The PocketRoles button sits at the top of the left column; the three vanilla buttons are collapsed under one "Vanilla settings" button. Inside the tab a row of page buttons: Roles / Lobby / Chat / Looks / Host tools. "?" buttons next to role headers and option rows show help in the left info box | [8](#8-settings-tab-lobby-settings-screen) |
 | Permissions (co-hosting) | `BepInEx\PocketRoles\Admin.txt` / `Moderator.txt` / `VIP.txt` / `Banlist.txt` (one player per line, friend code or Puid). `/admin` `/mod` `/vip` add / remove / list, `/kick`, `/ban`. Admins use the settings commands, moderators kick / ban, VIPs get a ★ and a personal greeting | [11](#11-commands) |
-| Extended vanilla ranges | Kill cooldown 0–120 s (0.5-s steps), voting 0–600 s, discussion 0–600 s, emergency cooldown 0–120 s, task counts 0–30 … from the settings screen arrows and `/vset`. Player speed and vision via `/vset` too. Vanilla players receive the same numbers | [8](#8-settings-tab-lobby-settings-screen), [11](#11-commands) |
+| Extended vanilla ranges | Kill cooldown 0–120 s (arrows step by 2.5 s by default; 0.5-s values via `/vset` or by lowering `[Vanilla] KillCooldownStep`), voting 0–600 s, discussion 0–600 s, emergency cooldown 0–120 s, task counts 0–30 … from the settings screen arrows and `/vset`. Player speed and vision via `/vset` too. Vanilla players receive the same numbers | [8](#8-settings-tab-lobby-settings-screen), [11](#11-commands) |
 | `/h` shows the level | The help ends with "Your level: player / VIP / moderator / admin / host" | [11](#11-commands) |
 | Bug-report tooling | The launcher's report zip (log, config, environment; never the DeepL key), report mailboxes, GitHub issue templates, a support address | [28](#28-reporting-bugs) |
 
@@ -231,14 +232,14 @@ Planned features (v0.5: a companion mode that shows proper role screens to frien
 
 ## 3. Innersloth's mod policy and public lobbies (read this)
 
-### 3.1 The lobby must be "registered" (+25 flag)
+### 3.1 The lobby must be "registered" (mod-lobby registration)
 
 Innersloth's Among Us Mod Policy (<https://www.innersloth.com/among-us-mod-policy/>, last modified July 30, 2026) says:
 
 > "Any mod that changes the functionality of Among Us on official servers must be registered on lobby creation. A change of functionality includes but is not limited to making modifications to gameplay, custom role behavior, cheating, or modifying any part of a peer's experience."
 
-PocketRoles adds roles and changes other players' experience, so **registration on lobby creation is mandatory** on official servers.
-Host-only mods register by adding 25 to the protocol version ("host authority mode", the +25 flag), documented in Innersloth's official material at <https://github.com/Innersloth-LLC/AmongUsModdingInformation>. PocketRoles **does this by default** (`RegisterAsModdedLobby = true`; the flag is only added when you create a lobby, never when you join someone else's).
+PocketRoles adds roles and changes other players' experience, so **mod-lobby registration (the so-called +25) on lobby creation is mandatory** on official servers.
+Host-only mods register by adding 25 to the protocol version ("host authority mode"), documented in Innersloth's official material at <https://github.com/Innersloth-LLC/AmongUsModdingInformation>. PocketRoles **does this by default** (`RegisterAsModdedLobby = true`; the flag is only added when you create a lobby, never when you join someone else's).
 
 With registration:
 
@@ -248,15 +249,15 @@ With registration:
 ### 3.2 A registered lobby does not appear in the public list
 
 Innersloth's help center (<https://innersloth.zendesk.com/hc/en-us/articles/6711746215700-Are-there-mods-for-Among-Us>) states that "modded games are not able to be found via public lobby search, so if you're hosting a modded game, you'll need to invite friends directly".
-A registered (+25) PocketRoles lobby **does not show up** in the vanilla public lobby list (checked with the mobile version), public or not. Share the **room code** with your players, or use the [guide room](#25-vanilla-room-registration-off-and-the-guide-room) (a vanilla public lobby on a spare phone whose name says "Roles→CODE").
+A registered PocketRoles lobby **does not show up** in the vanilla public lobby list (checked with the mobile version), public or not. Share the **room code** with your players, or use the [guide room](#25-vanilla-room-registration-off-and-the-guide-room) (a vanilla public lobby on a spare phone whose name says "Roles→CODE").
 
 For reference: Japanese mods (TOH-Y, TOH-K, SuperNewRoles …) were contacted by Innersloth in 2023 about vanilla players unknowingly joining modded lobbies and have disabled public lobbies on official servers since.
 
-Technical note (from the 2026.8.18 client): the vanilla Find Game filters include a mod filter (ModFilter) meant for GUID-registered mods that every client installs. A vanilla client never adds that filter, so a registered (+25) host-only lobby is excluded from the list server-side. There is no client-side way to stay registered and be listed.
+Technical note (from the 2026.8.18 client): the vanilla Find Game filters include a mod filter (ModFilter) meant for GUID-registered mods that every client installs. A vanilla client never adds that filter, so a registered host-only lobby is excluded from the list server-side. There is no client-side way to stay registered and be listed.
 
 ### 3.3 Registration off = a "vanilla room" without roles
 
-A lobby created with `RegisterAsModdedLobby = false` (`/opt register off`, "Register lobby (+25)" in the settings tab, "Register (+25)" in the gear panel) appears in the public list, but **no roles are handed out**.
+A lobby created with `RegisterAsModdedLobby = false` (`/opt register off`, "Mod-lobby registration (official rule, required for roles)" in the settings tab, "Mod-lobby registration" in the gear panel) appears in the public list, but **no roles are handed out**.
 
 - In an unregistered lobby the server treats a message addressed to a single player as cheating and **disconnects the host** (confirmed live: "DC because Hacking"). Private role notices are impossible, so PocketRoles switches off roles, name tags and private messages there and keeps only the host tools on top of a vanilla game (time left, auto start, haison, end meeting, broadcast translation …). That is the "utility mod" use, like AUR; it does not change gameplay, so registration is not required by the policy.
 - There is no private `/cmd` channel either: players' commands are visible to everyone.
@@ -271,7 +272,7 @@ Innersloth says that using a mod alone does not get you banned as long as you do
 **Mind the ban points (short-lived lobbies)**: the official servers count creating a lobby and leaving it right away, leaving a game half-way, or re-creating lobbies again and again in a short time as "deliberate disconnects" (ban points; in live testing 3.5 points produced "restricted for deliberately disconnecting" and lobby creation was blocked for a while). This has nothing to do with the mod — vanilla hosts get the same treatment. Re-create lobbies (auto re-host, `/move`, the high-ping re-creation) only when needed and prefer haison (same lobby, timer reset).
 ### 3.5 Difference from AUR
 
-AUR (Among Us Revamped) is a host **utility mod** without roles or per-client settings (desync) and does not add the +25 flag. PocketRoles is a "mod that changes other players' experience", so the policy treats it differently. The v0.4 host tools (haison, cancel button, Game Master …) use the same vanilla mechanisms as AUR / EHR / SuperNewRoles.
+AUR (Among Us Revamped) is a host **utility mod** without roles or per-client settings (desync) and does not use mod-lobby registration. PocketRoles is a "mod that changes other players' experience", so the policy treats it differently. The v0.4 host tools (haison, cancel button, Game Master …) use the same vanilla mechanisms as AUR / EHR / SuperNewRoles.
 
 ### 3.6 No monetization
 
@@ -307,7 +308,7 @@ Either way the layout is a **copy of the Steam game folder** with BepInEx and th
 2. Extract it into a folder you will keep (e.g. `Documents\PocketRoles`). **Put `PocketRoles-<version>.zip` (the mod) into the same folder (extracted or not)** and the installation works offline too. The desktop shortcut will point at this folder, so do not move or delete it later.
 3. **Double-click "PocketRoles Launcher.cmd"**. If Windows shows "Windows protected your PC" (SmartScreen) on the first run, click **"More info" → "Run anyway"**. It appears because no code-signing certificate is used; it is not malware.
 4. Press **"Install"** in the launcher. It does the following automatically (a few minutes; progress is shown in the box at the bottom):
-   1. Finds your Steam Among Us (a folder picker appears when it cannot) and copies it to `Desktop\Among Us PocketRoles` (about 1 GB)
+   1. Finds your Steam Among Us (a folder picker appears when it cannot) and copies it to `Desktop\Among Us PocketRoles` (about 1 GB). When the Desktop is backed up by OneDrive the copy goes to `%LOCALAPPDATA%\PocketRoles\Among Us PocketRoles` instead (the argument `-GameDir` lets you pick any folder)
    2. Downloads BepInEx 6.0.0-be.735 (win-x86) from builds.bepinex.dev and extracts it
    3. Fetches `PocketRoles-<ver>.zip` from the latest GitHub release and puts it in place (a `PocketRoles-<ver>.zip` next to the launcher is used instead, so offline installs work). An old `HostRoles.dll` is deleted
    4. Creates the "PocketRoles Launcher" shortcut on the Desktop
@@ -321,7 +322,7 @@ If a step fails, fix the cause (internet connection, Steam location …) and pre
 1. Copy `C:\Program Files (x86)\Steam\steamapps\common\Among Us` to another folder (e.g. `Desktop\Among Us PocketRoles`).
 2. Extract the BepInEx zip above into the copy (`winhttp.dll`, `doorstop_config.ini` and the `BepInEx\` folder end up next to `Among Us.exe`).
 3. **With Steam running**, start the copied `Among Us.exe` **once**. The first start generates `BepInEx\interop`, so the title screen takes **1–3 minutes** to appear. Close the game once you see it.
-4. Extract `PocketRoles-<ver>.zip` from GitHub Releases into the copy (it contains `BepInEx\plugins\PocketRoles.dll`, `BepInEx\PocketRoles\lang\*.json`, the READMEs and LICENSE). **Delete an old `HostRoles.dll` if one is still there** (the same patches would be applied twice).
+4. Extract `PocketRoles-<ver>.zip` from GitHub Releases into the copy (it contains `BepInEx\plugins\PocketRoles.dll`, `BepInEx\PocketRoles\lang\*.json`, the READMEs, LICENSE and NOTICE). **Delete an old `HostRoles.dll` if one is still there** (the same patches would be applied twice).
 5. Start `Among Us.exe` from the copy (not from the Steam library; keep Steam running). `PocketRoles v0.4.0` in the top-left corner and the PocketRoles panel in the right-hand window of the title screen mean the mod is loaded. `BepInEx\LogOutput.log` contains `PocketRoles v0.4.0 loaded`.
 
 The first start creates `BepInEx\config\jp.pocketroles.mod.cfg` (settings), `BepInEx\PocketRoles\lang\` (language files) and `BepInEx\PocketRoles\{hats,visors,nameplates,music,images}\` plus a `README.txt` (cosmetics). The permission files `Admin.txt` / `Moderator.txt` / `VIP.txt` / `Banlist.txt` are created in `BepInEx\PocketRoles\` when you first host a lobby. `deepl-key.txt` (only for DeepL) is a file you create yourself ([chapter 13](#13-languages-japanese--chinese--english)). If an old HostRoles config `jp.hostroles.mod.cfg` exists in the same folder and the new file does not, its contents are copied over automatically (your settings carry over).
@@ -411,7 +412,7 @@ If the mod loads but the game version differs from the supported one, the [versi
 1. Start with the launcher's "Launch" ("Launch with mod" in developer mode; or `Among Us.exe` from the modded copy) while Steam runs.
 2. **Online → Create game** (game mode **Classic**, registration on as usual). Pick the region as you always do.
 3. Open the laptop (settings) in the lobby and press the **"PocketRoles"** button on the left to set role counts etc. ([chapter 8](#8-settings-tab-lobby-settings-screen)). Chat works too: `/set sheriff 1`, `/opt sheriff.cooldown 25`; both save to the config immediately. Defaults: Sheriff 1, Jester 1, Madmate 1.
-4. Get players in. The room code is shown **big** at the top-left of the lobby (`Role room ABCDEF`): tell your friends, or copy it into the **guide room** on a spare phone (`/announce` copies it; [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). A few seconds after joining, each player receives a private chat notice that this is a modded lobby, which roles are enabled, the rules and how to switch their language ([chapter 14](#14-welcome-message-and-rules-line)).
+4. Get players in. Tell your friends the **room code** shown at the bottom of the lobby screen, or copy it into the **guide room** on a spare phone (`/announce` copies it; `/code on` also shows it big at the top-left; [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). A few seconds after joining, each player receives a private chat notice that this is a modded lobby, which roles are enabled, the rules and how to switch their language ([chapter 14](#14-welcome-message-and-rules-line)).
 5. **Chat translation** on the Chat page of the settings tab is on by default (foreign-language chat is translated into your language for everyone and your words reach foreign players in theirs; chat text is sent to Google / DeepL, so turn it off with `/opt translate off` if you do not want that — [chapter 13](#13-languages-japanese--chinese--english)).
 6. While waiting, the top-left corner shows `Lobby mm:ss left`. Press Start when everyone is in, or let auto start do it (`/autostart <n>`). When the lobby time runs low the mod extends the lobby or runs haison automatically, so the lobby never closes on you ([chapter 16](#16-lobby-time-left-auto-start-and-haison)).
 7. Start. A few seconds later each player gets their role name and description in chat, and the role name appears above their own name (small, next to the name in meetings). Players with a regular role only get "this game has extra roles".
@@ -450,7 +451,7 @@ When the host opens the laptop (settings) in the lobby, a **blue "PocketRoles" b
 - **Lobby**: Auto re-host, Auto public, Auto public delay (0–60 s), Re-host max attempts (1–10), Re-host when ping above (ms) (0–300, 0 = never; asks first), Auto start, Auto start players (4–15), Start countdown (1–30 s), Lobby timer action (extend / haison / notify), Timer warning at (30–300 s, steps of 10), Extend notice delay (0–60 s), Auto lowest-ping region, Offer Dleks map
 - **Chat**: Welcome includes settings, Rules line (none / custom), Welcome in all languages, Player commands, All commands, **Chat translation**, Translation provider (auto / google / deepl), Translation language (ja / zh / en), Show translation on host, Broadcast translation, Translate for players, Auto-detect language, Translate min characters (1–50), Translations per minute (1–120, steps of 5)
 - **Looks (host only)**: Custom cosmetics, Lobby music (custom / vanilla / mute), Lobby music volume (0–1), Lobby paint, Dropship decoration, Menu background, Mouse cursor
-- **Host** (host tools): an **action-button row** at the top (Start now / Cancel / Haison / End meeting / Test mode / Show settings; only the ones that make sense in the current state are enabled). Header "General" = Register lobby (+25), Language (ja / zh / en), Welcome message, Role info at meetings, Kick on forged RPC, Ignore version mismatch, Show credits. Header "Host tools" = Game Master, Hotkeys enabled, Haison key (press twice), End meeting key (press twice), Cancel start key (each chosen from F1–F12), **Big room-code overlay, /move: re-create as registered** (guide room, [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)), **Admins can change settings, Moderators can kick, VIP star marker** (permissions), **Vanilla extended ranges, Kill cooldown min (s), Kill cooldown max (s), Kill cooldown step (s), Voting time min (s), Voting time max (s), Discussion time max (s), Emergency cooldown max (s), Task count max** (see "Extended vanilla ranges" below)
+- **Host** (host tools): an **action-button row** at the top (Start now / Cancel / Haison / End meeting / Test mode / Show settings; only the ones that make sense in the current state are enabled). Header "General" = Mod-lobby registration (official rule, required for roles), Language (ja / zh / en), Welcome message, Role info at meetings, Kick on forged RPC, Ignore version mismatch, Show credits. Header "Host tools" = Game Master, Hotkeys enabled, Haison key (press twice), End meeting key (press twice), Cancel start key (each chosen from F1–F12), **Big room-code overlay, /move: re-create as registered** (guide room, [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)), **Admins can change settings, Moderators can kick, VIP star marker** (permissions), **Vanilla extended ranges, Kill cooldown min (s), Kill cooldown max (s), Kill cooldown step (s), Voting time min (s), Voting time max (s), Discussion time max (s), Emergency cooldown max (s), Task count max** (see "Extended vanilla ranges" below)
 - Numbers use `−` / `+`, booleans a checkbox, choices `<` / `>`.
 - Every change is **saved to the config immediately** and echoed in the host's chat ("Setting changed: Sheriff Count = 1").
 - Values changed with `/opt` or the gear panel show up the next time the tab opens.
@@ -467,7 +468,7 @@ The numbers of the vanilla "Game Settings" tab have limits (kill cooldown 10–6
 
 | Setting | Vanilla range | Extended default | Config key (settings-tab row) |
 |---|---|---|---|
-| Kill cooldown | 10–60 s, steps of 2.5 | **0–120 s, steps of 0.5** | `KillCooldownMin` (0–60) / `KillCooldownMax` (10–600) / `KillCooldownStep` (0.5–10) |
+| Kill cooldown | 10–60 s, steps of 2.5 | **0–120 s**, arrow step 2.5 by default (lower `KillCooldownStep` to 0.5 or use `/vset` for 0.5-s values) | `KillCooldownMin` (0–60) / `KillCooldownMax` (10–600) / `KillCooldownStep` (0.5–10, default 2.5) |
 | Voting time | 15–300 s | **0–600 s** (0 = no voting phase) | `VotingTimeMin` (0–300) / `VotingTimeMax` (15–3600) |
 | Discussion time | 0–120 s | **0–600 s** | `DiscussionTimeMax` (0–3600) |
 | Emergency cooldown | 0–60 s | **0–120 s** | `EmergencyCooldownMax` (0–600) |
@@ -495,7 +496,7 @@ The game's settings (gear) menu has a **blue "PocketRoles settings" button at th
 | Auto start | Start automatically when enough players are in | `[Lobby] AutoStart` |
 | Lobby music: custom / vanilla / mute | Cycles on every click | `[Cosmetics] LobbyMusic` |
 | Cosmetics (v0.3) | Master switch of the cosmetics | `[Cosmetics] Enabled` |
-| Register (+25) | Lobby registration (off violates the policy; applies to the next lobby) | `[General] RegisterAsModdedLobby` |
+| Mod-lobby registration | Mod-lobby registration (the so-called +25; official rule, required for roles; off violates the policy; applies to the next lobby) | `[General] RegisterAsModdedLobby` |
 | Language: Japanese / Chinese / English | Lobby default language (cycles; the panel itself is relabelled) | `[General] Language` |
 | Lobby timer action: extend / haison / notify only | What happens when the lobby timer is about to expire | `[Lobby] TimerMode` |
 | Hotkeys enabled | Enables F7 / F8 / F9 | `[Hotkeys] Enabled` |
@@ -636,7 +637,7 @@ Typed in chat as `/cmd <command> …` or `/<command> …`. Settings can also be 
 | `cos reload` | Re-read the cosmetic images and music and re-apply them |
 | `cos music custom|vanilla|mute` | Lobby music mode (no argument = current state) |
 | `vset <setting> <value>` | Set a vanilla option beyond the menu range (`/vset killcd 5`, `/vset vote 0`, `/vset short 12`, `/vset speed 4`). Lobby only. `/vset show` prints the current values. Settings and ranges in [chapter 8](#8-settings-tab-lobby-settings-screen) |
-| `code` / `code on|off` | Toggle the **big room-code overlay** at the top-left of the lobby (`[Guide] ShowCodeOverlay`); also prints the current code |
+| `code` / `code on|off` | Toggle the **big room-code overlay** at the top-left of the lobby (`[Guide] ShowCodeOverlay`, default off); also prints the current code |
 | `announce`, `guide` | **Copy the room code to the clipboard** and print the four steps for the spare-phone guide room ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). In an unregistered lobby it copies the role-room code set with `/move <code>` |
 | `move` / `migrate` / `move <code>` / `move cancel` | In a vanilla room (registration off): tell everyone in three languages where the lobby with roles is. `/move <code>` stores the code (`[Guide] RoleRoomCode`); without a code the message says "look at the guide-room host's name". With `[Guide] AutoRecreateRegistered = true` the lobby is re-created as registered 30 s later (`/move cancel` aborts). In a registered lobby it prints the `/announce` steps |
 | `diag` / `diag on|off` | Print a snapshot of the start button, test mode, haison, the game flags and the screen to chat and to the log (for black-screen reports). `on` enables the detailed start trace in the log, `off` stops it |
@@ -724,7 +725,7 @@ A way to run the lobby together with friends, managed through four text files in
 | `lobby.autopublicdelay` | 0–60 | `[Lobby] AutoPublicDelay` |
 | `lobby.rehostmax` | 1–10 | `[Lobby] RehostMaxAttempts` |
 | `lobby.maxping` (`maxping`) | 0–300 (0 = off) | `[Lobby] MaxHostPing` (ping above which the host is **asked** whether to re-create the lobby) |
-| `guide.overlay` | on / off | `[Guide] ShowCodeOverlay` (big room-code overlay; same as `/code`) |
+| `guide.overlay` | on / off | `[Guide] ShowCodeOverlay` (big room-code overlay; default off; same as `/code`) |
 | `guide.code` | room code (4 / 6 letters) | `[Guide] RoleRoomCode` (same as `/move <code>`; empty clears it) |
 | `guide.autoreg` | on / off | `[Guide] AutoRecreateRegistered` (re-create as registered 30 s after `/move`) |
 | `lobby.autostart` | on / off | `[Lobby] AutoStart` |
@@ -760,7 +761,7 @@ Out-of-range values are clamped. on / off also accept `1`/`0`, `true`/`false`, `
 [General]
 Enabled = true                  # mod on / off (/mod on|off)
 Language = ja                   # lobby default language: ja | zh | en (players pick their own with /lang)
-RegisterAsModdedLobby = true    # register the lobby with the +25 flag (required by Innersloth's policy; off violates it)
+RegisterAsModdedLobby = true    # mod-lobby registration (the so-called +25): required by Innersloth's policy and for roles; off violates it
 IgnoreVersionMismatch = false   # keep the mod active on a game version other than 2026.8.18 (at your own risk)
 GameMaster = false              # Game Master: the host gets no role, dies right after the intro and only spectates / moderates
 
@@ -795,7 +796,7 @@ VipMarker = true                # star marker next to VIP.txt players' names and
 ExtendedRanges = true           # let the vanilla numeric settings go beyond their vanilla limits
 KillCooldownMin = 0             # lowest kill cooldown offered (s, 0-60; vanilla 10)
 KillCooldownMax = 120           # highest (s, 10-600; vanilla 60)
-KillCooldownStep = 0.5          # step of one arrow click (s, 0.5-10; vanilla 2.5)
+KillCooldownStep = 2.5          # step of one arrow click (s, 0.5-10; same as vanilla 2.5. 0.5 gives 0.5-s steps; /vset accepts any value regardless of the step)
 VotingTimeMin = 0               # lowest voting time (s, 0-300; vanilla 15; 0 = no voting phase)
 VotingTimeMax = 600             # highest voting time (s, 15-3600; vanilla 300)
 DiscussionTimeMax = 600         # highest discussion time (s, 0-3600; vanilla 120)
@@ -821,9 +822,9 @@ AutoRegion = false              # measure the three official regions before host
 EnableDleks = true              # offer the mirrored Skeld (Dleks) in the map picker
 
 [Guide]                         # guide-room helpers (v0.4e)
-ShowCodeOverlay = true          # show the room code big at the top-left of the host's lobby screen (/code)
+ShowCodeOverlay = false         # off by default; /code on shows the room code big at the top-left of the host's lobby screen
 RoleRoomCode =                  # code of the role lobby announced by /move from a vanilla room (empty = "see the guide-room host's name")
-AutoRecreateRegistered = false  # re-create this lobby as registered (+25) 30 s after /move
+AutoRecreateRegistered = false  # re-create this lobby as a registered role lobby 30 s after /move
 
 [Hotkeys]
 Enabled = true                  # host hotkeys (ignored while typing in chat)
@@ -1005,7 +1006,7 @@ English: /cmd lang en ｜ 中文: /cmd lang zh ｜ 日本語: /cmd lang ja
 Sheriff x1 KCD 30s, can kill Madmate
 Madmate x1
 Jester x1
-lang=en register(+25)=on welcome=on
+lang=en registration=on welcome=on
 ```
 
 - Line 4 is the **rules line** (v0.4). The default says "no special rules"; `/rules <text>` replaces it with your own rules.
@@ -1072,7 +1073,7 @@ Even in the official Asia region the assigned server may answer in 8–10 ms (To
 
 - `/public now` makes it public right away (online lobby only).
 - Not while the game version mismatches ([chapter 24](#24-game-version-check)).
-- A registered (+25) lobby **does not appear** in the list even when public ([3.2](#32-a-registered-lobby-does-not-appear-in-the-public-list)). To be listed, use an unregistered "vanilla room" (no roles) together with the guide room ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)).
+- A registered lobby **does not appear** in the list even when public ([3.2](#32-a-registered-lobby-does-not-appear-in-the-public-list)). To be listed, use an unregistered "vanilla room" (no roles) together with the guide room ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)).
 
 `/rehost` and `/public` alone show the state. The "Lobby" section of the settings tab has the same switches.
 
@@ -1151,7 +1152,7 @@ Host only, and only while the chat box is closed / not focused. `[Hotkeys] Enabl
 
 | Key (default) | Action | How |
 |---|---|---|
-| **F7** | In the lobby: haison (refresh the lobby); in a game: end it now and return to the same lobby ([16.4](#164-haison-haison-廃村-f7-2)) | **Twice within 3 seconds**. The first press shows "F7: press again to execute (haison (refresh the lobby))" at the top of the screen |
+| **F7** | In the lobby: haison (refresh the lobby); in a game: end it now and return to the same lobby ([16.4](#164-haison-haison-廃村-f7-2)) | **Twice within 3 seconds**. The first press shows "Press F7 again within 3 s to haison (refresh the lobby)" (toast at the top of the screen and a host-local chat line) |
 | **F8** | End the vote of the current meeting ([chapter 18](#18-force-ending-a-meeting)) | **Twice within 3 seconds**. Does nothing outside the discussion / voting phase |
 | **F9** or **Esc** | Cancel the start countdown | Once; only while a countdown runs (Esc reacts only during a countdown). F9 also works while the chat box has the focus (v0.4c) |
 
@@ -1335,7 +1336,7 @@ The host alone can start, so the host's own role display and settings can be che
 The mod is built for Among Us **2026.8.18**. On load and on the title screen it compares the real game version (`Application.version`); when it differs:
 
 - The mod stays **inactive** (no roles, no traffic; vanilla play works).
-- The top-left corner also shows the region you are connected to (`PocketRoles v0.4.0 (host) · Asia`) and, in an online lobby, the room code in big letters (`Role room ABCDEF`, to copy into the guide room). The top-left display carries a red `(version mismatch)`.
+- The top-left display carries a red `(version mismatch)`.
 - Creating a lobby shows "PocketRoles is made for Among Us 2026.8.18 (this game is X.X.X). The mod is disabled; …" in the host's chat.
 - A warning is logged.
 
@@ -1359,9 +1360,9 @@ The mod also disables itself when Harmony cannot apply its patches (a large inte
 | Private messages to players (role notices, welcome, `/cmd` replies) | Delivered (`/cmd …` is seen by the host only) | **Not sent** (the server treats them as cheating and disconnects the host; confirmed live) |
 | Chat translation | Combined (broadcast + private) | Broadcast only |
 | Host tools (time left, auto start, haison, end meeting, cancel, hotkeys, cosmetics) | Yes | Yes |
-| Top-left display | `Role room ABCDEF` | `Vanilla room ABCDEF` (plus `Roles→CODE` below it after `/move <code>`) |
+| Top-left display (with `/code on`) | `Role room ABCDEF` | `Vanilla room ABCDEF` (plus `Roles→CODE` below it after `/move <code>`) |
 
-Creating an unregistered lobby prints "Unregistered (便利ホスト) lobby: this game runs vanilla without custom roles; roles need a registered (+25) lobby." in the host's chat. The switch applies to the next lobby you create; `/opt register on` restores it.
+Creating an unregistered lobby prints "Unregistered (便利ホスト) lobby: this game runs vanilla without custom roles; roles need a registered lobby (mod-lobby registration on)." in the host's chat. The switch applies to the next lobby you create; `/opt register on` restores it.
 
 ### 25.2 The guide room (recommended: one spare phone)
 
@@ -1379,7 +1380,7 @@ The role lobby is never listed, so **host a vanilla public lobby on a spare phon
 3. Create a **public** lobby on the phone (no mod; any game settings). Write "Roles are in QWERTY — enter the code to join" in its chat. You can leave the guide room alone (re-create it when it times out).
 4. Play in the role lobby on the PC as usual. **Haison (F7) keeps the code.** When auto re-host or a re-creation changes the code, `/announce` again and fix the phone's name.
 
-- The big code at the top-left of the lobby can be hidden with `/code` (`[Guide] ShowCodeOverlay`, "Big room-code overlay" in the settings tab). It hides itself while the settings screen (lobby computer) is open and during games.
+- The big code at the top-left of the lobby is off by default; `/code on` shows it (`/code off` hides it; `[Guide] ShowCodeOverlay`, "Big room-code overlay" in the settings tab). While shown, it hides itself while the settings screen (lobby computer) is open and during games.
 - The gear menu's "PocketRoles settings" panel shows the same hint at the bottom.
 - Keep Among Us in the foreground on the phone (switching to another app can drop the lobby).
 
@@ -1611,7 +1612,7 @@ build.cmd
 - `lang\*.json` and `assets\PocketRoles-256.png` (the title-screen icon) are embedded resources; the language files are written to `BepInEx\PocketRoles\lang\` on first start — edit the written files instead of rebuilding to change texts.
 - Verification: start `Among Us.exe` from the modded copy and check `PocketRoles v0.4.0 loaded` and the absence of Harmony patch errors in `BepInEx\LogOutput.log`.
 
-Release zips: `powershell -NoProfile -ExecutionPolicy Bypass -File build-release.ps1` (`-SkipBuild` skips the build). It produces `dist\PocketRoles-<ver>.zip` (`BepInEx\plugins\PocketRoles.dll`, `BepInEx\PocketRoles\lang\*.json`, the three READMEs, LICENSE), `dist\PocketRoles-Setup-<ver>.zip` (`PocketRolesLauncher.ps1`, `PocketRoles Launcher.cmd`, `assets\PocketRoles.ico`, `はじめに.txt`) and `SHA256SUMS.txt`. The version comes from `<Version>` in `PocketRoles.csproj`. Attach both zips to a GitHub release and the launcher's "Check for updates" / "Install" find the latest version (they look for an asset named `PocketRoles-<ver>.zip`).
+Release zips: `powershell -NoProfile -ExecutionPolicy Bypass -File build-release.ps1` (`-SkipBuild` skips the build). It produces `dist\PocketRoles-<ver>.zip` (`BepInEx\plugins\PocketRoles.dll`, `BepInEx\PocketRoles\lang\*.json`, the three READMEs, LICENSE, NOTICE), `dist\PocketRoles-Setup-<ver>.zip` (`PocketRolesLauncher.ps1`, `PocketRoles Launcher.cmd`, `assets\PocketRoles.ico`, `はじめに.txt`) and `SHA256SUMS.txt`. The version comes from `<Version>` in `PocketRoles.csproj`. Attach both zips to a GitHub release and the launcher's "Check for updates" / "Install" find the latest version (they look for an asset named `PocketRoles-<ver>.zip`).
 
 Source layout (`src\`):
 
@@ -1634,7 +1635,7 @@ Other root files: `PocketRolesLauncher.ps1` / `PocketRoles Launcher.cmd` (the la
 
 ## 30. License
 
-**GNU General Public License v3.0 or later (GPL-3.0-or-later)**. Full text: <https://www.gnu.org/licenses/gpl-3.0.html> (see the bundled `LICENSE`).
+**GNU General Public License v3.0 or later (GPL-3.0-or-later)**. The full text is in the bundled `LICENSE` (identical to <https://www.gnu.org/licenses/gpl-3.0.html>); the copyright notice and the Among Us / Innersloth disclaimer are in `NOTICE`.
 
 > This mod is not affiliated with Among Us or Innersloth LLC, and the content contained therein is not endorsed or otherwise sponsored by Innersloth LLC. Portions of the materials contained herein are property of Innersloth LLC. © Innersloth LLC.
 

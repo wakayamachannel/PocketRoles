@@ -123,6 +123,10 @@ namespace PocketRoles.Game
                 if (Core.Game.TestMode && !_testOverride)
                 {
                     PocketRolesPlugin.Logger.LogInfo($"EndGame({kind}) suppressed: test mode (use /end)");
+                    // A suppressed solo win must not stay pending: Check() would otherwise skip CheckNow() (and with
+                    // it the sabotage-timer end) for the rest of the test game.
+                    Core.Game.SoloWinner = CustomRole.None;
+                    Core.Game.SoloWinnerId = 255;
                     return;
                 }
                 Core.Game.Ending = true;

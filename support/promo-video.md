@@ -106,3 +106,81 @@ README.md / README.zh-CN.md / README.en.md の冒頭は最終版に更新済み�
 
 ### Release の本文
 `support/release-notes-v0.4.0.md` を使う（ダウンロード表、SHA256、既知の制限、免責、zh / en の短縮版つき）。
+
+## 8. YouTube と bilibili の入力欄（そのまま貼る用）
+
+方針（簡略版）: YouTube は **日本語の字幕焼き込み版 2 本** を 1 つの再生リストに、bilibili は **中文の字幕焼き込み版 2 本** を 1 つの合集にまとめる。English 版は当面作らない。SRT（字幕トラック）は使わない（焼き込みのみ）。
+
+### YouTube（日本語焼き込み版 2 本。再生リスト「PocketRoles（Among Us 役職 MOD）」にまとめる）
+| 項目 | 導入編（PocketRoles-install-ja.mp4） | 遊び方編（PocketRoles-play-ja.mp4） |
+|---|---|---|
+| タイトル | 【Among Us】ホストだけ入れる役職MOD「PocketRoles」導入編（参加者は何も入れなくてOK） | 【Among Us】ホストだけ入れる役職MOD「PocketRoles」遊び方編（13役職・自動翻訳） |
+| 説明欄 | 下の「説明欄（ja）」をそのまま。(URL) は 2 本を上げてからそれぞれの動画 URL に置き換える | 同左 |
+| タグ | Among Us, アモアス, 役職MOD, PocketRoles | 同左 |
+| 再生リスト | 「PocketRoles（Among Us 役職 MOD）」に 2 本とも | 同左 |
+| 終了画面 | 遊び方編へ | 導入編＋チャンネル登録 |
+| サムネ | thumbnail-ja.png（「入れるのはホストだけ」） | 同じ画像でよい（文字を「参加者はバニラのまま」に差し替えた版が欲しければ作る） |
+| 字幕 | 焼き込みのみ（SRT なし） | 同左 |
+| 公開設定 | 公開（URL は README に貼る） | 公開 |
+
+説明欄（ja、2 本とも同じ）:
+```
+参加者は何も入れなくてOK。部屋を作る人だけが入れる Among Us の役職MODです。
+ダウンロードと説明書 → https://github.com/wakayamachannel/PocketRoles
+遊び方編 → (URL)　導入編 → (URL)
+質問はメールへ（読んで返事します）: pocketroles.report+help@gmail.com
+※役職MODの部屋は公式ルールで公開一覧に出ません。部屋コードか案内部屋から入ってもらいます。
+#AmongUs #アモアス #役職MOD
+```
+
+### bilibili（中文字幕焼き込み版 2 本。合集「PocketRoles（Among Us 职业MOD）」にまとめる。SRT は不要）
+| 項目 | 安装篇（PocketRoles-install-zh-CN.mp4） | 玩法篇（PocketRoles-play-zh-CN.mp4） |
+|---|---|---|
+| 标题（80 字以内） | 【Among Us】只需房主安装的职业MOD「PocketRoles」安装篇（玩家什么都不用装） | 【Among Us】只需房主安装的职业MOD「PocketRoles」玩法篇（13种职业・自动翻译） |
+| 分区 | 游戏 → 网络游戏 | 同左 |
+| 类型 | 自制 | 自制 |
+| 标签 | Among Us, 太空狼人杀, MOD, 职业模组, PocketRoles | 同左 |
+| 合集 | 「PocketRoles（Among Us 职业MOD）」に 2 本とも | 同左 |
+| 简介 | 下の「简介（zh）」をそのまま。(URL) は 2 本を上げてからそれぞれの動画 URL に置き換える | 同左 |
+| 封面 | thumbnail-ja.png の文字を「只需房主安装」に差し替えた版（頼めば作る） | 同左 |
+| 备注 | 投稿には中国大陆の携帯番号での実名認証が必要。無理なら YouTube の URL を中国の友達に渡す | |
+
+简介（zh、2 本とも同じ）:
+```
+玩家什么都不用装。只有建房的人需要安装的 Among Us 职业MOD。
+下载与说明书 → https://github.com/wakayamachannel/PocketRoles
+玩法篇 → (URL)　安装篇 → (URL)
+有问题请发邮件（会阅读并回复）: pocketroles.report+help@gmail.com
+※职业MOD的房间按官方规则不会出现在公开列表里。请用房间代码或引导房加入。
+#AmongUs #太空狼人杀 #职业模组
+```
+
+### 共通の一言（コメント欄の固定 / 最初のコメント）
+- ja: 参加者は何も入れなくて OK。部屋を建てる人だけ導入。質問は pocketroles.report+help@gmail.com へ（読んで返事します）
+- zh: 其他玩家什么都不用装，只有房主需要安装。有问题请发邮件 pocketroles.report+help@gmail.com（会回复）
+
+## 9. テスト会の募集文と確認リスト
+
+### 募集文（X / 案内部屋 / GitHub Issue「テスト会 参加者募集 / Looking for testers」）
+- ja: 【テスト会】Among Us の役職 MOD「PocketRoles」を一緒に試してくれる人を募集。参加者は何も入れなくて OK（Steam / スマホ / Switch のバニラのまま）。○月○日 ○時〜 30 分ほど。集合はサブ垢の公開部屋「役職→コード」で。役職 13 種・チャット自動翻訳あり。
+- zh: 【测试招募】一起来试玩 Among Us 职业 MOD「PocketRoles」。玩家什么都不用装（Steam / 手机 / Switch 原版即可）。○月○日 ○点起约 30 分钟。集合地点：公开房“职业→代码”。13 种职业，聊天自动翻译。
+- en: [Test session] Looking for a few players to try PocketRoles, an Among Us role mod that only the host installs (you join with vanilla Steam / mobile / Switch). Date/time TBA, about 30 minutes. Meet in the public lobby named "Roles→CODE". 13 roles, chat auto-translation.
+
+### 当日の確認リスト（ホストが順に）
+1. 入室のたびに挨拶が届く（本人の言語で）。中国語の人がいれば翻訳の往復（[訳] 表示）。
+2. `/cmd h` `/cmd n` の返信が本人だけに届く。
+3. 開始 → イントロ → 役職の人の名前の上に役職名（本人だけ）。真っ暗にならない。
+4. 会議: 役職説明が本人だけに届く。F8 で会議を強制終了できる。
+5. シェリフのキル（クルーを撃つと自分が死ぬ）、ジャッカルの勝利、ジェスターの追放勝ち。
+6. 廃村 F7 → 数秒でロビー復帰 → もう一度開始できる。
+7. 終わったらランチャー「報告」で zip をメール（ログが私に届く）。
+
+### v0.4.1 で足す予定（1 版につき 3〜4 役職 → テスト会 1 回）
+ラバーズ（2 人組）、放火魔（第三陣営）、エクスキューショナー（第三陣営）、ゲッサー（会議で推理して撃つ）。
+
+## 10. 案内部屋の台本（サブスマホのメモ帳に貼る）
+Desktop\案内部屋の台本.txt と同じ内容。名前「役職→ABCDEF」、公開バニラ部屋、開始は押さない。入室者にチャットで 1 行ずつ:
+- ja: 役職MOD部屋やってます。参加者は何も入れなくてOK！ / コード ABCDEF で入ってね（この部屋は案内だけ） / 満員なら次の回まで待っててね
+- zh: 职业MOD房间开着，玩家什么都不用装！ / 输入房间代码 ABCDEF 加入（这里只是引导房） / 满员的话请等下一局
+- en: Role-mod lobby is open. Nothing to install! / Join with code ABCDEF (this room is only a guide) / If it is full, wait for the next round
+15 人制限: 役職部屋は PC＋14 人。満員なら名前を「役職→満員」に。試合後は同じコードで再開するので待機者はそのまま入れる。

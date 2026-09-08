@@ -254,13 +254,13 @@ namespace PocketRoles.UI
                 // Off: the overrides already written into the loaded hat/visor/nameplate view data must be undone now.
                 if (!v) PocketRoles.Cosmetics.CosmeticOverrides.Reset();
             });
-            AddToggle(() => Lang.T("ui.gear.register", "登録(+25)", "Register (+25)"), () => Options.HostAuthorityMode, v =>
+            AddToggle(() => Lang.T("ui.gear.register", "MOD部屋登録", "Mod-lobby registration"), () => Options.HostAuthorityMode, v =>
             {
                 Options.HostAuthorityMode = v;
                 Popup(Lang.T("ui.gear.register.notice",
-                    "MOD登録(+25)は次に部屋を作った時から適用されます。オフは Innersloth のMODポリシー違反です。",
-                    "Register (+25) applies to the next lobby you create. Off violates Innersloth's mod policy.",
-                    "模组注册(+25)从下次创建房间起生效。关闭违反 Innersloth 的模组政策。"));
+                    "MOD部屋登録（公式ルール・役職に必須）は次に部屋を作った時から適用されます。オフは Innersloth のMODポリシー違反です。",
+                    "Mod-lobby registration (official rule, required for roles) applies to the next lobby you create. Off violates Innersloth's mod policy.",
+                    "MOD房间注册（官方规则・职业必需）从下次创建房间起生效。关闭违反 Innersloth 的模组政策。"));
             });
             AddCycle(() => Lang.T("ui.gear.lang", "言語", "Language") + ": " + Lang.DisplayName(Options.Language),
                 () => Options.Language = Next(Lang.Supported, Options.Language));

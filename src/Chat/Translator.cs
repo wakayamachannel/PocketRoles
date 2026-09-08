@@ -300,7 +300,9 @@ namespace PocketRoles.Chat
             // zh player is left out of the ja broadcast when a zh line is on its way to them). Private lines exist only
             // in a registered lobby: unregistered (compat) lobbies allow no client-addressed message (findings #21/#22).
             bool forPlayers = Options.TranslateForPlayers && !Registration.CompatMode;
-            bool broadcast = Options.TranslateBroadcastToAll && r.Target == hostTarget && !ghost;
+            // Only a player's line is broadcast in the host language. The host's own line whose target happens to
+            // equal TargetLang (TargetLang != [General] Language) takes the private per-player path below instead.
+            bool broadcast = !job.FromHost && Options.TranslateBroadcastToAll && r.Target == hostTarget && !ghost;
             if (!job.FromHost && r.Target == hostTarget)
             {
                 var lp = PlayerControl.LocalPlayer;

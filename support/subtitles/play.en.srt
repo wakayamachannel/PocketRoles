@@ -17,7 +17,7 @@ Pick the map and player count. Players install nothing
 
 5
 00:00:44,000 --> 00:00:53,000
-The room code is shown big in the lobby (for guiding people)
+The room code is in the right panel (use it for the guide room)
 Bottom right: PocketRoles version and region
 
 6
