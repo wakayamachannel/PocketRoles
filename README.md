@@ -1,5 +1,7 @@
 # PocketRoles — Among Us ホスト専用 役職 MOD
 
+[日本語](README.md) | [简体中文](README.zh-CN.md) | [English](README.en.md)
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **部屋を作る人だけが入れる、Among Us（2026.8.18 / Steam）の役職 MOD です。** 友達は PC でもスマホでも Switch でも、いつもの Among Us のまま部屋コードを打つだけ。シェリフやジャッカル、ジェスターなど 13 の役職が、名前タグとチャットで本人にだけこっそり届きます。設定はロビーのパソコンから、案内は日本語・中文・English の 3 言語、外国語のチャットは自動で翻訳。ロビーの時間切れや会議の長引きもホストの手元で解決できます。無料・非営利、ソースは GitHub で公開しています（**v0.4.0**、旧名 HostRoles）。
