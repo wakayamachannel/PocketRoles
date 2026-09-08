@@ -5,3 +5,4 @@
 *.ico binary
 *.zip binary
 *.mp4 binary
+*.sh text eol=lf
