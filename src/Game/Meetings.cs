@@ -191,7 +191,9 @@ namespace PocketRoles.Game
                 // Not forced: only the own-role tags differ between the two layouts, so one small SetName per
                 // custom-role client leaves (a forced refresh would be 1-2 packets per client in this frame); the
                 // urgent path merges the per-client messages into a few packets (Rpc.MultiBatch).
-                NameTags.RefreshAll(force: false, meeting: true, urgent: true);
+                // 2026-09-09: paced, not urgent — several per-client messages in one frame trip the official server's
+                // rate limit ("Hacking" kick); a late meeting layout only costs the small tag format in the vote areas.
+                NameTags.RefreshAll(force: false, meeting: true, urgent: false);
             }
             catch (Exception e)
             {

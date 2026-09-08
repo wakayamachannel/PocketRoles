@@ -580,9 +580,22 @@ namespace PocketRoles.UI
                 if (menu.createGameScreen != null && Active(menu.createGameScreen.gameObject)) return true;
                 // NOTE: menu.ejectMenu.gameObject is active on the plain main screen too (verified 2026-09-07 in the log:
                 // "eject=True" while nothing was open), so it must not count as an open sub-menu.
+                if (PopupOpen()) return true; // "ルームから追い出されました" etc.: the panel covered the vanilla popup (2026-09-09)
             }
             catch (Exception) { }
             return false;
+        }
+
+        /// <summary>The vanilla DisconnectPopup (kicked / disconnected / custom notices) is on screen.</summary>
+        internal static bool PopupOpen()
+        {
+            try
+            {
+                if (!DisconnectPopup.InstanceExists) return false;
+                var p = DisconnectPopup.Instance;
+                return p != null && p.gameObject.activeInHierarchy;
+            }
+            catch (Exception) { return false; }
         }
 
         /// <summary>Shows the panel on the main screen and hides it while a sub-menu is open (also handles the vanilla logo).</summary>

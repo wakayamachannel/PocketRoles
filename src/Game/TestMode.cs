@@ -248,6 +248,36 @@ namespace PocketRoles.Game
     // ---------------------------------------------------------------------- patches
 
     /// <summary>
+    /// Test mode: vanilla clamps the impostor count by player count (3 players → 0 impostors, "teamMax=0" in the traces),
+    /// which made every 3-player test a zero-impostor game — and the official server disconnects the host ("Hacking")
+    /// when a client's role table has no Impostor at all (2026-09-09, findings #49/#50). Use the lobby's NumImpostors
+    /// as is while test mode is on (TOHE/EHR "UnrestrictedNumImpostorsPatch"); normal games keep the vanilla clamp.
+    /// </summary>
+    [HarmonyPatch(typeof(IGameOptionsExtensions), nameof(IGameOptionsExtensions.GetAdjustedNumImpostors))]
+    internal static class TestMode_AdjustedNumImpostorsPatch
+    {
+        private static bool Prefix(int __1, ref int __result) // __1 = playerCount (positional: the interop name may differ)
+        {
+            try
+            {
+                if (!TestMode.Enabled || !Core.Game.IsHostActive) return true;
+                var gom = GameOptionsManager.Instance;
+                if (gom == null || gom.CurrentGameOptions == null) return true;
+                // at least 1 impostor, at most (players - 1) / 2 (3 players → 1; the lobby setting 3 would give none)
+                int playerCount = __1;
+                int max = Math.Max(1, (playerCount - 1) / 2);
+                __result = Math.Max(1, Math.Min(gom.CurrentGameOptions.NumImpostors, max));
+                return false;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"TestMode_AdjustedNumImpostorsPatch: {e}");
+                return true;
+            }
+        }
+    }
+
+    /// <summary>
     /// Lobby: in test mode the start button is enabled from 1 player. Vanilla decides from LastPlayerCount &gt;= MinPlayers
     /// inside Update — but only when the player count CHANGED (verify finding #2), so every MinPlayers change also
     /// resets LastPlayerCount (AutoStart.SetMinPlayers) and the button / counter are redrawn on that Update. The vanilla

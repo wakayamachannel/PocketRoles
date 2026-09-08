@@ -872,8 +872,12 @@ namespace PocketRoles.Net
         /// <summary>Sends at most one writer every <see cref="Interval"/> seconds (official-server rate limit).</summary>
         public static class Queue
         {
-            /// <summary>0.1 s normally, 0.3 s in <see cref="SafeMode"/>.</summary>
-            public static float Interval => SafeMode ? 0.3f : 0.1f;
+            /// <summary>
+            /// 0.3 s always (2026-09-09): the official server disconnected the host with "Hacking" twice when the
+            /// per-client role tables of TWO clients went out in the same frame (one client was fine), and TOHE
+            /// spaces its per-client SetRole messages by exactly 0.3 s on official servers ("BypassRateLimitAC").
+            /// </summary>
+            public static float Interval => 0.3f;
             private static readonly List<MessageWriter> Pending = new List<MessageWriter>();
             private static float _lastSend = -1f;
 

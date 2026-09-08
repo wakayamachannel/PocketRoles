@@ -83,6 +83,47 @@ namespace PocketRoles.Game
 
         // ------------------------------------------------------------------ initial assignment
 
+        /// <summary>
+        /// Safety net (2026-09-09, findings #49/#50): the official server disconnects the host ("Hacking", with ban points)
+        /// as soon as a client receives a role table without any Impostor-type role. Vanilla 2026.8.18 handed out no
+        /// impostor at all in the 3-player tests (the impostor pass ran with an empty list and its Crewmate default), and a
+        /// forced crew role on the only impostor (test mode) empties the pool too. With 3+ players, promote one random
+        /// plain crewmate (not forced, no custom role yet) to a real Impostor before the custom roles are drawn.
+        /// </summary>
+        private static void EnsureImpostorPresent(List<PlayerControl> players, HashSet<byte> forced)
+        {
+            try
+            {
+                if (players == null || players.Count < 3) return;
+                int impostors = 0;
+                var candidates = new List<PlayerControl>();
+                foreach (var pc in players)
+                {
+                    if (pc == null || pc.Data == null || pc.Data.Disconnected) continue;
+                    byte id = pc.PlayerId;
+                    if (IsImpostorRole(Core.Game.VanillaRoleOf(id))) { impostors++; continue; }
+                    if (forced != null && forced.Contains(id)) continue;
+                    if (Core.Game.RoleOf(id) != CustomRole.None) continue;
+                    if (Core.Game.GameMasterActive && Core.Game.IsHost(id)) continue;
+                    candidates.Add(pc);
+                }
+                if (impostors > 0) return;
+                if (candidates.Count == 0)
+                {
+                    PocketRolesPlugin.Logger.LogWarning("RoleAssignment: vanilla assigned no impostor and nobody can be promoted — every client would see an impostor-less table");
+                    return;
+                }
+                var pick = candidates[new System.Random().Next(candidates.Count)];
+                Core.Game.VanillaRoles[pick.PlayerId] = RoleTypes.Impostor;
+                if (Core.Game.IsHost(pick.PlayerId)) Rpc.ApplyRoleLocal(pick, RoleTypes.Impostor);
+                PocketRolesPlugin.Logger.LogWarning($"RoleAssignment: vanilla assigned no impostor ({players.Count} players) — promoted #{pick.PlayerId} {Core.Game.NameOf(pick.PlayerId)} to Impostor so every role table has one");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"RoleAssignment.EnsureImpostorPresent: {e}");
+            }
+        }
+
         /// <summary>Called from the RoleManager.SelectRoles postfix once every vanilla role has been recorded.</summary>
         public static void DispatchInitialRoles()
         {
@@ -97,7 +138,8 @@ namespace PocketRoles.Game
 
             var players = Core.Game.AllPlayers();
             // Test mode (/assign): forced roles first; they are excluded from the random pools below.
-            TestMode.ApplyForcedRoles(players);
+            var forced = TestMode.ApplyForcedRoles(players);
+            EnsureImpostorPresent(players, forced);
             AssignCustomRoles(players);
             LogAssignment(players);
 
@@ -124,18 +166,34 @@ namespace PocketRoles.Game
                 }
                 var batch = multi.For(clientId);
                 PlayerControl own = null;
+                int impostorsInView = 0;
                 foreach (var pc in players)
                 {
                     if (pc.Data == null || pc.Data.Disconnected) continue;
                     if (pc.PlayerId == viewer) { own = pc; continue; }
-                    batch.SetRole(pc, View(viewer, pc.PlayerId), canOverride: false); // first assignment on the client (vanilla flag)
+                    RoleTypes view = View(viewer, pc.PlayerId);
+                    if (IsImpostorRole(view)) impostorsInView++;
+                    batch.SetRole(pc, view, canOverride: false); // first assignment on the client (vanilla flag)
                     sends++;
                 }
-                if (own != null) { batch.SetRole(own, View(viewer, viewer), canOverride: false); sends++; } // last: its own CoSetRole starts the intro
+                if (own != null)
+                {
+                    RoleTypes ownView = View(viewer, viewer);
+                    if (IsImpostorRole(ownView)) impostorsInView++;
+                    batch.SetRole(own, ownView, canOverride: false); sends++; // last: its own CoSetRole starts the intro
+                }
+                // Official server rule seen 2026-09-09 (findings #49/#50): a client whose role table carries NO Impostor-type
+                // role gets the host disconnected ("Hacking") as soon as the table is sent (3-player tests where vanilla
+                // assigned no impostor; one-client games with 0 impostors were tolerated). Normal games always have one.
+                if (impostorsInView == 0 && players.Count >= 3)
+                    PocketRolesPlugin.Logger.LogWarning($"RoleAssignment: client {clientId} (#{viewer}) would see NO impostor — the official server may disconnect the host for this table");
                 batch.Send();
                 clients++;
             }
-            if (!multi.IsEmpty) multi.Send(urgent: true);
+            // Paced (0.3 s per client), never all at once: two clients' tables in one frame got the host kicked ("Hacking",
+            // 2026-09-09 01:29 / 01:36). Each client starts its intro when its own SetRole arrives, so the pacing only delays
+            // the intro of the n-th client by 0.3 s × n.
+            if (!multi.IsEmpty) multi.Send(urgent: false);
             float sinceSelect = SelectRolesStartedAt >= 0f ? UnityEngine.Time.time - SelectRolesStartedAt : -1f;
             PocketRolesPlugin.Logger.LogInfo($"RoleAssignment: role views sent at once to {clients} client(s) ({sends} SetRole) "
                 + (sinceSelect >= 0f ? $"+{sinceSelect * 1000f:0} ms after SelectRoles began" : "(no SelectRoles timestamp)")
@@ -330,7 +388,7 @@ namespace PocketRoles.Game
                     batch.Send();
                     sends++;
                 }
-                if (!multi.IsEmpty) multi.Send(urgent: true);
+                if (!multi.IsEmpty) multi.Send(urgent: false); // paced: N ghost messages at once would trip the server rate limit
                 byte hostId = HostPlayerId();
                 if (hostId != 255) Rpc.SetRoleTo(dead, View(hostId, deadId), Rpc.HostClientId);
                 PocketRolesPlugin.Logger.LogInfo($"RoleAssignment: ghost role of #{deadId} {Core.Game.NameOf(deadId)} sent per viewer ({sends} client(s); own view {View(deadId, deadId)})");
