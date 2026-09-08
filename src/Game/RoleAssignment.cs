@@ -491,6 +491,7 @@ namespace PocketRoles.Game
                 // Give every still-unassigned player its plain role here while the passthrough is active: the vanilla
                 // RpcSetRole bookkeeping runs exactly as for a special role and the per-client views follow below.
                 AssignPlainRoles();
+                DowngradeImpostorSpecials();
                 Core.Game.AssigningRoles = false;
                 RoleAssignment.DispatchInitialRoles();
             }
@@ -501,12 +502,49 @@ namespace PocketRoles.Game
             }
         }
 
-        /// <summary>Vanilla special roles whose rates are zeroed while [Roles] VanillaRoles is off (ghost roles excluded).</summary>
+        /// <summary>
+        /// Vanilla CREW special roles whose rates are zeroed while [Roles] VanillaRoles is off (ghost roles excluded).
+        /// The impostor specials are NOT zeroed any more (2026-09-09, finding #51): V11 computes the plain-Impostor fill
+        /// from the saved special counts, so zeroing Shapeshifter / Phantom / Viper at SelectRoles time left the impostor
+        /// pass with an empty list and its Crewmate default — a game without any impostor (and the official server then
+        /// disconnected the host for the impostor-less role tables). They are assigned by vanilla and downgraded to plain
+        /// Impostor in <see cref="DowngradeImpostorSpecials"/> instead.
+        /// </summary>
         private static readonly RoleTypes[] VanillaSpecialRoles =
         {
-            RoleTypes.Scientist, RoleTypes.Engineer, RoleTypes.Shapeshifter, RoleTypes.Noisemaker, RoleTypes.Phantom,
-            RoleTypes.Tracker, RoleTypes.Detective, RoleTypes.Viper, RoleTypes.Judge,
+            RoleTypes.Scientist, RoleTypes.Engineer, RoleTypes.Noisemaker, RoleTypes.Tracker, RoleTypes.Detective, RoleTypes.Judge,
         };
+        private static readonly RoleTypes[] VanillaImpostorSpecials = { RoleTypes.Shapeshifter, RoleTypes.Phantom, RoleTypes.Viper };
+
+        /// <summary>
+        /// [Roles] VanillaRoles off: a vanilla Shapeshifter / Phantom / Viper becomes a plain Impostor — in the host's
+        /// role table (so every view and the ghost role say Impostor) and on the host's own client. The clients receive
+        /// Impostor as their first assignment from DispatchInitialRoles, so the special abilities never exist.
+        /// </summary>
+        private static void DowngradeImpostorSpecials()
+        {
+            try
+            {
+                if (Options.VanillaRolesEnabled) return;
+                int n = 0;
+                foreach (var pc in Core.Game.AllPlayers())
+                {
+                    if (pc == null || pc.Data == null || pc.Data.Disconnected) continue;
+                    byte id = pc.PlayerId;
+                    RoleTypes v = Core.Game.VanillaRoleOf(id);
+                    if (Array.IndexOf(VanillaImpostorSpecials, v) < 0) continue;
+                    Core.Game.VanillaRoles[id] = RoleTypes.Impostor;
+                    Rpc.ApplyRoleLocal(pc, RoleTypes.Impostor);
+                    n++;
+                    PocketRolesPlugin.Logger.LogInfo($"Assign: vanilla {v} on #{id} {Core.Game.NameOf(id)} downgraded to plain Impostor ([Roles] VanillaRoles = off)");
+                }
+                if (n > 0) PocketRolesPlugin.Logger.LogInfo($"Assign: {n} vanilla impostor special(s) downgraded to plain Impostor");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Assign.DowngradeImpostorSpecials: {e}");
+            }
+        }
         private static readonly Dictionary<RoleTypes, (int count, int chance)> _savedRates = new Dictionary<RoleTypes, (int, int)>();
 
         /// <summary>

@@ -671,8 +671,18 @@ namespace PocketRoles.Net
 
             public bool IsEmpty => _cur == null && _done.Count == 0;
 
-            /// <summary>Batch for one client whose root message is written into this packet set (nothing leaves before Send).</summary>
-            public Batch For(int clientId) => new Batch(clientId, this);
+            /// <summary>
+            /// Batch for one client. ONE PACKET PER CLIENT (2026-09-09, finding #52): a reliable packet carrying GameDataTo
+            /// messages for two different clients got the host disconnected ("Hacking") six times out of six with two
+            /// clients — paced or not, with or without impostors — and never with a single client. Vanilla never packs
+            /// messages for different recipients into one packet and TOHE sends one packet per client, so every client's
+            /// root message now starts a fresh writer; the writers still leave through the paced queue.
+            /// </summary>
+            public Batch For(int clientId)
+            {
+                if (_cur != null) { _done.Add(_cur); _cur = null; }
+                return new Batch(clientId, this);
+            }
 
             internal MessageWriter Writer()
             {
