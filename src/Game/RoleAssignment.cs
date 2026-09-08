@@ -36,6 +36,9 @@ namespace PocketRoles.Game
             {
                 // A desync viewer saw every other player as Crewmate while alive; keep that consistent after death.
                 if (viewerDesync) return RoleTypes.CrewmateGhost;
+                // A desync player's own client holds Impostor while alive: its ghost must be ImpostorGhost (a CrewmateGhost
+                // sent to an Impostor client left the phone on a black screen — 2-player test 2026-09-08 23:45).
+                if (viewerId == targetId && Core.Game.IsDesyncImpostor(targetId)) return RoleTypes.ImpostorGhost;
                 return Core.Game.IsImpostorTeamKiller(targetId) ? RoleTypes.ImpostorGhost : RoleTypes.CrewmateGhost;
             }
 
@@ -125,10 +128,10 @@ namespace PocketRoles.Game
                 {
                     if (pc.Data == null || pc.Data.Disconnected) continue;
                     if (pc.PlayerId == viewer) { own = pc; continue; }
-                    batch.SetRole(pc, View(viewer, pc.PlayerId));
+                    batch.SetRole(pc, View(viewer, pc.PlayerId), canOverride: false); // first assignment on the client (vanilla flag)
                     sends++;
                 }
-                if (own != null) { batch.SetRole(own, View(viewer, viewer)); sends++; }
+                if (own != null) { batch.SetRole(own, View(viewer, viewer), canOverride: false); sends++; } // last: its own CoSetRole starts the intro
                 batch.Send();
                 clients++;
             }
@@ -302,44 +305,40 @@ namespace PocketRoles.Game
         // ------------------------------------------------------------------ ghosts
 
         /// <summary>
-        /// Sends the ghost role of a dead player: the common view is broadcast at once (the dead player's own client
-        /// needs it to float), viewers whose view differs (desync impostors) get a targeted override, and the host applies
-        /// its own view locally (the vanilla local CoSetRole was suppressed together with the broadcast).
+        /// Sends the ghost role of a dead player: every client gets exactly ONE SetRole, the ghost that matches the role
+        /// it already holds for that player (View: a desync player's own client → ImpostorGhost, desync viewers →
+        /// CrewmateGhost, everyone else by team), packed into one urgent send; the host applies its own view locally
+        /// (the vanilla local CoSetRole was suppressed together with the broadcast). No common broadcast first: a
+        /// CrewmateGhost reaching an Impostor client (the dead desync player itself) left a black screen, and the
+        /// "override 0.2 s later" was ignored by 2026.8.18 clients (2-player test 2026-09-08 23:45).
         /// </summary>
         public static void SendGhostRole(PlayerControl dead)
         {
             if (!Core.Game.IsHostActive || dead == null || dead.Data == null) return;
             byte deadId = dead.PlayerId;
-            RoleTypes common = Core.Game.IsImpostorTeamKiller(deadId) ? RoleTypes.ImpostorGhost : RoleTypes.CrewmateGhost;
-
-            var all = new Rpc.Batch(-1);
-            all.SetRole(dead, common);
-            all.Send(urgent: true);
-
-            byte hostId = HostPlayerId();
-            if (hostId != 255) Rpc.SetRoleTo(dead, View(hostId, deadId), Rpc.HostClientId);
-
-            // Per-viewer overrides (desync viewers) go out 0.2 s later: two CoSetRole coroutines started in the same
-            // frame for the same player are not guaranteed to finish in send order (EHR spaces them the same way).
-            Scheduler.After(0.2f, () =>
+            try
             {
-                try
+                var players = Core.Game.AllPlayers();
+                var multi = new Rpc.MultiBatch();
+                int sends = 0;
+                foreach (int clientId in Rpc.AllClientIds(false))
                 {
-                    if (!Core.Game.IsHostActive || dead == null) return;
-                    var players = Core.Game.AllPlayers();
-                    foreach (int clientId in Rpc.AllClientIds(false))
-                    {
-                        byte viewer = ViewerIdOf(clientId, players);
-                        if (viewer == 255) continue;
-                        RoleTypes view = View(viewer, deadId);
-                        if (view != common) Rpc.SetRoleTo(dead, view, clientId);
-                    }
+                    byte viewer = ViewerIdOf(clientId, players);
+                    if (viewer == 255) continue;
+                    var batch = multi.For(clientId);
+                    batch.SetRole(dead, View(viewer, deadId));
+                    batch.Send();
+                    sends++;
                 }
-                catch (Exception e)
-                {
-                    PocketRolesPlugin.Logger.LogError($"RoleAssignment.SendGhostRole overrides: {e}");
-                }
-            }, "assign.ghost." + deadId);
+                if (!multi.IsEmpty) multi.Send(urgent: true);
+                byte hostId = HostPlayerId();
+                if (hostId != 255) Rpc.SetRoleTo(dead, View(hostId, deadId), Rpc.HostClientId);
+                PocketRolesPlugin.Logger.LogInfo($"RoleAssignment: ghost role of #{deadId} {Core.Game.NameOf(deadId)} sent per viewer ({sends} client(s); own view {View(deadId, deadId)})");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"RoleAssignment.SendGhostRole: {e}");
+            }
         }
 
         /// <summary>Shared cleanup for game end / join / disconnect: one reset for every module (Game.ResetForNewLobby).</summary>
@@ -547,14 +546,19 @@ namespace PocketRoles.Game
 
                 if (Core.Game.AssigningRoles)
                 {
-                    // Record the vanilla role and let the vanilla RpcSetRole run for EVERY player (2026-09-08): the
-                    // vanilla start flow only reaches HudManager.CoShowIntro when its own RpcSetRole bookkeeping ran
-                    // for all players (swallowing them — even with roleAssigned raised and the host's role re-sent —
-                    // left the screen black with 2+ players, while the 廃村 throwaway game, which lets vanilla run,
-                    // always showed the intro). The broadcast carries only vanilla roles, exactly like a vanilla game;
-                    // DispatchInitialRoles overrides every client's view right after SelectRoles.
+                    // Record the vanilla role, run the host-local part of RpcSetRole (CoSetRole: roleAssigned, the host's
+                    // own intro trigger) and drop the broadcast. 2026.8.18 clients apply only the FIRST SetRole they
+                    // receive for a player — a later one, canOverride or not, is ignored (phone test 2026-09-08 23:30:
+                    // the Arsonist view sent right after SelectRoles never applied; the host showed the same with a
+                    // local CoSetRole). So the vanilla roles must never reach the clients: DispatchInitialRoles sends
+                    // each client its own per-viewer table as the first (and only) assignment. The host-side bookkeeping
+                    // stays complete because every RpcSetRole of the start (specials, plain roles) still runs CoSetRole
+                    // here — the black screens of the earlier hijack came from plain players without any RpcSetRole
+                    // (finding #39), which AssignPlainRoles now covers.
                     Core.Game.VanillaRoles[id] = roleType;
-                    return true;
+                    try { __instance.StartCoroutine(__instance.CoSetRole(roleType, canOverrideRole)); }
+                    catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Assign_RpcSetRole: local CoSetRole #{id} {roleType}: {e}"); }
+                    return false;
                 }
 
                 // EndGame already broadcast the Victory/Defeat ghost roles; a vanilla death in the 0.4 s window before

@@ -785,7 +785,9 @@ namespace PocketRoles.Net
                 return this;
             }
 
-            public Batch SetRole(PlayerControl target, RoleTypes role)
+            /// <param name="canOverride">The SetRole flag on the wire. false for a client's first assignment (the vanilla
+            /// value; 2026.8.18 clients ignore any SetRole after their first one), true for later ghost / GA sends.</param>
+            public Batch SetRole(PlayerControl target, RoleTypes role, bool canOverride = true)
             {
                 if (target == null) return this;
                 if (_local)
@@ -797,7 +799,7 @@ namespace PocketRoles.Net
                 return Rpc(target.NetId, RpcCalls.SetRole, w =>
                 {
                     w.Write((ushort)role);
-                    w.Write(true);
+                    w.Write(canOverride);
                 });
             }
 
