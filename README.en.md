@@ -2,6 +2,8 @@
 
 [日本語](README.md) | [简体中文](README.zh-CN.md) | [English](README.en.md)
 
+▶ Videos: [Install (YouTube, Japanese subtitles, 1.5 min)](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [How to play (YouTube, 3.5 min)](https://www.youtube.com/watch?v=UyvmPzYSrRM) · Chinese: [Install (bilibili)](https://www.bilibili.com/video/BV17obV6CESH) / [How to play (bilibili)](https://www.bilibili.com/video/BV1qobV6kERQ)
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **A role mod for Among Us (2026.8.18 / Steam) that only the person who creates the lobby installs.** Your friends keep their everyday Among Us on PC, phone or Switch and just type the room code. Seventeen roles — Sheriff, Jackal, Jester and more — reach each player privately through their name tag and chat. Settings live in the lobby computer, every notice comes in Japanese / Chinese / English, foreign-language chat is translated automatically, and lobby time-outs or endless meetings are handled from the host's keyboard. Free, non-commercial, source on GitHub (**v0.4.1**, formerly HostRoles).

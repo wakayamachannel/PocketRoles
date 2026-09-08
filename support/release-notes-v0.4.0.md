@@ -5,6 +5,7 @@
 ---
 
 ## PocketRoles v0.4.0 — ホストだけ導入で役職が遊べる Among Us MOD
+▶ 動画 / Videos: [導入編 (YouTube)](https://www.youtube.com/watch?v=Aogbzc_dUTU) · [遊び方編 (YouTube)](https://www.youtube.com/watch?v=UyvmPzYSrRM) · [安装篇 (bilibili)](https://www.bilibili.com/video/BV17obV6CESH) · [玩法篇 (bilibili)](https://www.bilibili.com/video/BV1qobV6kERQ)
 
 **部屋を作る人だけ** が入れる役職 MOD です。参加者は PC / スマホ / Switch の **バニラのまま**、部屋コードを打つだけ。13 役職（シェリフ、メイヤー、スニッチ、ジャッカル、ジェスター…）が名前タグとチャットで本人にだけ届き、案内は日本語 / 中文 / English、外国語のチャットは自動翻訳。ロビーの残り時間の自動延長、自動開始、廃村（F7）、会議の強制終了（F8）などホストの道具も一式そろっています。無料・非営利。
 

@@ -2,6 +2,8 @@
 
 [日本語](README.md) | [简体中文](README.zh-CN.md) | [English](README.en.md)
 
+▶ 视频: [安装篇（bilibili・1 分半）](https://www.bilibili.com/video/BV17obV6CESH) / [玩法篇（bilibili・3 分半）](https://www.bilibili.com/video/BV1qobV6kERQ)　日本語: [导入篇（YouTube）](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [玩法篇（YouTube）](https://www.youtube.com/watch?v=UyvmPzYSrRM)
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **这是一个只需建房的人安装的 Among Us（2026.8.18 / Steam）职业模组。** 朋友们用 PC、手机或 Switch 上平时的 Among Us，输入房间代码就能加入。警长、豺狼、小丑等 17 种职业会通过名字标签和聊天悄悄地只告诉本人。设置在房间的电脑里完成，提示支持 日本語 / 中文 / English 三种语言，外语聊天自动翻译，房间超时和拖沓的会议也能由房主一键处理。免费、非营利，源代码在 GitHub 公开（**v0.4.1**，旧名 HostRoles）。

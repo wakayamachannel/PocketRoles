@@ -2,6 +2,8 @@
 
 [日本語](README.md) | [简体中文](README.zh-CN.md) | [English](README.en.md)
 
+▶ 動画: [導入編（YouTube・1 分半）](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [遊び方編（YouTube・3 分半）](https://www.youtube.com/watch?v=UyvmPzYSrRM)　中文: [安装篇（bilibili）](https://www.bilibili.com/video/BV17obV6CESH) / [玩法篇（bilibili）](https://www.bilibili.com/video/BV1qobV6kERQ)
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **部屋を作る人だけが入れる、Among Us（2026.8.18 / Steam）の役職 MOD です。** 友達は PC でもスマホでも Switch でも、いつもの Among Us のまま部屋コードを打つだけ。シェリフやジャッカル、ジェスターなど 17 の役職が、名前タグとチャットで本人にだけこっそり届きます。設定はロビーのパソコンから、案内は日本語・中文・English の 3 言語、外国語のチャットは自動で翻訳。ロビーの時間切れや会議の長引きもホストの手元で解決できます。無料・非営利、ソースは GitHub で公開しています（**v0.4.1**、旧名 HostRoles）。
