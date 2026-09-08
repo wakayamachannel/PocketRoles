@@ -20,22 +20,22 @@
 
 ```
 SHA256
-PocketRoles-Setup-0.4.0.zip  768d5b6a9ae8a1677828182a8af509a712edcbdb6af9c66a5ae426d1354bed17
-PocketRoles-0.4.0.zip        2994d42461dfea712f9e690ba7fc26fd7441870caa63ac5b9cc2c3c74ddd4ae7
+PocketRoles-Setup-0.4.0.zip  cda89bdc1ff4274fd4bd97b6eff262f4ab99346ddf7c8d2e12866faef847782c
+PocketRoles-0.4.0.zip        8c895ee1f4e90b9c4de33151346f3c6af83f406b64cca8a200c7b3e74efa7293
 ```
 
 必要なもの: Windows 10 / 11、Steam 版 Among Us **2026.8.18**、Steam クライアント起動中。参加者側には何も要りません。
 
-### 人の集め方（案内部屋）
+### 人の集め方
 
-役職ありの部屋は Innersloth のポリシーどおり「登録済み MOD 部屋」なので **公開一覧には出ません**。サブのスマホでバニラの公開部屋を作り、名前を「役職→ABCDEF」（PC の部屋コード）にしておくと、そこから人が移動してきます。コードは `/announce` でコピーできます（`/code on` でロビーの左上に大きく出すこともできます。説明書「人の集め方」）。
+役職ありの部屋は Innersloth のポリシーどおり「登録済み MOD 部屋」なので **公開一覧には出ません**。部屋コードの伝え方は自由です: **Discord サーバー**（部屋コードを貼るだけ）、**LINE などのグループ**、**X のフォロワー**、**フレンドに直接**。コミュニティを持っていない・野良で集めたい人は、サブのスマホなどでバニラの公開部屋を作り、名前を「役職→ABCDEF」（PC の部屋コード）にしておくと（案内部屋）、公開一覧からそこに来た人が移動してきます。コードは `/announce` でコピーできます（Discord などにそのまま貼れます。`/code on` でロビーの左上に大きく出すこともできます。説明書「人の集め方」）。
 
 ### v0.4.0 の主な内容
 
 - 13 役職、名前タグ・チャットでの本人だけへの通知、会議ごとの役職説明の再送、試合後の結果一覧
 - ロビーの設定画面の「PocketRoles」タブ（役職 / ロビー / 会話 / 見た目 / ホスト、「?」ヘルプ、「▶ バニラ設定」の折りたたみ、ホストページの操作ボタン）と歯車メニューのパネル、タイトル画面のパネル
 - 日本語 / 简体中文 / English（参加者ごとに `/lang`、書いた言語の自動判定）、チャット翻訳（Google / DeepL、併用モード。既定でオンで、チャットの文章がホストの PC から Google または DeepL に送られます。`/opt translate off` か設定タブでオフ）
-- 案内部屋の支援（`/code` `/announce` `/move`）、部屋コードの大表示（`/code on`。既定オフ）
+- 人集め・案内部屋の支援（`/announce` でコードをコピー、`/code` `/move`）、部屋コードの大表示（`/code on`。既定オフ）
 - ロビー残り時間の常時表示と自動延長・廃村、自動開始、キャンセルボタン、ホットキー F7 / F8 / F9、会議の強制終了、ゲームマスター、逆スケルド（Dleks）、高 PING 時の作り直し確認
 - 権限（アドミン / モデレーター / VIP / BAN）、バニラ設定の範囲拡張（キルクールダウン 0〜120 秒など、`/vset`）
 - ホストの画面だけの見た目カスタマイズ（帽子・バイザー・ネームプレート・BGM・壁絵・背景・カーソル）
@@ -64,7 +64,7 @@ PocketRoles-0.4.0.zip        2994d42461dfea712f9e690ba7fc26fd7441870caa63ac5b9cc
 
 > This mod is not affiliated with Among Us or Innersloth LLC, and the content contained therein is not endorsed or otherwise sponsored by Innersloth LLC. Portions of the materials contained herein are property of Innersloth LLC. © Innersloth LLC.
 
-Innersloth の Among Us Mod Policy（2026-07-30）に従い、部屋作成時に MOD 部屋登録（公式ルール・役職に必須）を自動で行います。登録した部屋は公開一覧に出ないので、部屋コードか案内部屋から入ってもらいます。無料・非営利、GPL-3.0-or-later。ランチャーは署名証明書を付けていないため、初回に SmartScreen の警告が出ます（「詳細情報」→「実行」）。
+Innersloth の Among Us Mod Policy（2026-07-30）に従い、部屋作成時に MOD 部屋登録（公式ルール・役職に必須）を自動で行います。登録した部屋は公開一覧に出ないので、Discord などで部屋コードを伝えるか、案内部屋から入ってもらいます。無料・非営利、GPL-3.0-or-later。ランチャーは署名証明書を付けていないため、初回に SmartScreen の警告が出ます（「詳細情報」→「実行」）。
 
 ---
 
@@ -73,7 +73,7 @@ Innersloth の Among Us Mod Policy（2026-07-30）に従い、部屋作成時に
 **只需房主安装** 的 Among Us 职业模组。其他玩家用 PC / 手机 / Switch 的 **原版** 输入房间代码即可加入。13 种职业（警长、市长、告密者、豺狼、小丑等）通过名字标签和聊天只告诉本人，提示支持 日本語 / 中文 / English，外语聊天自动翻译，房间剩余时间自动延长、自动开始、废村（F7）、强制结束会议（F8）等房主工具齐全。免费、非营利。
 
 - **安装**：把 `PocketRoles-Setup-0.4.0.zip` 和 `PocketRoles-0.4.0.zip` 解压到同一个文件夹 → 双击 `PocketRoles Launcher.cmd` → “安装” → 启动 Steam 后点“启动”。需要 Windows + Steam 版 Among Us 2026.8.18。玩家什么都不用装。
-- **招人**：有职业的房间不会出现在公开列表里。用副手机开一个原版公开房，名字改成“职业→代码”（引导房），玩家看到代码后加入 PC 的房间。代码可用 `/announce` 复制（`/code on` 可在房间左上角大字显示，默认关闭）。
+- **招人**：有职业的房间不会出现在公开列表里。把房间代码贴到 Discord 服务器、微信・QQ 群，或直接告诉朋友即可。没有社群、想招路人的话，用副手机等开一个原版公开房，名字改成“职业→代码”（引导房），玩家看到代码后加入 PC 的房间。代码可用 `/announce` 复制（可直接贴到 Discord 等；`/code on` 可在房间左上角大字显示，默认关闭）。
 - **已知限制**：警长、豺狼的开场动画显示为“内鬼”（真正的职业随后通过名字标签和聊天送达）；只能用快捷聊天的平台无法输入命令；不支持房主迁移；关闭注册的房间不分配职业；短时间内反复重建房间会触发官方服务器的 ban points。
 - **说明书**：[README.zh-CN.md](https://github.com/wakayamachannel/PocketRoles/blob/main/README.zh-CN.md)。提问：`pocketroles.report+help@gmail.com`，问题报告：`pocketroles.report@gmail.com`（附上启动器生成的报告 zip）。
 
@@ -82,7 +82,7 @@ Innersloth の Among Us Mod Policy（2026-07-30）に従い、部屋作成時に
 An Among Us role mod that **only the host installs**. Everyone else joins with the **vanilla** game on PC, mobile or Switch by entering the room code. 13 roles (Sheriff, Mayor, Snitch, Jackal, Jester …) reach each player privately through the name tag and chat; notices come in Japanese / Chinese / English, foreign-language chat is auto-translated, and the host gets lobby auto-extend, auto start, haison (F7), force-end meeting (F8) and more. Free, non-commercial.
 
 - **Install**: extract `PocketRoles-Setup-0.4.0.zip` and `PocketRoles-0.4.0.zip` into the same folder → double-click `PocketRoles Launcher.cmd` → "Install" → start Steam and press "Launch". Needs Windows + Steam Among Us 2026.8.18. Players install nothing.
-- **Getting players**: a lobby with roles never appears in the public list. Host a vanilla public lobby on a spare phone named "Roles→CODE" (a guide room); people read the code there and join the PC lobby. `/announce` copies the code (`/code on` also shows it big at the top-left of the lobby; off by default).
+- **Getting players**: a lobby with roles never appears in the public list. Share the room code on your Discord server, in a group chat, or with friends directly. If you have no community and want random players, host a vanilla public lobby on a spare phone or any second device named "Roles→CODE" (a guide room); people read the code there and join the PC lobby. `/announce` copies the code (paste it into Discord etc.; `/code on` also shows it big at the top-left of the lobby; off by default).
 - **Known limitations**: Sheriff and Jackal see the "Impostor" intro (the real role follows through the name tag and chat); quick-chat-only platforms cannot type commands; no host migration; unregistered lobbies hand out no roles; re-creating lobbies repeatedly triggers the official servers' ban points.
 - **Manual**: [README.en.md](https://github.com/wakayamachannel/PocketRoles/blob/main/README.en.md). Questions: `pocketroles.report+help@gmail.com`; bugs: `pocketroles.report@gmail.com` (attach the launcher's report zip).
 

@@ -99,9 +99,10 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    初回はタイトル画面まで 1〜2 分かかります (途中で黒い窓が出ても閉じないでください)。
    タイトル画面の右の窓に PocketRoles のパネルが出たら完了。「オンライン → 部屋を作る」で役職が有効になります。
 ・参加者は何も入れなくて OK。mod を入れるのは部屋を作るホストだけです。
-・役職ありの部屋は公開一覧に出ません。ロビー画面の下に出る部屋コード (「/code on」で左上に大きく表示もできます) を友達に伝えるか、
-   サブのスマホで名前を「役職→コード」にしたバニラの公開部屋 (案内部屋) を作って呼びます。
-   チャットで「/announce」と打つとコードがコピーされ、手順が出ます (説明書「人の集め方」)。
+・役職ありの部屋は公開一覧に出ません。ロビー画面の下に出る部屋コード (「/code on」で左上に大きく表示もできます) を
+   Discord サーバー・LINE などのグループ・X・フレンドに伝えます (貼るだけで OK)。野良で集めたい人は、
+   サブのスマホなどで名前を「役職→コード」にしたバニラの公開部屋 (案内部屋) を作って呼びます。
+   チャットで「/announce」と打つとコードがコピーされ (Discord などにそのまま貼れます)、案内部屋の手順が出ます (説明書「人の集め方」)。
 ・画面右上の「言語」で 日本語 / 中文 / English を切り替えられます。
 ・不具合や要望は「報告 zip を作る」を押して、できた zip をメールに添付してください。
    不具合: pocketroles.report@gmail.com   要望: pocketroles.report+request@gmail.com
@@ -122,9 +123,10 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    首次启动到标题画面需要 1〜2 分钟 (中途出现黑色窗口也请不要关闭)。
    标题画面右侧窗口出现 PocketRoles 面板即安装完成。“在线 → 创建房间”后职业就会启用。
 ・其他玩家不需要安装任何东西，只有建房的房主需要 mod。
-・有职业的房间不会出现在公开列表里。把房间画面下方显示的代码 (输入“/code on”可在左上角大字显示) 告诉朋友，
-   或者用副手机把名字改成“职业→代码”，开一个原版公开房 (引导房) 来招人。
-   在聊天里输入“/announce”会复制代码并显示步骤 (见说明书“如何招人”)。
+・有职业的房间不会出现在公开列表里。把房间画面下方显示的代码 (输入“/code on”可在左上角大字显示)
+   贴到 Discord 服务器、微信・QQ 群，或直接告诉朋友即可。想招路人的话，
+   用副手机等把名字改成“职业→代码”，开一个原版公开房 (引导房) 来招人。
+   在聊天里输入“/announce”会复制代码 (可直接贴到 Discord 等) 并显示引导房的步骤 (见说明书“如何招人”)。
 ・右上角的“语言”可以切换 日本語 / 中文 / English。
 ・遇到问题或有建议: 点击“生成报告 zip”，把生成的 zip 作为邮件附件发送。
    问题: pocketroles.report@gmail.com   建议: pocketroles.report+request@gmail.com
@@ -146,9 +148,10 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    The first launch takes 1-2 minutes to reach the title screen (if a black window appears in between, do not close it).
    When the PocketRoles panel shows in the right-hand window of the title screen you are done. "Online -> Create game" and the roles are active.
 - Other players install nothing; only the host who creates the room needs the mod.
-- A lobby with roles never appears in the public list. Tell your friends the code shown at the bottom of the lobby screen ("/code on" also shows it big at the top-left),
-   or host a vanilla PUBLIC lobby on a spare phone with the name "Roles->CODE" (a guide room) to bring people in.
-   Type "/announce" in chat to copy the code and see the steps (README, "Getting players in").
+- A lobby with roles never appears in the public list. Share the code shown at the bottom of the lobby screen ("/code on" also shows it big at the top-left)
+   on your Discord server, in a group chat, or with friends directly. To pick up random players,
+   host a vanilla PUBLIC lobby on a spare phone or any second device with the name "Roles->CODE" (a guide room).
+   Type "/announce" in chat to copy the code (paste it into Discord etc.) and see the guide-room steps (README, "Getting players in").
 - "Language" at the top-right switches between 日本語 / 中文 / English.
 - Bugs / requests: press "Create report zip" and e-mail the zip as an attachment.
    Bugs: pocketroles.report@gmail.com   Requests: pocketroles.report+request@gmail.com

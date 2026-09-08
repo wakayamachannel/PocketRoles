@@ -1,6 +1,6 @@
 # PocketRoles 動画・告知・GitHub 説明文（v0.4.0 最終版）
 
-方針: 「みんなが入れて楽しくなる」トーンで、短く・やさしく。売り文句は 3 つに絞る — **参加者は何も入れない** / **13 役職を 3 言語でこっそり通知** / **ホストが楽になる道具つき**。人の集め方は **案内部屋（サブスマホ）** で統一（Discord・フレンド一覧の話はしない）。
+方針: 「みんなが入れて楽しくなる」トーンで、短く・やさしく。売り文句は 3 つに絞る — **参加者は何も入れない** / **13 役職を 3 言語でこっそり通知** / **ホストが楽になる道具つき**。人の集め方は **Discord などに部屋コードを貼るだけ** を基本にし、野良で集めたい人向けに **案内部屋（サブスマホ）** を添える。
 
 ## 1. 動画タイトル案（興味を引く順）
 
@@ -27,17 +27,17 @@ PocketRoles は、部屋を作るホストだけが導入する Among Us の役�
 ・13 役職（シェリフ、メイヤー、スニッチ、ジャッカル、ジェスター など）。役職は名前タグとチャットで本人にだけ届きます
 ・設定はロビーのパソコンから。役職の説明は「?」で日本語 / 中文 / English
 ・チャット自動翻訳（Google / DeepL）、入室時のウェルカム、ロビー残り時間の表示と自動延長、自動開始、廃村 F7、会議終了 F8
-・人の集め方: サブスマホで名前を「役職→コード」にしたバニラの公開部屋（案内部屋）を作るだけ。/announce でコードをコピー
+・人の集め方: Discord などに部屋コードを貼るだけ（/announce でコピー）。野良で集めるなら、サブスマホで名前を「役職→コード」にしたバニラの公開部屋（案内部屋）を作る
 ・ホスト画面の見た目カスタム（帽子・ネームプレート・BGM）、友達に渡せるインストーラー
 ダウンロード / 説明書: https://github.com/wakayamachannel/PocketRoles
 質問（説明を見てもわからないとき）: pocketroles.report+help@gmail.com　不具合: pocketroles.report@gmail.com
-Innersloth の MOD ポリシー（2026-07-30）に従い、公式サーバーでは「登録済み MOD 部屋」として動作します。登録済みの部屋は公開一覧には出ないため、案内部屋か部屋コードで入ってもらいます。無料・非営利。
+Innersloth の MOD ポリシー（2026-07-30）に従い、公式サーバーでは「登録済み MOD 部屋」として動作します。登録済みの部屋は公開一覧には出ないため、Discord などで部屋コードを伝えるか、案内部屋から入ってもらいます。無料・非営利。
 
 PocketRoles 是只需房主安装的 Among Us 职业 MOD。其他玩家什么都不用装（Steam / 手机 / Switch 原版，输入房间代码即可加入）。
 ・13 种职业（警长、市长、告密者、豺狼、小丑等），通过名字标签和聊天只告诉本人
 ・在大厅电脑里设置，职业说明支持 日本語 / 中文 / English
 ・聊天自动翻译（Google / DeepL）、进房欢迎语、大厅剩余时间显示与自动延长、自动开始、废村 F7、结束会议 F8
-・招人方法：用副手机开一个名字为“职业→代码”的原版公开房（引导房）即可，/announce 复制代码
+・招人方法：把房间代码贴到 Discord・微信・QQ 群即可（/announce 复制）。想招路人的话，用副手机开一个名字为“职业→代码”的原版公开房（引导房）
 下载 / 说明书: https://github.com/wakayamachannel/PocketRoles
 提问: pocketroles.report+help@gmail.com　问题报告: pocketroles.report@gmail.com
 
@@ -45,10 +45,10 @@ PocketRoles is an Among Us role mod that only the host installs. Everyone else j
 ・13 roles (Sheriff, Mayor, Snitch, Jackal, Jester and more), delivered privately through the name tag and chat
 ・Settings in the lobby computer; role descriptions in Japanese / Chinese / English
 ・Chat auto-translation (Google / DeepL), welcome messages, lobby timer with auto-extend, auto-start, haison F7, end meeting F8
-・Getting players: host a vanilla public lobby on a spare phone named "Roles→CODE" (a guide room); /announce copies the code
+・Getting players: just paste the room code on Discord or in a group chat (/announce copies it). For random players, host a vanilla public lobby on a spare phone named "Roles→CODE" (a guide room)
 Download / manual: https://github.com/wakayamachannel/PocketRoles
 Questions: pocketroles.report+help@gmail.com　Bugs: pocketroles.report@gmail.com
-Registered on official servers per Innersloth's mod policy (2026-07-30); registered lobbies are joined by room code or through the guide room. Free, non-commercial.
+Registered on official servers per Innersloth's mod policy (2026-07-30); registered lobbies are joined by room code (shared on Discord etc.) or through the guide room. Free, non-commercial.
 
 #AmongUs #アモングアス #AmongUsMod #PocketRoles
 ```
@@ -71,14 +71,14 @@ Registered on official servers per Innersloth's mod policy (2026-07-30); registe
 Among Us の役職MOD「PocketRoles」を公開しました。入れるのはホストだけ、参加者はスマホ・SwitchのバニラのままでOK。シェリフやジャッカルなど13役職、日中英3言語、チャット自動翻訳つき。無料です。
 https://github.com/wakayamachannel/PocketRoles #AmongUs
 ```
-（本文 121 字 + URL。返信に「人の集め方: サブスマホで名前を『役職→コード』にした公開部屋を作るだけ。困ったら pocketroles.report+help@gmail.com へ」を続ける）
+（本文 121 字 + URL。返信に「人の集め方: Discord などでコードを貼るだけ。野良で集めるならサブスマホの案内部屋。困ったら pocketroles.report+help@gmail.com へ」を続ける）
 
 ### 中文
 ```
 发布了 Among Us 职业模组「PocketRoles」：只需房主安装，其他玩家用手机、Switch 的原版就能加入。警长、豺狼等 13 种职业，日中英三语，聊天自动翻译，免费。
 https://github.com/wakayamachannel/PocketRoles #AmongUs #AmongUsMod
 ```
-（回复里补一句：“招人方法：用副手机开一个名字为‘职业→代码’的原版公开房即可。有问题请发 pocketroles.report+help@gmail.com”）
+（回复里补一句：“招人方法：把房间代码贴到 Discord・微信・QQ 群即可。想招路人就用副手机开引导房。有问题请发 pocketroles.report+help@gmail.com”）
 
 ### English（任意）
 ```
@@ -99,7 +99,7 @@ among-us, amongus, among-us-mod, bepinex, il2cpp, harmony, role-mod, host-only, 
 ```
 
 ### README 冒頭
-README.md / README.zh-CN.md / README.en.md の冒頭は最終版に更新済み（1 段落の紹介 → 3 つの見出し → スクリーンショット → 「3 分で導入」→「人の集め方（案内部屋）」→「困ったらメール」→ かんたん FAQ）。動画ができたらスクリーンショットの表の下に次の 1 行を足す:
+README.md / README.zh-CN.md / README.en.md の冒頭は最終版に更新済み（1 段落の紹介 → 3 つの見出し → スクリーンショット → 「3 分で導入」→「人の集め方」→「困ったらメール」→ かんたん FAQ）。動画ができたらスクリーンショットの表の下に次の 1 行を足す:
 ```
 ▶ [導入動画（3 分）](https://youtu.be/xxxx) / ▶ [遊び方動画（2 分）](https://youtu.be/xxxx)
 ```
@@ -129,7 +129,7 @@ README.md / README.zh-CN.md / README.en.md の冒頭は最終版に更新済み�
 ダウンロードと説明書 → https://github.com/wakayamachannel/PocketRoles
 遊び方編 → (URL)　導入編 → (URL)
 質問はメールへ（読んで返事します）: pocketroles.report+help@gmail.com
-※役職MODの部屋は公式ルールで公開一覧に出ません。部屋コードか案内部屋から入ってもらいます。
+※役職MODの部屋は公式ルールで公開一覧に出ません。Discord などで部屋コードを伝えるか、案内部屋から入ってもらいます。
 #AmongUs #アモアス #役職MOD
 ```
 
@@ -151,7 +151,7 @@ README.md / README.zh-CN.md / README.en.md の冒頭は最終版に更新済み�
 下载与说明书 → https://github.com/wakayamachannel/PocketRoles
 玩法篇 → (URL)　安装篇 → (URL)
 有问题请发邮件（会阅读并回复）: pocketroles.report+help@gmail.com
-※职业MOD的房间按官方规则不会出现在公开列表里。请用房间代码或引导房加入。
+※职业MOD的房间按官方规则不会出现在公开列表里。请在 Discord 等分享房间代码，或从引导房加入。
 #AmongUs #太空狼人杀 #职业模组
 ```
 
@@ -162,9 +162,9 @@ README.md / README.zh-CN.md / README.en.md の冒頭は最終版に更新済み�
 ## 9. テスト会の募集文と確認リスト
 
 ### 募集文（X / 案内部屋 / GitHub Issue「テスト会 参加者募集 / Looking for testers」）
-- ja: 【テスト会】Among Us の役職 MOD「PocketRoles」を一緒に試してくれる人を募集。参加者は何も入れなくて OK（Steam / スマホ / Switch のバニラのまま）。○月○日 ○時〜 30 分ほど。集合はサブ垢の公開部屋「役職→コード」で。役職 13 種・チャット自動翻訳あり。
-- zh: 【测试招募】一起来试玩 Among Us 职业 MOD「PocketRoles」。玩家什么都不用装（Steam / 手机 / Switch 原版即可）。○月○日 ○点起约 30 分钟。集合地点：公开房“职业→代码”。13 种职业，聊天自动翻译。
-- en: [Test session] Looking for a few players to try PocketRoles, an Among Us role mod that only the host installs (you join with vanilla Steam / mobile / Switch). Date/time TBA, about 30 minutes. Meet in the public lobby named "Roles→CODE". 13 roles, chat auto-translation.
+- ja: 【テスト会】Among Us の役職 MOD「PocketRoles」を一緒に試してくれる人を募集。参加者は何も入れなくて OK（Steam / スマホ / Switch のバニラのまま）。○月○日 ○時〜 30 分ほど。部屋コードは開始時にここに返信します（公開部屋「役職→コード」からも入れます）。役職 13 種・チャット自動翻訳あり。
+- zh: 【测试招募】一起来试玩 Among Us 职业 MOD「PocketRoles」。玩家什么都不用装（Steam / 手机 / Switch 原版即可）。○月○日 ○点起约 30 分钟。房间代码开始时在这里回复（也可从公开房“职业→代码”进入）。13 种职业，聊天自动翻译。
+- en: [Test session] Looking for a few players to try PocketRoles, an Among Us role mod that only the host installs (you join with vanilla Steam / mobile / Switch). Date/time TBA, about 30 minutes. The room code is posted here as a reply when we start (or meet in the public lobby named "Roles→CODE"). 13 roles, chat auto-translation.
 
 ### 当日の確認リスト（ホストが順に）
 1. 入室のたびに挨拶が届く（本人の言語で）。中国語の人がいれば翻訳の往復（[訳] 表示）。
@@ -179,7 +179,7 @@ README.md / README.zh-CN.md / README.en.md の冒頭は最終版に更新済み�
 ラバーズ（2 人組）、放火魔（第三陣営）、エクスキューショナー（第三陣営）、ゲッサー（会議で推理して撃つ）。
 
 ## 10. 案内部屋の台本（サブスマホのメモ帳に貼る）
-Desktop\案内部屋の台本.txt と同じ内容。名前「役職→ABCDEF」、公開バニラ部屋、開始は押さない。入室者にチャットで 1 行ずつ:
+Discord や LINE などがある人は、そこに部屋コードを貼るだけで OK。この台本は公開一覧から野良を集めたい時用。Desktop\案内部屋の台本.txt と同じ内容。名前「役職→ABCDEF」、公開バニラ部屋、開始は押さない。入室者にチャットで 1 行ずつ:
 - ja: 役職MOD部屋やってます。参加者は何も入れなくてOK！ / コード ABCDEF で入ってね（この部屋は案内だけ） / 満員なら次の回まで待っててね
 - zh: 职业MOD房间开着，玩家什么都不用装！ / 输入房间代码 ABCDEF 加入（这里只是引导房） / 满员的话请等下一局
 - en: Role-mod lobby is open. Nothing to install! / Join with code ABCDEF (this room is only a guide) / If it is full, wait for the next round

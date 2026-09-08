@@ -32,9 +32,15 @@ Other languages: **[日本語 (README.md)](README.md)** / **[简体中文 (READM
 
 Details and manual installation: [chapter 5](#5-installation-steam). The launcher: [chapter 6](#6-launcher-and-updates). Playing: [chapter 7](#7-playing).
 
-## Getting players in (the guide room)
+## Getting players in
 
-Since July 2026 the official servers require lobbies that use mods to register (mod-lobby registration; PocketRoles does it automatically). Registered lobbies **do not appear in the public list**, so players join by room code or through the guide room ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)). So you create a "guide room" with **one spare phone**:
+Since July 2026 the official servers require lobbies that use mods to register (mod-lobby registration; PocketRoles does it automatically). Registered lobbies **do not appear in the public list**, so the host hands out the room code ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)). Share it any way you like, wherever your players already are:
+
+- **Discord server**: just paste the room code (copy the code shown on the host's screen; typing `/announce` in chat copies it to the clipboard)
+- **Group chat** (LINE, WhatsApp and the like)
+- **Friends** directly
+
+If you have no community and want to pick up random players, use a **guide room**: a vanilla public lobby hosted on a spare phone or any second device, named "Roles→CODE". It is the only way in from the public list:
 
 1. **Create the role lobby on the PC** (as usual, registration stays on). The room code is at the bottom of the lobby screen (the vanilla room-code panel); `/code on` also shows it **big** at the top-left, e.g. "Role room QWERTY" (off by default). Type `/announce` in chat: the code is copied to the clipboard and the steps below are shown.
 2. **On the spare phone (vanilla Among Us) set your name to "Roles→QWERTY"** (your own code, of course).
@@ -64,7 +70,7 @@ No mail client? Webmail such as Gmail in the browser is fine (attach the zip fro
 | "Windows protected your PC" appeared | "More info" → "Run anyway". If it still does not open: right-click the file → Properties → tick "Unblock" |
 | The game does not start / stays on a black window | The first launch takes 1–3 minutes. Check that Steam is running, that Among Us is not running twice, and that your antivirus did not quarantine `winhttp.dll` (send a report zip, [chapter 28](#28-reporting-bugs)) |
 | What do the players have to do? | Nothing to install — just join with the room code. In chat they can use `/cmd h` (help), `/cmd n` (their role), `/cmd lang en` (language) ([chapter 26](#26-what-vanilla-players-see)) |
-| My lobby is not in the public list | The official rules keep role-mod lobbies out of the public list (by design). Hand out the room code or use the guide room above ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)) |
+| My lobby is not in the public list | The official rules keep role-mod lobbies out of the public list (by design). Hand out the room code (on Discord etc.) or use the guide room above ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)) |
 | No vanilla roles (Scientist, Engineer, Judge, ...) appear | By default only PocketRoles roles are handed out and the vanilla special roles are suppressed. To use both, turn on "Also assign vanilla special roles" in the Roles tab or type `/opt roles.vanilla on` (they then follow the vanilla role settings) |
 | Where do I change settings? | The "PocketRoles" button in the lobby computer; also `/set` `/opt` in chat or the gear menu ([chapter 8](#8-settings-tab-lobby-settings-screen)) |
 | Changing the language | Players: `/cmd lang zh` etc. The lobby default: "Language" in the settings tab. The launcher: "Language" at the top-right ([chapter 13](#13-languages-japanese--chinese--english)) |
@@ -83,7 +89,7 @@ No mail client? Webmail such as Gmail in the browser is fine (attach the zip fro
 - Settings live in the **"PocketRoles" tab of the lobby settings screen** (pages Roles / Lobby / Chat / Looks / Host with "?" help; the three vanilla buttons are folded into "▶ Vanilla settings (game · presets · roles)") and the **"PocketRoles settings" panel of the gear menu** (chat commands `/set` `/opt` and the config file work too)
 - Languages: **Japanese / Simplified Chinese / English**. Each player can pick their own with `/lang` (the language they write in is detected as well); every text is editable in `lang\*.json`
 - **Chat translation** (on by default, combined mode): foreign-language chat is translated into the host's language for everyone, and the host's words reach foreign players privately in their language (Google, or DeepL with your API key)
-- **Guide-room helpers**: big room-code display (`/code on`, off by default), copy the code and show the steps (`/announce`), send players from a vanilla room to the role room (`/move`)
+- **Player-recruiting helpers**: copy the room code and show the guide-room steps (`/announce`; the copied code pastes straight into Discord etc.), big room-code display (`/code on`, off by default), send players from a vanilla room to the role room (`/move`)
 - Host tools: lobby time left, auto start, haison (lobby refresh), a cancel button for the start countdown, force-ending meetings, hotkeys (F7 / F8 / F9), an action-button row on the Host page, Game Master (spectator) mode, mirrored Skeld (Dleks), a confirmation to re-create a high-ping lobby
 - **Permissions (co-hosting)**: admins / moderators / VIPs / bans managed through `Admin.txt` etc. and `/admin` `/kick` `/ban`. Admins may use the settings commands, moderators may kick
 - **Extended vanilla ranges**: kill cooldown, voting / discussion time, emergency cooldown and task counts beyond the vanilla limits (the arrows of the settings screen and `/vset`; vanilla players receive the same numbers)
@@ -150,7 +156,7 @@ Only the host's Among Us is modified. Vanilla clients simply display whatever th
 
 ### v0.4e (finishing v0.4.0: guide room, vanilla room, combined translation)
 
-- **Guide-room helpers** ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)): the room code in big letters at the top-left of the lobby (`Role room ABCDEF`; off by default, `/code on` turns it on, `/code` toggles, "Big room-code overlay" in the settings tab). `/announce` (`/guide`) copies the code to the clipboard and prints the four steps for the spare-phone guide room. `/move [code]` sends everyone in a vanilla room the way to the role room in three languages (`/opt guide.autoreg on` re-creates the lobby as registered 30 s later). A guide-room hint in the gear menu.
+- **Guide-room helpers** ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)): the room code in big letters at the top-left of the lobby (`Role room ABCDEF`; off by default, `/code on` turns it on, `/code` toggles, "Big room-code overlay" in the settings tab). `/announce` (`/guide`) copies the code to the clipboard (paste it into Discord etc.) and prints the four steps for the spare-phone guide room. `/move [code]` sends everyone in a vanilla room the way to the role room in three languages (`/opt guide.autoreg on` re-creates the lobby as registered 30 s later). A guide-room hint in the gear menu.
 - **Vanilla room (registration off) clarified**: live testing showed that in an unregistered lobby the server disconnects the host ("DC because Hacking") as soon as one message is addressed to a single player. Unregistered lobbies therefore run **vanilla, without roles** (host tools and broadcast notices only). Roles need a registered lobby (the default).
 - **Combined translation by default** (`BroadcastToAll = true` + `TranslateForPlayers = true`): foreign-language chat is translated into the host's language for everyone; the host's words reach players who chose another language privately in that language; nobody gets the same line twice. Translation itself (`Enabled`) is on by default too (chat text is sent to Google, or to DeepL when you put a key into `BepInEx\PocketRoles\deepl-key.txt`); turn it off with "Chat translation" in the settings tab or `/opt translate off`.
 - **High-ping re-creation asks first**: when the ping is high right after the lobby is created, the host sees "Ping is high (N ms). Re-create the lobby?" (Yes / No, or `/rehost yes|no`). Off by default (`MaxHostPing = 0`), because repeated re-creations add ban points ([3.4](#34-bans-and-kicks)).
@@ -251,7 +257,7 @@ With registration:
 ### 3.2 A registered lobby does not appear in the public list
 
 Innersloth's help center (<https://innersloth.zendesk.com/hc/en-us/articles/6711746215700-Are-there-mods-for-Among-Us>) states that "modded games are not able to be found via public lobby search, so if you're hosting a modded game, you'll need to invite friends directly".
-A registered PocketRoles lobby **does not show up** in the vanilla public lobby list (checked with the mobile version), public or not. Share the **room code** with your players, or use the [guide room](#25-vanilla-room-registration-off-and-the-guide-room) (a vanilla public lobby on a spare phone whose name says "Roles→CODE").
+A registered PocketRoles lobby **does not show up** in the vanilla public lobby list (checked with the mobile version), public or not. Share the **room code** with your players (Discord server, group chat, or friends directly), or use the [guide room](#25-vanilla-room-registration-off-and-the-guide-room) (a vanilla public lobby on a spare phone or any second device whose name says "Roles→CODE"; for picking up random players from the public list).
 
 For reference: Japanese mods (TOH-Y, TOH-K, SuperNewRoles …) were contacted by Innersloth in 2023 about vanilla players unknowingly joining modded lobbies and have disabled public lobbies on official servers since.
 
@@ -263,7 +269,7 @@ A lobby created with `RegisterAsModdedLobby = false` (`/opt register off`, "Mod-
 
 - In an unregistered lobby the server treats a message addressed to a single player as cheating and **disconnects the host** (confirmed live: "DC because Hacking"). Private role notices are impossible, so PocketRoles switches off roles, name tags and private messages there and keeps only the host tools on top of a vanilla game (time left, auto start, haison, end meeting, broadcast translation …). That is the "utility mod" use, like AUR; it does not change gameplay, so registration is not required by the policy.
 - There is no private `/cmd` channel either: players' commands are visible to everyone.
-- To play with roles create a **registered lobby (the default)**. How to get players there: [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room) (guide room, `/move`).
+- To play with roles create a **registered lobby (the default)**. How to get players there: [Getting players in](#getting-players-in) (share the code on Discord etc.) and [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room) (guide room, `/move`).
 
 `/opt register on` restores it (from the next lobby you create).
 
@@ -414,7 +420,7 @@ If the mod loads but the game version differs from the supported one, the [versi
 1. Start with the launcher's "Launch" ("Launch with mod" in developer mode; or `Among Us.exe` from the modded copy) while Steam runs.
 2. **Online → Create game** (game mode **Classic**, registration on as usual). Pick the region as you always do.
 3. Open the laptop (settings) in the lobby and press the **"PocketRoles"** button on the left to set role counts etc. ([chapter 8](#8-settings-tab-lobby-settings-screen)). Chat works too: `/set sheriff 1`, `/opt sheriff.cooldown 25`; both save to the config immediately. Defaults: Sheriff 1, Jester 1, Madmate 1.
-4. Get players in. Tell your friends the **room code** shown at the bottom of the lobby screen, or copy it into the **guide room** on a spare phone (`/announce` copies it; `/code on` also shows it big at the top-left; [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). A few seconds after joining, each player receives a private chat notice that this is a modded lobby, which roles are enabled, the rules and how to switch their language ([chapter 14](#14-welcome-message-and-rules-line)).
+4. Get players in. Share the **room code** shown at the bottom of the lobby screen on your Discord server, in a group chat, or with friends directly (`/announce` copies it so you can paste it; `/code on` also shows it big at the top-left). If you have no community and want random players, copy it into the **guide room** on a spare phone ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). A few seconds after joining, each player receives a private chat notice that this is a modded lobby, which roles are enabled, the rules and how to switch their language ([chapter 14](#14-welcome-message-and-rules-line)).
 5. **Chat translation** on the Chat page of the settings tab is on by default (foreign-language chat is translated into your language for everyone and your words reach foreign players in theirs; chat text is sent to Google / DeepL, so turn it off with `/opt translate off` if you do not want that — [chapter 13](#13-languages-japanese--chinese--english)).
 6. While waiting, the top-left corner shows `Lobby mm:ss left`. Press Start when everyone is in, or let auto start do it (`/autostart <n>`). When the lobby time runs low the mod extends the lobby or runs haison automatically, so the lobby never closes on you ([chapter 16](#16-lobby-time-left-auto-start-and-haison)).
 7. Start. A few seconds later each player gets their role name and description in chat, and the role name appears above their own name (small, next to the name in meetings). Players with a regular role only get "this game has extra roles".
@@ -431,7 +437,7 @@ Tips:
 - The Host page of the settings tab has a button row too: **Start now / Cancel / Haison / End meeting / Test mode / Show settings** (mouse only).
 - To play vanilla for a while use `/mod off` (from the next game); `/mod on` restores it.
 - Before a real session, check everything with a second device (a phone) in [test mode](#23-test-mode-checking-with-one-phone).
-- `/rehost on` recreates the lobby automatically after a server disconnect ([chapter 15](#15-auto-re-host-and-auto-public)). The code changes, so fix the guide room's name afterwards.
+- `/rehost on` recreates the lobby automatically after a server disconnect ([chapter 15](#15-auto-re-host-and-auto-public)). The code changes, so share it again afterwards (and fix the guide room's name if you use one).
 - A friend who co-hosts can be made an admin with `/admin add <name>`; they can then use `/set`, `/kick` and more ([chapter 11](#11-commands)).
 - Want a kill cooldown below 10 seconds or a discussion longer than 2 minutes? The arrows of the settings screen simply keep going beyond the vanilla limits (`/vset killcd 5` works too; [chapter 8](#8-settings-tab-lobby-settings-screen)).
 - Screen stays black? Type `/diag` — the state goes to chat and to the log; send it with the report zip ([chapter 28](#28-reporting-bugs)).
@@ -640,7 +646,7 @@ Typed in chat as `/cmd <command> …` or `/<command> …`. Settings can also be 
 | `cos music custom|vanilla|mute` | Lobby music mode (no argument = current state) |
 | `vset <setting> <value>` | Set a vanilla option beyond the menu range (`/vset killcd 5`, `/vset vote 0`, `/vset short 12`, `/vset speed 4`). Lobby only. `/vset show` prints the current values. Settings and ranges in [chapter 8](#8-settings-tab-lobby-settings-screen) |
 | `code` / `code on|off` | Toggle the **big room-code overlay** at the top-left of the lobby (`[Guide] ShowCodeOverlay`, default off); also prints the current code |
-| `announce`, `guide` | **Copy the room code to the clipboard** and print the four steps for the spare-phone guide room ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). In an unregistered lobby it copies the role-room code set with `/move <code>` |
+| `announce`, `guide` | **Copy the room code to the clipboard** (paste it into Discord etc.) and print the four steps for the spare-phone guide room ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). In an unregistered lobby it copies the role-room code set with `/move <code>` |
 | `move` / `migrate` / `move <code>` / `move cancel` | In a vanilla room (registration off): tell everyone in three languages where the lobby with roles is. `/move <code>` stores the code (`[Guide] RoleRoomCode`); without a code the message says "look at the guide-room host's name". With `[Guide] AutoRecreateRegistered = true` the lobby is re-created as registered 30 s later (`/move cancel` aborts). In a registered lobby it prints the `/announce` steps |
 | `diag` / `diag on|off` / `diag dump` | Print a snapshot of the start button, test mode, haison, the game flags and the screen to chat and to the log (for black-screen reports). `on` enables the detailed start trace in the log, `off` stops it The detailed trace is always recorded in the background (last 400 lines) and written to the log automatically when a start gets stuck or an emergency report is refused; `diag dump` writes it at any time |
 | `admin` / `admin list` | The admin list and usage (`Admin.txt`) |
@@ -1059,7 +1065,7 @@ When the host is **disconnected unexpectedly** (server error, timeout, an anti-c
 - Gives up after `RehostMaxAttempts` (default 3) consecutive failures; the counter resets once a lobby lasted 60 seconds.
 - Creating or joining a lobby yourself while it waits cancels the re-host.
 - A public lobby is made public again.
-- The host's chat shows "Auto re-hosted after the disconnect. New room code: XXXXXX". **The room code changes** — tell your players (`/announce` copies it; fix the guide room's name, [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). For lobby-timer expiry use haison instead ([chapter 16](#16-lobby-time-left-auto-start-and-haison)); it keeps the code.
+- The host's chat shows "Auto re-hosted after the disconnect. New room code: XXXXXX". **The room code changes** — tell your players (`/announce` copies it; paste it into Discord etc. again, and fix the guide room's name if you use one, [chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). For lobby-timer expiry use haison instead ([chapter 16](#16-lobby-time-left-auto-start-and-haison)); it keeps the code.
 - When the login (EOS) session is gone nothing is re-hosted; the game's login screen takes over.
 
 ### Ask before re-creating a high-ping lobby (`[Lobby] MaxHostPing`, `/opt maxping <ms>`)
@@ -1366,9 +1372,9 @@ The mod also disables itself when Harmony cannot apply its patches (a large inte
 
 Creating an unregistered lobby prints "Unregistered (便利ホスト) lobby: this game runs vanilla without custom roles; roles need a registered lobby (mod-lobby registration on)." in the host's chat. The switch applies to the next lobby you create; `/opt register on` restores it.
 
-### 25.2 The guide room (recommended: one spare phone)
+### 25.2 The guide room (for random players: one spare phone)
 
-The role lobby is never listed, so **host a vanilla public lobby on a spare phone (or a second PC) and put the role lobby's code in its name and chat**. Players read the code there and re-join the role lobby.
+The role lobby is never listed, so normally you share the room code on your **Discord server, in a group chat, or with friends directly** (`/announce` copies it so you can paste it). If you have no community and want to pick up random players from the public list, **host a vanilla public lobby on a spare phone (or any second device) and put the role lobby's code in its name and chat**: a guide room. It is the only way in from the public list. Players read the code there and re-join the role lobby.
 
 1. Create the role lobby on the PC and type `/announce` (`/guide`). The room code is copied to the clipboard and the steps appear in chat:
    ```
@@ -1397,7 +1403,7 @@ The other way round: gather people in a listed vanilla room (registration off), 
 | `/move cancel` | Aborts a scheduled re-creation (everyone is told) |
 | `/announce` | In a vanilla room copies the role-lobby code set with `/move <code>` |
 
-- With `[Guide] AutoRecreateRegistered = true` ("/move: re-create as registered" in the settings tab, `/opt guide.autoreg on`) the lobby **re-creates itself as registered 30 s after `/move`** ("In 30 s this lobby is re-created as the lobby with roles; rejoin with the new code" → a 5-second reminder → re-creation). The new code appears in the host's chat; `/announce` copies it for the guide room. Off by default (announcement only).
+- With `[Guide] AutoRecreateRegistered = true` ("/move: re-create as registered" in the settings tab, `/opt guide.autoreg on`) the lobby **re-creates itself as registered 30 s after `/move`** ("In 30 s this lobby is re-created as the lobby with roles; rejoin with the new code" → a 5-second reminder → re-creation). The new code appears in the host's chat; `/announce` copies it for Discord etc. or the guide room. Off by default (announcement only).
 - A re-creation counts as a deliberate disconnect, so do not chain them ([3.4](#34-bans-and-kicks)).
 
 ### 25.4 Notes on the vanilla room
@@ -1554,7 +1560,7 @@ Names are sent per client by the host. Right after a death / leave or after the 
 - Roles come from the plain Crewmate / plain Impostor pools only; vanilla special roles (Scientist, Engineer, Shapeshifter …) never get one. Vampire and Mafia use Impostor slots: with 1 Impostor and Vampire = 1 that Impostor is the Vampire (`/assign` ignores this).
 - Sheriff / Jackal / Lighter / Speed Booster effects are per-client "game settings"; right after vanilla re-sends the settings (a lobby setting change …) they may drop to the normal values for a moment (re-sent at the start, after the intro and after meetings).
 - Win checks are off in test mode; `/test off` before a real game (recreating the lobby does it too).
-- A lobby re-created by auto re-host, `/move` or the high-ping dialog has a **new room code** (haison keeps it). Fix the guide room's name.
+- A lobby re-created by auto re-host, `/move` or the high-ping dialog has a **new room code** (haison keeps it). Share it again (and fix the guide room's name if you use one).
 - Re-creating lobbies again and again in a short time, or leaving games half-way, adds **ban points** on the official servers and temporarily blocks lobby creation ([3.4](#34-bans-and-kicks)).
 - The throwaway haison game has an intro in which somebody is shown as a vanilla Impostor; no roles are given and it ends at once.
 - How often and when a lobby can be extended is up to the server; without an offer the mod falls back to haison.
