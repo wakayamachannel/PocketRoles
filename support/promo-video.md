@@ -184,3 +184,8 @@ Discord や LINE などがある人は、そこに部屋コードを貼るだけ
 - zh: 职业MOD房间开着，玩家什么都不用装！ / 输入房间代码 ABCDEF 加入（这里只是引导房） / 满员的话请等下一局
 - en: Role-mod lobby is open. Nothing to install! / Join with code ABCDEF (this room is only a guide) / If it is full, wait for the next round
 15 人制限: 役職部屋は PC＋14 人。満員なら名前を「役職→満員」に。試合後は同じコードで再開するので待機者はそのまま入れる。
+
+## 11. 小红书（中文）
+- 账号: 日本の電話番号で登録可。動画は中文ハードサブ版（玩法篇）か 60 秒版（PocketRoles-short-zh-CN-60s.mp4）。横長でも可、縦長が好まれる。
+- 标题（20 字以内）: 只需房主安装的Among Us职业MOD
+- 正文・话题标签: Desktop\PocketRoles動画\投稿用テキスト.txt の小红书の項と同じ。外部リンクは書かず「GitHub 搜索 wakayamachannel/PocketRoles」。
