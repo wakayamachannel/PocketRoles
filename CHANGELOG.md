@@ -2,7 +2,7 @@
 
 Among Us **2026.8.18**（Steam / Windows）向けのホスト専用役職 MOD。日付は日本時間。詳しい説明は `README.md`（日本語）/ `README.zh-CN.md` / `README.en.md`。
 
-## v0.4.1 — 2026-09-xx
+## v0.4.1 — 2026-09-09
 
 - 役職を 4 つ追加: ラバーズ（第三陣営・2 人 1 組）、放火魔（第三陣営）、魔女（インポスター枠）、アサシン（インポスター枠、会議中の `/cmd guess`）。シェリフは放火魔も撃てるようになった
 - 設定: `[Lovers] AllowImpostor / WinAsLastThree`、`[Arsonist] DouseCooldown / CanVent`、`[Witch] SpellCooldown / SpelledSeeMark`、`[Assassin] GuessesPerMeeting / CanGuessFirstMeeting`（設定タブ「役職」ページ、`/opt lovers.* arsonist.* witch.* assassin.*`）。`[Roles] Lovers.Count` は 0 / 1（組数）
