@@ -34,6 +34,16 @@ namespace PocketRoles.Lobby
 
         private static bool Enabled => Options.EnableDleks;
 
+        private static bool _compatLogged;
+
+        /// <summary>Compat mode (no +25): the server closes the host for anything non-vanilla, and a Dleks start spawns a non-vanilla ship.</summary>
+        private static void CompatSkip(string where)
+        {
+            if (_compatLogged) return;
+            _compatLogged = true;
+            PocketRolesPlugin.Logger.LogInfo($"DleksMap: compat mode (no +25): Dleks not offered ({where})");
+        }
+
         // ------------------------------------------------------------------ helpers
 
         private static MapIconByName FindIcon(Il2CppSystem.Collections.Generic.List<MapIconByName> icons, MapNames name)
@@ -51,6 +61,7 @@ namespace PocketRoles.Lobby
         internal static void EnsureIcon(Il2CppSystem.Collections.Generic.List<MapIconByName> icons, string where)
         {
             if (icons == null) return;
+            if (!Options.HostAuthorityMode) { CompatSkip(where); return; } // v0.4.1: never offer Dleks in an unregistered (compat) lobby
             if (FindIcon(icons, MapNames.Dleks) != null) return;
             var skeld = FindIcon(icons, MapNames.Skeld);
             if (skeld == null)
@@ -110,7 +121,7 @@ namespace PocketRoles.Lobby
         {
             try
             {
-                if (!Enabled || !Selected || !AmHost()) return;
+                if (!Enabled || !Selected || !AmHost() || !Options.HostAuthorityMode) return;
                 SetMapId(DleksIndex, "start requested");
             }
             catch (Exception e)
@@ -156,6 +167,7 @@ namespace PocketRoles.Lobby
                 }
             }
             if (!Enabled) Selected = false;
+            if (!Options.HostAuthorityMode && Selected) { Selected = false; PocketRolesPlugin.Logger.LogInfo("DleksMap: compat mode (no +25): Dleks deselected"); }
             _createScreenChoice = false;
         }
 

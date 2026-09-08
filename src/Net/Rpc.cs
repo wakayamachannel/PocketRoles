@@ -145,11 +145,33 @@ namespace PocketRoles.Net
             ApplyRoleLocal(target, role);
         }
 
-        private static void ApplyRoleLocal(PlayerControl target, RoleTypes role)
+        /// <summary>
+        /// Writes the host's own role table entry for <paramref name="target"/> (the local view). 2026.8.18: a
+        /// PlayerControl.CoSetRole(role, canOverride: true) started after the vanilla assignment never reaches
+        /// RoleManager.SetRole on the host (solo test 2026-09-08 22:45: a host Arsonist and a forced Impostor basis kept
+        /// the Crewmate HUD — no kill button, real tasks), so the table is written directly through RoleManager.SetRole.
+        /// Before the intro the HUD is rebuilt from Data.Role at the intro end anyway; while a game already runs
+        /// (ghost roles, late views) SetHudActive(true) refreshes the buttons of the local player.
+        /// </summary>
+        internal static void ApplyRoleLocal(PlayerControl target, RoleTypes role)
         {
+            if (target == null) return;
             try
             {
-                target.StartCoroutine(target.CoSetRole(role, true));
+                var rm = RoleManager.Instance;
+                if (rm == null)
+                {
+                    target.StartCoroutine(target.CoSetRole(role, true));
+                    return;
+                }
+                rm.SetRole(target, role);
+                RoleTypes now = target.Data != null && target.Data.Role != null ? target.Data.Role.Role : RoleTypes.Crewmate;
+                PocketRolesPlugin.Logger.LogInfo($"Rpc.ApplyRoleLocal: #{target.PlayerId} -> {role} (local table now {now})");
+                if (target.AmOwner && GameManager.Instance != null && GameManager.Instance.GameHasStarted && HudManager.Instance != null)
+                {
+                    try { HudManager.Instance.SetHudActive(true); }
+                    catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Rpc.ApplyRoleLocal: SetHudActive: {e.Message}"); }
+                }
             }
             catch (Exception e)
             {

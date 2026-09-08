@@ -170,9 +170,9 @@ namespace PocketRoles.Game
                     if (basis != vanilla)
                     {
                         Core.Game.VanillaRoles[id] = basis;
-                        // Keep the host's local table on the same basis as the desync views computed from it.
-                        try { pc.StartCoroutine(pc.CoSetRole(basis, true)); }
-                        catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"TestMode: local CoSetRole for #{id} failed: {e.Message}"); }
+                        // Keep the host's local table on the same basis as the desync views computed from it
+                        // (direct RoleManager.SetRole: CoSetRole with canOverride never applies on 2026.8.18).
+                        Net.Rpc.ApplyRoleLocal(pc, basis);
                     }
                     Core.Game.Roles[id] = role;
                     forced.Add(id);
