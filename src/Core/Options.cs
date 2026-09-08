@@ -86,6 +86,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<string> _timerMode;
         private static ConfigEntry<bool> _autoRegion;
         private static ConfigEntry<bool> _enableDleks;
+        private static ConfigEntry<bool> _dleksUnregistered;
 
         // v0.4 [General] Game Master, [Hotkeys]
         private static ConfigEntry<bool> _gameMaster;
@@ -275,6 +276,7 @@ namespace PocketRoles.Core
             _timerMode = cfg.Bind("Lobby", "TimerMode", "extend", new ConfigDescription("What to do when the lobby timer is about to expire: extend (request the server extension, fall back to haison), haison (start and end a game immediately so everyone stays in the same lobby), notify (only tell the players)", new AcceptableValueList<string>(TimerModeChoices)));
             _autoRegion = cfg.Bind("Lobby", "AutoRegion", false, "Before hosting, ping the official regions and select the one with the lowest latency (/region shows the table)");
             _enableDleks = cfg.Bind("Lobby", "EnableDleks", true, "Offer the mirrored Skeld (Dleks) in the lobby map picker. Vanilla clients ship the map and can play it");
+            _dleksUnregistered = cfg.Bind("Lobby", "DleksWhenUnregistered", false, "Also offer Dleks in an unregistered (compat / 便利ホスト) lobby. Off by default: on 2026-09-08 the official server disconnected the host (\"Hacking\") right after Dleks was picked in such a lobby (other mods report Dleks works there, so the real trigger may have been something else - turn this on at your own risk; a Hacking disconnect adds ban points)");
 
             // ---- v0.4 Game Master + hotkeys
             _gameMaster = cfg.Bind("General", "GameMaster", false, "Game Master mode: the host gets no role, dies at the start of every game and only watches / moderates (chat and map stay usable)");
@@ -430,6 +432,7 @@ namespace PocketRoles.Core
         public static string TimerMode { get => GetChoice(_timerMode, TimerModeChoices); set => SetChoice(_timerMode, TimerModeChoices, value); }
         public static bool AutoRegion { get => _autoRegion != null && _autoRegion.Value; set { if (_autoRegion != null) _autoRegion.Value = value; } }
         public static bool EnableDleks { get => _enableDleks == null || _enableDleks.Value; set { if (_enableDleks != null) _enableDleks.Value = value; } }
+        public static bool DleksWhenUnregistered { get => _dleksUnregistered != null && _dleksUnregistered.Value; set { if (_dleksUnregistered != null) _dleksUnregistered.Value = value; } }
 
         // ------------------------------------------------------------------ v0.4 [General] Game Master, [Hotkeys]
 
@@ -860,6 +863,8 @@ namespace PocketRoles.Core
                 .Tip("部屋を作る前に各地域のpingを測り、最も速い地域を選びます。", "Pings the regions before hosting and picks the fastest one.", "创建房间前测试各区域延迟并选择最快的区域。"));
             _descriptors.Add(Bool("lobby.dleks", lJa, lEn, "逆スケルド(Dleks)を出す", "Offer Dleks map", _enableDleks)
                 .Tip("マップ選択に逆スケルド（Dleks）を出します。バニラの人も遊べます。", "Offers the mirrored Skeld (Dleks) in the map picker; vanilla players can play it.", "在地图选择中提供镜像 Skeld（Dleks）；原版玩家也可以游玩。"));
+            _descriptors.Add(Bool("lobby.dleks.compat", lJa, lEn, "登録オフの部屋でも Dleks", "Dleks in unregistered lobby", _dleksUnregistered)
+                .Tip("登録オフ（便利ホスト）の部屋でも逆スケルドを出します。登録オフで Dleks を選んだ直後にサーバーがホストを切断した例があるため既定はオフ（自己責任）。", "Also offers Dleks in an unregistered (compat) lobby. Off by default: the server once disconnected the host right after Dleks was picked there (at your own risk).", "在未注册（便利房）的房间中也提供镜像 Skeld。曾出现选择后服务器断开房主的情况，默认关闭（风险自负）。"));
 
             const string hJa = "ホスト支援", hEn = "Host tools";
             _descriptors.Add(Bool("gm", hJa, hEn, "ゲームマスター", "Game Master", _gameMaster)
@@ -1090,6 +1095,7 @@ namespace PocketRoles.Core
                 case "lobby.extenddelay": case "lobby.extendnoticedelay": case "extenddelay": return SetInt(_extendNoticeDelay, value, 0, 60, "lobby.extenddelay", out message);
                 case "lobby.autoregion": case "autoregion": return SetBool(_autoRegion, value, "lobby.autoregion", out message);
                 case "lobby.dleks": case "lobby.enabledleks": case "dleks": return SetBool(_enableDleks, value, "lobby.dleks", out message);
+                case "lobby.dleks.compat": case "lobby.dlekscompat": case "dleks.compat": case "lobby.dleksunregistered": return SetBool(_dleksUnregistered, value, "lobby.dleks.compat", out message);
                 // v0.4 host tools
                 case "gm": case "gamemaster": case "general.gamemaster": return SetBool(_gameMaster, value, "gm", out message);
                 case "hotkeys": case "hotkeys.enabled": return SetBool(_hotkeysEnabled, value, "hotkeys", out message);

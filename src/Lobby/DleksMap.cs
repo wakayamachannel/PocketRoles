@@ -36,6 +36,9 @@ namespace PocketRoles.Lobby
 
         private static bool _compatLogged;
 
+        /// <summary>Registered lobby, or the host opted in for unregistered lobbies ([Lobby] DleksWhenUnregistered).</summary>
+        private static bool AllowedInThisLobby => Options.HostAuthorityMode || Options.DleksWhenUnregistered;
+
         /// <summary>Compat mode (no +25): the server closes the host for anything non-vanilla, and a Dleks start spawns a non-vanilla ship.</summary>
         private static void CompatSkip(string where)
         {
@@ -61,7 +64,7 @@ namespace PocketRoles.Lobby
         internal static void EnsureIcon(Il2CppSystem.Collections.Generic.List<MapIconByName> icons, string where)
         {
             if (icons == null) return;
-            if (!Options.HostAuthorityMode) { CompatSkip(where); return; } // v0.4.1: never offer Dleks in an unregistered (compat) lobby
+            if (!AllowedInThisLobby) { CompatSkip(where); return; } // v0.4.1: never offer Dleks in an unregistered (compat) lobby
             if (FindIcon(icons, MapNames.Dleks) != null) return;
             var skeld = FindIcon(icons, MapNames.Skeld);
             if (skeld == null)
@@ -121,7 +124,7 @@ namespace PocketRoles.Lobby
         {
             try
             {
-                if (!Enabled || !Selected || !AmHost() || !Options.HostAuthorityMode) return;
+                if (!Enabled || !Selected || !AmHost() || !AllowedInThisLobby) return;
                 SetMapId(DleksIndex, "start requested");
             }
             catch (Exception e)
@@ -167,7 +170,7 @@ namespace PocketRoles.Lobby
                 }
             }
             if (!Enabled) Selected = false;
-            if (!Options.HostAuthorityMode && Selected) { Selected = false; PocketRolesPlugin.Logger.LogInfo("DleksMap: compat mode (no +25): Dleks deselected"); }
+            if (!AllowedInThisLobby && Selected) { Selected = false; PocketRolesPlugin.Logger.LogInfo("DleksMap: compat mode (no +25): Dleks deselected"); }
             _createScreenChoice = false;
         }
 
