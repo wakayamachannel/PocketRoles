@@ -1,6 +1,7 @@
 # PocketRoles — host-only role mod for Among Us
 
 [日本語](README.md) | [简体中文](README.zh-CN.md) | [English](README.en.md)
+
 ▶ Videos: [Install (YouTube, Japanese subtitles, 1.5 min)](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [How to play (YouTube, 3.5 min)](https://www.youtube.com/watch?v=UyvmPzYSrRM) · Chinese: [Install (bilibili)](https://www.bilibili.com/video/BV17obV6CESH) / [How to play (bilibili)](https://www.bilibili.com/video/BV1qobV6kERQ)
 
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>

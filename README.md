@@ -1,6 +1,7 @@
 # PocketRoles — Among Us ホスト専用 役職 MOD
 
 [日本語](README.md) | [简体中文](README.zh-CN.md) | [English](README.en.md)
+
 ▶ 動画: [導入編（YouTube・1 分半）](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [遊び方編（YouTube・3 分半）](https://www.youtube.com/watch?v=UyvmPzYSrRM)　中文: [安装篇（bilibili）](https://www.bilibili.com/video/BV17obV6CESH) / [玩法篇（bilibili）](https://www.bilibili.com/video/BV1qobV6kERQ)
 
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
