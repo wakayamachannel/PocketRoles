@@ -158,6 +158,11 @@ namespace PocketRoles.Core
         private static ConfigEntry<float> _speedBoosterSpeed;
         private static ConfigEntry<bool> _madmateKnownToImpostors;
 
+        // v0.4.1 [Lovers] / [Arsonist] / [Witch] / [Assassin]
+        private static ConfigEntry<bool> _loversAllowImpostor, _loversLastThree, _arsonistCanVent, _witchSpelledSeeMark, _assassinFirstMeeting;
+        private static ConfigEntry<float> _arsonistDouseCooldown, _witchSpellCooldown;
+        private static ConfigEntry<int> _assassinGuessesPerMeeting;
+
         private static readonly List<OptionDescriptor> _descriptors = new List<OptionDescriptor>();
 
         /// <summary>Every editable option in display order (role rows first, then General / Lobby / Chat). Built by Init().</summary>
@@ -320,8 +325,11 @@ namespace PocketRoles.Core
             foreach (var r in Roles.All)
             {
                 int defCount = (r.Id == CustomRole.Sheriff || r.Id == CustomRole.Jester || r.Id == CustomRole.Madmate) ? 1 : 0;
+                // Lovers is the only pair role: at most one pair per game.
+                int maxCount = r.Id == CustomRole.Lovers ? 1 : 15;
+                string countDesc = r.Id == CustomRole.Lovers ? "Lovers pairs per game (0 or 1)" : $"Maximum number of {r.NameEn} ({r.NameJa}) per game";
                 _count[r.Id] = cfg.Bind("Roles", r.NameEn.Replace(" ", "") + ".Count", defCount,
-                    new ConfigDescription($"Maximum number of {r.NameEn} ({r.NameJa}) per game", new AcceptableValueRange<int>(0, 15)));
+                    new ConfigDescription(countDesc, new AcceptableValueRange<int>(0, maxCount)));
                 _chance[r.Id] = cfg.Bind("Roles", r.NameEn.Replace(" ", "") + ".Chance", 100,
                     new ConfigDescription($"Chance (%) for each {r.NameEn} slot to be assigned", new AcceptableValueRange<int>(0, 100)));
             }
@@ -336,6 +344,16 @@ namespace PocketRoles.Core
             _lighterVision = cfg.Bind("Lighter", "VisionMultiplier", 2f, new ConfigDescription("Lighter vision multiplier", new AcceptableValueRange<float>(1f, 5f)));
             _speedBoosterSpeed = cfg.Bind("SpeedBooster", "SpeedMultiplier", 1.5f, new ConfigDescription("Speed Booster speed multiplier", new AcceptableValueRange<float>(1f, 3f)));
             _madmateKnownToImpostors = cfg.Bind("Madmate", "KnownToImpostors", false, "Impostors see who the Madmate is");
+
+            // ---- v0.4.1 roles
+            _loversAllowImpostor = cfg.Bind("Lovers", "AllowImpostor", true, "The second lover may be a vanilla Impostor (keeps its kill button and counts as an Impostor for the win rules; wins only as a lover)");
+            _loversLastThree = cfg.Bind("Lovers", "WinAsLastThree", true, "The Lovers win as soon as both are alive and at most 3 players are alive");
+            _arsonistDouseCooldown = cfg.Bind("Arsonist", "DouseCooldown", 10f, new ConfigDescription("Seconds between two douses (the Arsonist's kill button)", new AcceptableValueRange<float>(2.5f, 180f)));
+            _arsonistCanVent = cfg.Bind("Arsonist", "CanVent", false, "Arsonist can use vents");
+            _witchSpellCooldown = cfg.Bind("Witch", "SpellCooldown", 0f, new ConfigDescription("Seconds between two spells (0 = the lobby's kill cooldown)", new AcceptableValueRange<float>(0f, 180f)));
+            _witchSpelledSeeMark = cfg.Bind("Witch", "SpelledSeeMark", false, "Spelled players see a mark on their own name (the Witch always sees it)");
+            _assassinGuessesPerMeeting = cfg.Bind("Assassin", "GuessesPerMeeting", 1, new ConfigDescription("Guesses (/cmd guess) per meeting", new AcceptableValueRange<int>(1, 5)));
+            _assassinFirstMeeting = cfg.Bind("Assassin", "CanGuessFirstMeeting", true, "The Assassin may guess in the first meeting of the game");
 
             BuildDescriptors();
         }
@@ -596,7 +614,7 @@ namespace PocketRoles.Core
 
         public static int Count(CustomRole r) => _count.TryGetValue(r, out var e) ? e.Value : 0;
         public static int Chance(CustomRole r) => _chance.TryGetValue(r, out var e) ? e.Value : 0;
-        public static void SetCount(CustomRole r, int n) { if (_count.TryGetValue(r, out var e)) e.Value = Math.Max(0, Math.Min(15, n)); }
+        public static void SetCount(CustomRole r, int n) { if (_count.TryGetValue(r, out var e)) e.Value = Math.Max(0, Math.Min(r == CustomRole.Lovers ? 1 : 15, n)); }
         public static void SetChance(CustomRole r, int c) { if (_chance.TryGetValue(r, out var e)) e.Value = Math.Max(0, Math.Min(100, c)); }
 
         public static float SheriffKillCooldown => _sheriffKillCooldown?.Value ?? 30f;
@@ -609,6 +627,17 @@ namespace PocketRoles.Core
         public static float LighterVision => _lighterVision?.Value ?? 2f;
         public static float SpeedBoosterSpeed => _speedBoosterSpeed?.Value ?? 1.5f;
         public static bool MadmateKnownToImpostors => _madmateKnownToImpostors != null && _madmateKnownToImpostors.Value;
+
+        // v0.4.1
+        public static bool LoversAllowImpostor => _loversAllowImpostor == null || _loversAllowImpostor.Value;
+        public static bool LoversWinAsLastThree => _loversLastThree == null || _loversLastThree.Value;
+        public static float ArsonistDouseCooldown => _arsonistDouseCooldown?.Value ?? 10f;
+        public static bool ArsonistCanVent => _arsonistCanVent != null && _arsonistCanVent.Value;
+        /// <summary>0 = the lobby kill cooldown.</summary>
+        public static float WitchSpellCooldown => _witchSpellCooldown?.Value ?? 0f;
+        public static bool WitchSpelledSeeMark => _witchSpelledSeeMark != null && _witchSpelledSeeMark.Value;
+        public static int AssassinGuessesPerMeeting => _assassinGuessesPerMeeting?.Value ?? 1;
+        public static bool AssassinCanGuessFirstMeeting => _assassinFirstMeeting == null || _assassinFirstMeeting.Value;
 
         /// <summary>Total number of custom-role slots that are enabled (for quick sanity messages).</summary>
         public static int EnabledSlots()
@@ -706,8 +735,12 @@ namespace PocketRoles.Core
             {
                 string sJa = r.NameJa, sEn = r.NameEn, color = r.Color;
                 var role = r.Id;
-                _descriptors.Add(Int(r.Key + ".count", sJa, sEn, "人数", "Count", _count[role], 0, 15, 1, color)
-                    .Tip("この役職を最大何人まで出すか（0 = 出さない）。", "Maximum number of this role per game (0 = never).", "此职业每局最多出现的人数（0 = 不出现）。"));
+                if (role == CustomRole.Lovers)
+                    _descriptors.Add(Int(r.Key + ".count", sJa, sEn, "組数（0/1）", "Pairs (0/1)", _count[role], 0, 1, 1, color)
+                        .Tip("ラバーズを出すか（1 = 1 組 2 人、0 = 出さない）。", "1 = one pair (two players), 0 = never.", "1 = 一对（两人），0 = 不出现。"));
+                else
+                    _descriptors.Add(Int(r.Key + ".count", sJa, sEn, "人数", "Count", _count[role], 0, 15, 1, color)
+                        .Tip("この役職を最大何人まで出すか（0 = 出さない）。", "Maximum number of this role per game (0 = never).", "此职业每局最多出现的人数（0 = 不出现）。"));
                 _descriptors.Add(Int(r.Key + ".chance", sJa, sEn, "確率", "Chance", _chance[role], 0, 100, 5, color)
                     .Tip("各枠にこの役職が実際に割り当てられる確率（%）。", "Chance (%) that each slot of this role is actually assigned.", "每个名额实际分配此职业的概率（%）。"));
                 switch (role)
@@ -747,6 +780,31 @@ namespace PocketRoles.Core
                     case CustomRole.Madmate:
                         _descriptors.Add(Bool("madmate.known", sJa, sEn, "インポスターに公開", "Known to impostors", _madmateKnownToImpostors, color)
                             .Tip("オンならインポスターに誰がマッドメイトか表示されます。", "On: Impostors see who the Madmate is.", "开启后内鬼可以看到谁是疯子船员。"));
+                        break;
+                    // v0.4.1
+                    case CustomRole.Lovers:
+                        _descriptors.Add(Bool("lovers.impostor", sJa, sEn, "インポスターも恋人になる", "Impostor may be a lover", _loversAllowImpostor, color)
+                            .Tip("オンなら2人目の恋人がインポスターから選ばれることがあります（キルはできたままです）。", "On: the second lover may be a vanilla Impostor (it keeps its kill button).", "开启后第二位恋人可能从内鬼中选出（仍可击杀）。"));
+                        _descriptors.Add(Bool("lovers.lastthree", sJa, sEn, "残り3人で勝利", "Win as last 3", _loversLastThree, color)
+                            .Tip("オンなら2人とも生きていて生存者が3人以下になった時点でラバーズの勝利です。", "On: the Lovers win as soon as both are alive and at most 3 players remain.", "开启后两人存活且存活者不超过3人时恋人立即获胜。"));
+                        break;
+                    case CustomRole.Arsonist:
+                        _descriptors.Add(Float("arsonist.cooldown", sJa, sEn, "油のクールダウン", "Douse cooldown", _arsonistDouseCooldown, 2.5f, 180f, 2.5f, color)
+                            .Tip("油をかけてから次にかけられるまでの秒数。", "Seconds between two douses.", "两次浇油之间的冷却秒数。"));
+                        _descriptors.Add(Bool("arsonist.vent", sJa, sEn, "ベント使用", "Can vent", _arsonistCanVent, color)
+                            .Tip("放火魔がベントに入れるかどうか。", "Whether the Arsonist can use vents.", "纵火犯是否可以跳管。"));
+                        break;
+                    case CustomRole.Witch:
+                        _descriptors.Add(Float("witch.cooldown", sJa, sEn, "呪いのクールダウン", "Spell cooldown", _witchSpellCooldown, 0f, 180f, 2.5f, color)
+                            .Tip("呪いをかけてから次にかけられるまでの秒数（0 = キルクールダウンと同じ）。", "Seconds between two spells (0 = same as the kill cooldown).", "两次诅咒之间的秒数（0 = 与击杀冷却相同）。"));
+                        _descriptors.Add(Bool("witch.mark", sJa, sEn, "呪われた本人に印", "Target sees mark", _witchSpelledSeeMark, color)
+                            .Tip("オンなら呪われた人の自分の名前に印が付きます（魔女にはいつも見えます）。", "On: a spelled player sees a mark on their own name (the Witch always sees it).", "开启后被诅咒者能在自己名字上看到标记（女巫始终可见）。"));
+                        break;
+                    case CustomRole.Assassin:
+                        _descriptors.Add(Int("assassin.guesses", sJa, sEn, "会議ごとの推理回数", "Guesses per meeting", _assassinGuessesPerMeeting, 1, 5, 1, color)
+                            .Tip("1回の会議で /cmd guess を使える回数。", "How many /cmd guess an Assassin may use per meeting.", "每次会议可使用 /cmd guess 的次数。"));
+                        _descriptors.Add(Bool("assassin.firstmeeting", sJa, sEn, "初回会議でも推理可", "Can guess in 1st meeting", _assassinFirstMeeting, color)
+                            .Tip("オフなら試合の最初の会議では推理できません。", "Off: no guessing in the first meeting of the game.", "关闭后本局第一次会议不能猜测。"));
                         break;
                 }
             }
@@ -976,7 +1034,8 @@ namespace PocketRoles.Core
         /// <summary>
         /// Sets one option from a chat command. Keys: "&lt;role&gt;.count", "&lt;role&gt;.chance", "sheriff.cooldown", "sheriff.killmadmate",
         /// "jackal.cooldown", "jackal.vent", "vampire.delay", "mayor.votes", "snitch.tasks", "lighter.vision", "speedbooster.speed",
-        /// "madmate.known", "lang", "enabled", "welcome", "roleinfo", "register", "kick", "general.ignoreversion",
+        /// "madmate.known", "lovers.impostor", "lovers.lastthree", "arsonist.cooldown", "arsonist.vent", "witch.cooldown", "witch.mark",
+        /// "assassin.guesses", "assassin.firstmeeting" (v0.4.1), "lang", "enabled", "welcome", "roleinfo", "register", "kick", "general.ignoreversion",
         /// "lobby.autorehost", "lobby.autopublic", "lobby.autopublicdelay", "lobby.rehostmax", "lobby.maxping" (alias "maxping"), "compat.risky",
         /// "lobby.autostart", "lobby.autostartplayers", "lobby.autostartcountdown", "lobby.timermode", "lobby.timerwarnat",
         /// "lobby.extenddelay", "lobby.autoregion", "lobby.dleks", "gm", "hotkeys", "hotkeys.haison", "hotkeys.endmeeting",
@@ -1097,6 +1156,15 @@ namespace PocketRoles.Core
                 case "cos.dropship": case "dropship": return SetBool(_cosDropship, value, "cos.dropship", out message);
                 case "cos.menubg": case "cos.menubackground": case "menubackground": return SetBool(_cosMenuBackground, value, "cos.menubg", out message);
                 case "cos.cursor": case "cursor": return SetBool(_cosCursor, value, "cos.cursor", out message);
+                // v0.4.1 roles
+                case "lovers.impostor": case "lovers.allowimpostor": return SetBool(_loversAllowImpostor, value, "lovers.impostor", out message);
+                case "lovers.lastthree": case "lovers.last3": case "lovers.winaslastthree": return SetBool(_loversLastThree, value, "lovers.lastthree", out message);
+                case "arsonist.cooldown": case "arsonist.cd": case "arsonist.dousecooldown": return SetFloat(_arsonistDouseCooldown, value, 2.5f, 180f, "arsonist.cooldown", out message);
+                case "arsonist.vent": case "arsonist.canvent": return SetBool(_arsonistCanVent, value, "arsonist.vent", out message);
+                case "witch.cooldown": case "witch.cd": case "witch.spellcooldown": return SetFloat(_witchSpellCooldown, value, 0f, 180f, "witch.cooldown", out message);
+                case "witch.mark": case "witch.spelledseemark": return SetBool(_witchSpelledSeeMark, value, "witch.mark", out message);
+                case "assassin.guesses": case "assassin.guessespermeeting": return SetInt(_assassinGuessesPerMeeting, value, 1, 5, "assassin.guesses", out message);
+                case "assassin.firstmeeting": case "assassin.first": case "assassin.canguessfirstmeeting": return SetBool(_assassinFirstMeeting, value, "assassin.firstmeeting", out message);
                 case "sheriff.cooldown": case "sheriff.cd": case "sheriff.killcooldown": return SetFloat(_sheriffKillCooldown, value, 2.5f, 180f, "sheriff.cooldown", out message);
                 case "sheriff.killmadmate": case "sheriff.madmate": return SetBool(_sheriffCanKillMadmate, value, "sheriff.killmadmate", out message);
                 case "jackal.cooldown": case "jackal.cd": case "jackal.killcooldown": return SetFloat(_jackalKillCooldown, value, 2.5f, 180f, "jackal.cooldown", out message);
@@ -1166,6 +1234,23 @@ namespace PocketRoles.Core
                     case CustomRole.Lighter: line += $" x{LighterVision:0.#}"; break;
                     case CustomRole.SpeedBooster: line += $" x{SpeedBoosterSpeed:0.#}"; break;
                     case CustomRole.Madmate: if (MadmateKnownToImpostors) line += Lang.T("opt.desc.madmate", " インポスターに公開", " known to impostors"); break;
+                    // v0.4.1
+                    case CustomRole.Lovers:
+                        if (LoversAllowImpostor) line += Lang.T("opt.desc.lovers.impostor", " インポスター可", ", impostor allowed");
+                        if (LoversWinAsLastThree) line += Lang.T("opt.desc.lovers.lastthree", " 残り3人で勝利", ", win as last 3");
+                        break;
+                    case CustomRole.Arsonist:
+                        line += Lang.TF("opt.desc.arsonist", " 油CD{0:0.#}秒", " douse CD {0:0.#}s", ArsonistDouseCooldown);
+                        if (ArsonistCanVent) line += Lang.T("opt.desc.arsonist.vent", " ベント可", ", can vent");
+                        break;
+                    case CustomRole.Witch:
+                        if (WitchSpellCooldown > 0f) line += Lang.TF("opt.desc.witch", " 呪いCD{0:0.#}秒", " spell CD {0:0.#}s", WitchSpellCooldown);
+                        if (WitchSpelledSeeMark) line += Lang.T("opt.desc.witch.mark", " 本人に印", ", target sees mark");
+                        break;
+                    case CustomRole.Assassin:
+                        line += Lang.TF("opt.desc.assassin", " 推理{0}回/会議", " {0} guess/meeting", AssassinGuessesPerMeeting);
+                        if (!AssassinCanGuessFirstMeeting) line += Lang.T("opt.desc.assassin.first", " 初回会議不可", ", not in 1st meeting");
+                        break;
                 }
                 lines.Add(line);
             }

@@ -32,12 +32,13 @@ namespace PocketRoles.Game
 
         // ------------------------------------------------------------------ public API (contract)
 
-        /// <summary>Per-frame (HudManager.Update postfix): executes vampire bites that are due.</summary>
+        /// <summary>Per-frame (HudManager.Update postfix): executes delayed deaths (vampire bites, lover suicide, curses) that are due.</summary>
         public static void Tick()
         {
             if (Game.Bites.Count == 0) return;
             if (!Game.IsHostActive || !Game.InProgress || Game.Ending) return;
-            if (MeetingHud.Instance != null || ExileController.Instance != null) return;
+            // Not during the intro either: a lover disconnecting during the intro queues its partner's death.
+            if (MeetingHud.Instance != null || ExileController.Instance != null || IntroCutscene.Instance != null) return;
 
             float now = Time.time;
             Scratch.Clear();
@@ -73,6 +74,8 @@ namespace PocketRoles.Game
             var role = Game.RoleOf(playerId);
             if (role == CustomRole.None) return true;
             if (role == CustomRole.Jackal) return Options.JackalCanVent;
+            if (role == CustomRole.Arsonist) return Options.ArsonistCanVent;
+            if (role == CustomRole.Lovers) return true; // a lover keeps its vanilla side's abilities (vanilla already rejects a crew lover)
             return Roles.Info(role).CanVent;
         }
 
@@ -80,11 +83,12 @@ namespace PocketRoles.Game
         {
             var role = Game.RoleOf(playerId);
             if (role == CustomRole.None) return true;
+            if (role == CustomRole.Lovers) return true; // a lover keeps its vanilla side's abilities (vanilla already rejects a crew lover)
             return Roles.Info(role).CanSabotage;
         }
 
-        /// <summary>The lobby's kill cooldown (used for Vampire / Mafia, who keep the vanilla impostor cooldown).</summary>
-        private static float LobbyKillCooldown()
+        /// <summary>The lobby's kill cooldown (used for Vampire / Mafia / Witch, who keep the vanilla impostor cooldown).</summary>
+        internal static float LobbyKillCooldown()
         {
             try
             {
@@ -107,7 +111,7 @@ namespace PocketRoles.Game
         {
             if (Game.IsImpostorTeamKiller(targetId)) return true;
             var role = Game.RoleOf(targetId);
-            if (role == CustomRole.Jackal) return true;
+            if (role == CustomRole.Jackal || role == CustomRole.Arsonist) return true;
             if (role == CustomRole.Madmate && Options.SheriffCanKillMadmate) return true;
             return false;
         }
@@ -138,7 +142,7 @@ namespace PocketRoles.Game
         }
 
         /// <summary>Private notice, built in the recipient's language (see Lang.PlayerLang). Texts may use {0}… placeholders.</summary>
-        private static void Notice(byte playerId, string key, string ja, string en, params object[] args)
+        internal static void Notice(byte playerId, string key, string ja, string en, params object[] args)
         {
             try
             {
@@ -176,9 +180,10 @@ namespace PocketRoles.Game
             }
             var role = Game.RoleOf(killerId);
 
-            // A host that holds a desync role (Sheriff / Jackal) applied Impostor to its OWN PlayerControl, so vanilla
-            // CheckMurder would reject it as an unkillable target (CanBeKilled). Decide those kills here with Rpc.Kill.
-            if (target != null && (role == CustomRole.None || role == CustomRole.Mafia)
+            // A host that holds a desync role (Sheriff / Jackal / Arsonist) applied Impostor to its OWN PlayerControl, so
+            // vanilla CheckMurder would reject it as an unkillable target (CanBeKilled). Decide those kills here with
+            // Rpc.Kill (vanilla impostors, Mafia, Assassin and an impostor lover; the Witch never needs a vanilla kill).
+            if (target != null && (role == CustomRole.None || role == CustomRole.Mafia || role == CustomRole.Assassin || role == CustomRole.Lovers)
                 && Game.IsHost(target.PlayerId) && Game.IsDesyncImpostor(target.PlayerId))
             {
                 bool allowed = Game.IsImpostorTeamKiller(killerId) && IsValidMurder(killer, target)
@@ -255,8 +260,17 @@ namespace PocketRoles.Game
                     }
                     return true; // vanilla impostor kill
 
+                // v0.4.1: the kill button is an ability (Vampire pattern: cooldown reset + mark + private notice)
+                case CustomRole.Arsonist:
+                    Arsonist.Douse(killer, target);
+                    return false;
+
+                case CustomRole.Witch:
+                    Witch.Spell(killer, target);
+                    return false;
+
                 default:
-                    return true;
+                    return true; // Assassin: vanilla kill (an impostor lover already left at the IsKiller check above)
             }
         }
 
@@ -276,6 +290,11 @@ namespace PocketRoles.Game
                 if (killer == null || killer.PlayerId == targetId) reporterId = bite.Killer;
                 Game.Bites.Remove(targetId);
             }
+
+            // v0.4.1 role bookkeeping on any death
+            Witch.OnPlayerDied(targetId);     // dead witch → curse fades; dead target → forgotten
+            Arsonist.OnPlayerDied(targetId);  // dead arsonist → douses vanish
+            Lovers.OnPlayerDied(targetId);    // partner follows (delayed death through Game.Bites)
 
             var targetRole = Game.RoleOf(targetId);
             if (targetRole == CustomRole.Terrorist && Game.TasksDone(targetId))
@@ -333,7 +352,7 @@ namespace PocketRoles.Game
                 Game.Bites[victimId] = bite;
                 return;
             }
-            PocketRolesPlugin.Logger.LogInfo($"Kills: bite on {Game.NameOf(victimId)} (by {Game.NameOf(bite.Killer)}) executes");
+            PocketRolesPlugin.Logger.LogInfo($"Kills: {(bite.Reason ?? "bite")} on {Game.NameOf(victimId)} (by {Game.NameOf(bite.Killer)}) executes");
             // The bite stays registered until the MurderPlayer postfix (OnMurder) has run, so the biter is credited
             // as the killer (Bait auto-report); OnMurder removes it, this is only the fallback.
             Rpc.Kill(victim, victim);
@@ -396,6 +415,7 @@ namespace PocketRoles.Game
             LastVentNotice.Clear();
             LastSabotageNotice.Clear();
             LastMafiaNotice.Clear();
+            Arsonist.ResetNotices();
         }
     }
 

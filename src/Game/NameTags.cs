@@ -55,6 +55,15 @@ namespace PocketRoles.Game
                 CustomRole targetRole = Core.Game.RoleOf(targetId);
                 CustomRole viewerRole = Core.Game.RoleOf(viewerId);
 
+                // v0.4.1 marks (prefixes; the later colour wrapping keeps them): ♥ on the partner for a lover,
+                // † on spelled players for the witch (and on the target itself by option), ♨ on doused players for the arsonist.
+                string mark = "";
+                if (viewerId != targetId && Core.Game.PartnerOf(viewerId) == targetId) mark += Lovers.Heart;
+                if (viewerRole == CustomRole.Witch && Core.Game.Spelled.TryGetValue(targetId, out var witchId) && witchId == viewerId) mark += Witch.Mark;
+                if (viewerId == targetId && Options.WitchSpelledSeeMark && Core.Game.Spelled.ContainsKey(targetId)) mark += Witch.Mark;
+                if (viewerRole == CustomRole.Arsonist && Core.Game.Doused.TryGetValue(viewerId, out var doused) && doused.Contains(targetId)) mark += Arsonist.Mark;
+                baseName = mark + baseName;
+
                 // 1. own role tag
                 if (viewerId == targetId)
                 {

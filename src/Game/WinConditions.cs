@@ -15,9 +15,15 @@ namespace PocketRoles.Game
     /// </summary>
     public static class WinConditions
     {
-        public enum WinKind { Crew, Impostor, Jackal, Jester, Terrorist }
+        public enum WinKind { Crew, Impostor, Jackal, Jester, Terrorist, Lovers, Arsonist }
 
-        private enum Outcome { Continue, Crew, Impostor, Jackal }
+        private enum Outcome { Continue, Crew, Impostor, Jackal, Lovers, Arsonist }
+
+        /// <summary>Arsonist id found by the last Evaluate that returned Outcome.Arsonist.</summary>
+        private static byte _evalSoloId = 255;
+
+        /// <summary>Solo win kinds (the winner is the player passed as soloId).</summary>
+        private static bool IsSoloKind(WinKind kind) => kind == WinKind.Jester || kind == WinKind.Terrorist || kind == WinKind.Arsonist;
 
         private const float CheckInterval = 0.25f;
         private const float EndGameDelay = 0.4f;
@@ -69,13 +75,7 @@ namespace PocketRoles.Game
                     if (CriticalSabotageExpired()) EndGameOverridingTestMode(WinKind.Impostor);
                     return;
                 }
-                var outcome = Evaluate(255);
-                switch (outcome)
-                {
-                    case Outcome.Crew: EndGame(WinKind.Crew); break;
-                    case Outcome.Impostor: EndGame(WinKind.Impostor); break;
-                    case Outcome.Jackal: EndGame(WinKind.Jackal); break;
-                }
+                EndFromOutcome(Evaluate(255));
             }
             catch (Exception e)
             {
@@ -133,7 +133,7 @@ namespace PocketRoles.Game
                 Core.Game.InProgress = false;
                 Scheduler.Cancel("win.end");
 
-                if (soloId == 255 && (kind == WinKind.Jester || kind == WinKind.Terrorist)) soloId = Core.Game.SoloWinnerId;
+                if (soloId == 255 && IsSoloKind(kind)) soloId = Core.Game.SoloWinnerId;
 
                 var winners = ComputeWinners(kind, soloId);
                 BuildSummary(kind, soloId, winners);
@@ -210,7 +210,32 @@ namespace PocketRoles.Game
             return false;
         }
 
+        /// <summary>
+        /// Base rules plus the v0.4.1 overrides: an Arsonist that doused every other living player wins alone; the
+        /// Lovers win when both are alive and any base end is reached (or, by option, at most 3 players remain).
+        /// Jester / Terrorist solo ends bypass this method and keep precedence.
+        /// </summary>
         private static Outcome Evaluate(byte exiledId)
+        {
+            Outcome o = EvaluateBase(exiledId);
+            byte arsonist = Arsonist.WinnerId(exiledId);           // alive arsonist whose douses cover every other alive player
+            if (arsonist != 255) { _evalSoloId = arsonist; return Outcome.Arsonist; }
+            if (Lovers.BothAlive(exiledId) && (o != Outcome.Continue || (Options.LoversWinAsLastThree && AliveCount(exiledId) <= 3)))
+                return Outcome.Lovers;
+            return o;
+        }
+
+        private static int AliveCount(byte exiledId)
+        {
+            int n = 0;
+            foreach (var id in Core.Game.AllPlayerIds())
+            {
+                if (id != exiledId && Core.Game.IsAlive(id)) n++;
+            }
+            return n;
+        }
+
+        private static Outcome EvaluateBase(byte exiledId)
         {
             // sabotage timer ran out → impostors
             if (CriticalSabotageExpired()) return Outcome.Impostor;
@@ -265,7 +290,9 @@ namespace PocketRoles.Game
                     case WinKind.Impostor: win = Core.Game.TeamOf(id) == Team.Impostor; break; // Madmate, Vampire, Mafia, vanilla impostors
                     case WinKind.Jackal: win = role == CustomRole.Jackal && (Core.Game.IsAlive(id) || id == soloId); break;
                     case WinKind.Jester:
-                    case WinKind.Terrorist: win = id == soloId; break;
+                    case WinKind.Terrorist:
+                    case WinKind.Arsonist: win = id == soloId; break;
+                    case WinKind.Lovers: win = role == CustomRole.Lovers; break;
                 }
                 if (win) winners.Add(id);
                 if (role == CustomRole.Opportunist && Core.Game.IsAlive(id))
@@ -274,7 +301,7 @@ namespace PocketRoles.Game
                     Core.Game.ExtraWinners.Add(id);
                 }
             }
-            if (soloId != 255 && (kind == WinKind.Jester || kind == WinKind.Terrorist)) winners.Add(soloId);
+            if (soloId != 255 && IsSoloKind(kind)) winners.Add(soloId);
             return winners;
         }
 
@@ -320,6 +347,14 @@ namespace PocketRoles.Game
                     plain = Lang.T("win.terrorist", "テロリスト勝利", "Terrorist wins");
                     color = Roles.Info(CustomRole.Terrorist).Color;
                     break;
+                case WinKind.Lovers:
+                    plain = Lang.T("win.lovers", "ラバーズ勝利", "Lovers win");
+                    color = Roles.Info(CustomRole.Lovers).Color;
+                    break;
+                case WinKind.Arsonist:
+                    plain = Lang.T("win.arsonist", "放火魔勝利", "Arsonist wins");
+                    color = Roles.Info(CustomRole.Arsonist).Color;
+                    break;
                 default:
                     plain = Lang.T("win.crew", "クルー勝利", "Crewmates win");
                     color = Roles.CrewColor;
@@ -329,8 +364,10 @@ namespace PocketRoles.Game
             _lastPlainWinText = plain;
 
             string text = "<color=" + color + ">" + plain + "</color>";
-            if (soloId != 255 && (kind == WinKind.Jester || kind == WinKind.Terrorist))
+            if (soloId != 255 && IsSoloKind(kind))
                 text += " (" + Core.Game.NameOf(soloId) + ")";
+            if (kind == WinKind.Lovers && Core.Game.LoverA != 255 && Core.Game.LoverB != 255)
+                text += " (" + Core.Game.NameOf(Core.Game.LoverA) + " & " + Core.Game.NameOf(Core.Game.LoverB) + ")";
             Core.Game.LastWinnerText = text;
         }
 
@@ -401,6 +438,8 @@ namespace PocketRoles.Game
                 case Outcome.Crew: EndGame(WinKind.Crew); break;
                 case Outcome.Impostor: EndGame(WinKind.Impostor); break;
                 case Outcome.Jackal: EndGame(WinKind.Jackal); break;
+                case Outcome.Lovers: EndGame(WinKind.Lovers); break;
+                case Outcome.Arsonist: EndGame(WinKind.Arsonist, _evalSoloId); break;
             }
         }
 

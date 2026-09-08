@@ -224,16 +224,33 @@ namespace PocketRoles.Game
             var rest = new List<RoleInfo>();
             foreach (var r in Roles.All)
             {
-                if (r.Id == CustomRole.Jackal || r.Id == CustomRole.Sheriff) order.Add(r);
+                if (r.Id == CustomRole.Jackal || r.Id == CustomRole.Sheriff || r.Id == CustomRole.Arsonist) order.Add(r);
                 else rest.Add(r);
             }
             Shuffle(order);
             Shuffle(rest);
             order.AddRange(rest);
 
+            // Lovers: the only pair role, drawn from both pools before the single-slot roles.
+            Lovers.Assign(plainCrew, plainImp, Rand);
+
             foreach (var role in order)
             {
+                if (role.Id == CustomRole.Lovers) continue; // assigned above
                 if (Roles.IsCompatBlocked(role.Id)) continue; // compat mode: Sheriff / Jackal off (ApplyCompatRoleGate told the host)
+                if (role.Id == CustomRole.Assassin && !Assassin.Enabled)
+                {
+                    // /cmd guess is a player command: without player commands the role could never act.
+                    if (Options.Count(role.Id) > 0)
+                    {
+                        PocketRolesPlugin.Logger.LogWarning("RoleAssignment: Assassin skipped (player commands disabled)");
+                        Chat.Chat.Local(Chat.Chat.Title, Lang.T("assign.assassin.nocmd",
+                            "アサシンはプレイヤーのコマンドが有効な時だけ配られます（/opt chat.playercommands on）。",
+                            "The Assassin is only assigned while player commands are enabled (/opt chat.playercommands on).",
+                            "只有启用玩家命令时才会分配刺客（/opt chat.playercommands on）。"));
+                    }
+                    continue;
+                }
                 int count = Options.Count(role.Id);
                 int chance = Options.Chance(role.Id);
                 var pool = role.FromImpostorPool ? plainImp : plainCrew;
@@ -276,6 +293,9 @@ namespace PocketRoles.Game
                     sb.Append(" -> ").Append(Roles.Info(custom).NameEn).Append(" [").Append(Roles.Info(custom).Team).Append(']');
                 if (pc.Data != null && pc.Data.Disconnected) sb.Append(" (disconnected)");
             }
+            if (Core.Game.LoverA != 255)
+                sb.Append("\n  Lovers: #").Append(Core.Game.LoverA).Append(' ').Append(Core.Game.NameOf(Core.Game.LoverA))
+                  .Append(" & #").Append(Core.Game.LoverB).Append(' ').Append(Core.Game.NameOf(Core.Game.LoverB));
             PocketRolesPlugin.Logger.LogInfo(sb.ToString());
         }
 

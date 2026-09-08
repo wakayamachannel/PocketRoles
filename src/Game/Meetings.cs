@@ -64,6 +64,7 @@ namespace PocketRoles.Game
                 byte voter = ps.PlayerId;
                 byte vote = ps.VotedForId;
                 states.Add(new MeetingHud.VoterState { VoterId = voter, VotedForId = vote });
+                if (ps.AmDead) continue; // killed mid-meeting (Assassin): its vote is not tallied
                 if (!ps.DidVote || !IsCountedVote(vote, hasNotVoted, missedVote, deadVote)) continue;
 
                 int weight = 1;
@@ -210,6 +211,8 @@ namespace PocketRoles.Game
             {
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return;
                 AntiBlackout.Prepared = false;
+                Core.Game.MeetingsHeld++;
+                Core.Game.GuessesThisMeeting.Clear();
                 Scheduler.After(1f, () =>
                 {
                     if (Options.RoleInfoAtMeeting && Core.Game.InProgress) PocketRoles.Chat.Chat.SendRoleInfoToAll(true);
@@ -255,6 +258,14 @@ namespace PocketRoles.Game
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return;
                 byte exiledId = exiled != null ? exiled.PlayerId : (byte)255;
                 Core.Game.LastExiled = exiledId;
+                // v0.4.1: an exiled witch's spells fade, an exiled arsonist's douses vanish, an exiled lover's partner
+                // follows (a bite that executes 2 s after WrapUp, like a postponed vampire bite, so WouldContinue stays consistent).
+                if (exiledId != 255)
+                {
+                    Witch.OnPlayerExiled(exiledId);
+                    Arsonist.OnPlayerDied(exiledId);
+                    Lovers.OnPlayerExiled(exiledId);
+                }
                 if (!AntiBlackout.Prepared) AntiBlackout.Prepare(exiledId);
                 if (exiledId != 255 && Core.Game.RoleOf(exiledId) == CustomRole.Jester && Core.Game.SoloWinner == CustomRole.None)
                 {
@@ -295,9 +306,10 @@ namespace PocketRoles.Game
                 }
                 byte exiledId = Core.Game.LastExiled;
                 // A suppressed end (test mode) falls through to the resync below like any other exile.
-                if (Core.Game.SoloWinner == CustomRole.Jester && Core.Game.SoloWinnerId != 255)
+                // Pending solo wins: an exiled Jester, or a Terrorist assassinated mid-meeting with all tasks done.
+                if ((Core.Game.SoloWinner == CustomRole.Jester || Core.Game.SoloWinner == CustomRole.Terrorist) && Core.Game.SoloWinnerId != 255)
                 {
-                    WinConditions.EndGame(WinConditions.WinKind.Jester, Core.Game.SoloWinnerId);
+                    WinConditions.EndGame(Core.Game.SoloWinner == CustomRole.Jester ? WinConditions.WinKind.Jester : WinConditions.WinKind.Terrorist, Core.Game.SoloWinnerId);
                     if (!Core.Game.InProgress) return;
                 }
                 if (exiledId != 255 && Core.Game.RoleOf(exiledId) == CustomRole.Terrorist && Core.Game.TasksDone(exiledId))
@@ -309,6 +321,9 @@ namespace PocketRoles.Game
                 // so clients whose own view says "game over" get the end screen instead of waiting on a black screen.
                 WinConditions.CheckNow();
                 if (!Core.Game.InProgress) return;
+                // v0.4.1: the witch's curse strikes now (bites due 2 s after the exile screen, after AntiBlackout.Restore);
+                // after the end checks so the curse is not announced when the exile ended the game.
+                Witch.OnMeetingEnd(exiledId);
                 // Vanilla re-broadcasts the true options around the meeting and clients set their post-meeting kill
                 // timer from what they hold now: queue the private options right behind the exile (the 2 s resend below
                 // stays as the safety net).

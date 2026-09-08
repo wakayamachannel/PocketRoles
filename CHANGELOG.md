@@ -2,6 +2,14 @@
 
 Among Us **2026.8.18**（Steam / Windows）向けのホスト専用役職 MOD。日付は日本時間。詳しい説明は `README.md`（日本語）/ `README.zh-CN.md` / `README.en.md`。
 
+## v0.4.1 — 2026-09-xx
+
+- 役職を 4 つ追加: ラバーズ（第三陣営・2 人 1 組）、放火魔（第三陣営）、魔女（インポスター枠）、アサシン（インポスター枠、会議中の `/cmd guess`）。シェリフは放火魔も撃てるようになった
+- 設定: `[Lovers] AllowImpostor / WinAsLastThree`、`[Arsonist] DouseCooldown / CanVent`、`[Witch] SpellCooldown / SpelledSeeMark`、`[Assassin] GuessesPerMeeting / CanGuessFirstMeeting`（設定タブ「役職」ページ、`/opt lovers.* arsonist.* witch.* assassin.*`）。`[Roles] Lovers.Count` は 0 / 1（組数）
+- 名前タグの印: ラバーズは相手に ♥、魔女は呪った相手に †（`SpelledSeeMark` で本人にも）、放火魔は油をかけた相手に ♨。役職チャットにラバーズの相手の名前、会議の再送に魔女の呪い中の一覧
+- 会議中の死亡（アサシンの推理）に対応: 会議画面でその場で ✕、投票済みの票は取り消し、メイヤー集計からも除外。魔女の呪いとラバーズの後追いは追放画面の約 2 秒後に実行（ヴァンパイアの噛みつきと同じ遅延死亡の仕組み）
+- アサシンは `[Chat] PlayerCommands` / `AllCommands` がオフの部屋では配られない（ホストに案内）。短縮形 `lv` `ars` `wt` `as` を追加。説明書 3 言語に 4 役職の説明・設定・見え方を追記
+
 ## v0.4.0 — 2026-09-08（初公開）
 
 v0.1〜v0.4 を 1 つにまとめた最初の公開版です（旧名 HostRoles → PocketRoles）。

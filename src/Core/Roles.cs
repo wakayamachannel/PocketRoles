@@ -10,7 +10,9 @@ namespace PocketRoles.Core
         None = 0,
         Sheriff, Mayor, Snitch, Lighter, SpeedBooster, Bait,
         Madmate, Vampire, Mafia,
-        Jester, Opportunist, Terrorist, Jackal
+        Jester, Opportunist, Terrorist, Jackal,
+        // v0.4.1
+        Lovers, Arsonist, Witch, Assassin
     }
 
     public sealed class RoleInfo
@@ -62,6 +64,8 @@ namespace PocketRoles.Core
         public const string CrewColor = "#8cffff";
         public const string JackalColor = "#00b4eb";
         public const string SnitchColor = "#b8fb4f";
+        public const string LoversColor = "#ff69b4";
+        public const string ArsonistColor = "#ff6633";
 
         private static readonly RoleInfo NoneInfo = new RoleInfo
         {
@@ -74,9 +78,9 @@ namespace PocketRoles.Core
             new RoleInfo { Id = CustomRole.Sheriff, Key = "sheriff", NameJa = "シェリフ", NameEn = "Sheriff", Team = Team.Crew, Color = "#f8cd46",
                 // A Sheriff holds the Impostor role on its own client and cannot use task consoles: its tasks are fake.
                 IsKiller = true, ImpostorDesync = true, CanVent = false, CanSabotage = false, TasksCount = false,
-                DescJa = "キルボタンでインポスターやジャッカルを撃てます。クルーを撃つと自分が死にます。ベントとサボタージュは使えず、タスクは偽物です。",
-                DescEn = "You have a kill button to shoot Impostors and the Jackal. Shooting a crewmate kills you instead. No venting or sabotage; your tasks are fake.",
-                NameZh = "警长", DescZh = "可用击杀键射杀内鬼和豺狼。误杀船员会让自己死亡。不能跳管和破坏，任务是假的。",
+                DescJa = "キルボタンでインポスターやジャッカル、放火魔を撃てます。クルーを撃つと自分が死にます。ベントとサボタージュは使えず、タスクは偽物です。",
+                DescEn = "You have a kill button to shoot Impostors, the Jackal and the Arsonist. Shooting anyone else kills you instead. No venting or sabotage; your tasks are fake.",
+                NameZh = "警长", DescZh = "可用击杀键射杀内鬼、豺狼和纵火犯。误杀其他人会让自己死亡。不能跳管和破坏，任务是假的。",
                 Aliases = new[] { "sh" } },
             new RoleInfo { Id = CustomRole.Mayor, Key = "mayor", NameJa = "メイヤー", NameEn = "Mayor", Team = Team.Crew, Color = "#204d42",
                 TasksCount = true,
@@ -126,6 +130,18 @@ namespace PocketRoles.Core
                 DescEn = "An Impostor who can only kill after all other Impostors are dead.",
                 NameZh = "黑手党", DescZh = "内鬼。在其他内鬼全部死亡之前不能击杀。",
                 Aliases = new[] { "mf" } },
+            new RoleInfo { Id = CustomRole.Witch, Key = "witch", NameJa = "魔女", NameEn = "Witch", NameZh = "女巫", Team = Team.Impostor, Color = ImpostorColor,
+                IsKiller = true, CanVent = true, CanSabotage = true, FromImpostorPool = true,
+                DescJa = "インポスターです。キルは「呪い」になり、次の会議が終わった後に呪った相手が全員死にます。あなたが追放・死亡すると呪いは消えます。",
+                DescEn = "An Impostor whose kill is a curse: everyone you cursed dies right after the next meeting. The curse fades if you are ejected or die.",
+                DescZh = "内鬼。你的击杀变成“诅咒”，下次会议结束后所有被诅咒的人一起死亡。你被投出或死亡则诅咒失效。",
+                Aliases = new[] { "wt", "wi" } },
+            new RoleInfo { Id = CustomRole.Assassin, Key = "assassin", NameJa = "アサシン", NameEn = "Assassin", NameZh = "刺客", Team = Team.Impostor, Color = ImpostorColor,
+                IsKiller = true, CanVent = true, CanSabotage = true, FromImpostorPool = true,
+                DescJa = "インポスターです。会議中に /cmd guess 名前 役職 と打つと、正解なら相手が死に、外れるとあなたが死にます。",
+                DescEn = "An Impostor. In a meeting type /cmd guess <name> <role>: a correct guess kills the target, a wrong one kills you.",
+                DescZh = "内鬼。会议中输入 /cmd guess 名字 职业：猜对则对方死亡，猜错则你死亡。",
+                Aliases = new[] { "as", "asn" } },
             new RoleInfo { Id = CustomRole.Jester, Key = "jester", NameJa = "ジェスター", NameEn = "Jester", Team = Team.Neutral, Color = "#ec62a5",
                 TasksCount = false,
                 DescJa = "第三陣営です。会議で追放されると単独勝利します。タスクは偽物です。",
@@ -150,6 +166,18 @@ namespace PocketRoles.Core
                 DescEn = "A neutral killer. You can kill anyone. Win by eliminating the Impostors and outnumbering the remaining crew.",
                 NameZh = "豺狼", DescZh = "中立杀手。可以击杀任何人。消灭全部内鬼，且剩余船员人数不超过你时获胜。",
                 Aliases = new[] { "jk" } },
+            new RoleInfo { Id = CustomRole.Lovers, Key = "lovers", NameJa = "ラバーズ", NameEn = "Lovers", NameZh = "恋人", Team = Team.Neutral, Color = LoversColor,
+                TasksCount = false,
+                DescJa = "恋人です。相手の名前に♥が見えます。片方が死ぬともう片方も死にます。2人とも生きて試合が終わる（または残り3人になる）と2人だけの勝利です。タスクは偽物です。",
+                DescEn = "Lovers. You see a ♥ on your partner. If one of you dies the other dies too. Both alive when the game ends (or as the last 3 players) = you two win. Your tasks are fake.",
+                DescZh = "恋人。你能看到伴侣名字上的♥。一方死亡另一方也会死。游戏结束时（或只剩3人时）两人都存活即两人获胜。任务是假的。",
+                Aliases = new[] { "lover", "lv", "love" } },
+            new RoleInfo { Id = CustomRole.Arsonist, Key = "arsonist", NameJa = "放火魔", NameEn = "Arsonist", NameZh = "纵火犯", Team = Team.Neutral, Color = ArsonistColor,
+                IsKiller = true, ImpostorDesync = true, CanVent = false, CanSabotage = false, TasksCount = false,
+                DescJa = "第三陣営です。キルボタンは「油をかける」で相手は死にません。生きている他の全員に油をかけると即座に単独勝利します。サボタージュ不可、タスクは偽物です。",
+                DescEn = "Neutral. Your kill button douses instead of killing. Douse every other living player to win alone at once. No sabotage; your tasks are fake.",
+                DescZh = "中立阵营。击杀键变成“浇油”，不会杀人。给所有其他存活玩家浇油后立即单独获胜。不能破坏，任务是假的。",
+                Aliases = new[] { "arso", "ars" } },
         };
 
         private static readonly Dictionary<CustomRole, RoleInfo> ById = Build();

@@ -4,10 +4,10 @@
 
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
-**A role mod for Among Us (2026.8.18 / Steam) that only the person who creates the lobby installs.** Your friends keep their everyday Among Us on PC, phone or Switch and just type the room code. Thirteen roles — Sheriff, Jackal, Jester and more — reach each player privately through their name tag and chat. Settings live in the lobby computer, every notice comes in Japanese / Chinese / English, foreign-language chat is translated automatically, and lobby time-outs or endless meetings are handled from the host's keyboard. Free, non-commercial, source on GitHub (**v0.4.0**, formerly HostRoles).
+**A role mod for Among Us (2026.8.18 / Steam) that only the person who creates the lobby installs.** Your friends keep their everyday Among Us on PC, phone or Switch and just type the room code. Seventeen roles — Sheriff, Jackal, Jester and more — reach each player privately through their name tag and chat. Settings live in the lobby computer, every notice comes in Japanese / Chinese / English, foreign-language chat is translated automatically, and lobby time-outs or endless meetings are handled from the host's keyboard. Free, non-commercial, source on GitHub (**v0.4.1**, formerly HostRoles).
 
 - **Players install nothing** — the mod runs on the host's PC only. Everyone else joins vanilla and plays as usual
-- **13 roles, whispered in 3 languages** — Sheriff, Mayor, Snitch, Jackal, Jester … Role descriptions reach each player privately in Japanese / Chinese / English, and foreign-language chat is auto-translated (combined mode)
+- **17 roles, whispered in 3 languages** — Sheriff, Mayor, Snitch, Jackal, Jester, Lovers … Role descriptions reach each player privately in Japanese / Chinese / English, and foreign-language chat is auto-translated (combined mode)
 - **Tools that make hosting easy** — lobby time left always visible with auto-extend, auto start, haison (F7), force-end a meeting (F8), cancel a start (F9), an optional big room-code display (`/code on`, off by default), and an installer for friends
 
 | ![Main-menu panel](docs/img/menu-panel.png) | ![Lobby timer and room code](docs/img/lobby-timer.png) | ![Settings tab](docs/img/settings-tabs.png) |
@@ -24,7 +24,7 @@ Other languages: **[日本語 (README.md)](README.md)** / **[简体中文 (READM
 
 ## Install in 3 minutes (Windows + Steam)
 
-1. Download the two zips from **[GitHub Releases](https://github.com/wakayamachannel/PocketRoles/releases)**: `PocketRoles-Setup-0.4.0.zip` (the launcher) and `PocketRoles-0.4.0.zip` (the mod).
+1. Download the two zips from **[GitHub Releases](https://github.com/wakayamachannel/PocketRoles/releases)**: `PocketRoles-Setup-0.4.1.zip` (the launcher) and `PocketRoles-0.4.1.zip` (the mod).
 2. **Extract both into the same folder** (e.g. `Documents\PocketRoles`, somewhere you will keep. With an internet connection the Setup zip alone works — the launcher fetches the mod).
 3. **Double-click "PocketRoles Launcher.cmd"**. If the blue "Windows protected your PC" screen appears, click "More info" → "Run anyway" (it appears because no code-signing certificate is used; it is not malware).
 4. Press **"Install"**. The launcher copies your Steam Among Us to "Among Us PocketRoles" on the Desktop and installs BepInEx and PocketRoles automatically (a few minutes; your Steam copy is not modified). On a PC whose Desktop is backed up by OneDrive the copy goes to `%LOCALAPPDATA%\PocketRoles\Among Us PocketRoles` instead (so 1 GB is not synced to the cloud; the launcher argument `-GameDir` lets you pick any folder).
@@ -84,7 +84,7 @@ No mail client? Webmail such as Gmail in the browser is fine (attach the zip fro
 
 ## Everything it does
 
-- 13 extra roles: Sheriff, Mayor, Snitch, Lighter, Speed Booster, Bait, Madmate, Vampire, Mafia, Jester, Opportunist, Terrorist, Jackal
+- 17 extra roles: Sheriff, Mayor, Snitch, Lighter, Speed Booster, Bait, Madmate, Vampire, Mafia, Jester, Opportunist, Terrorist, Jackal, Lovers, Arsonist, Witch, Assassin
 - Roles are shown to each player privately through their **name tag** and **chat**
 - Settings live in the **"PocketRoles" tab of the lobby settings screen** (pages Roles / Lobby / Chat / Looks / Host with "?" help; the three vanilla buttons are folded into "▶ Vanilla settings (game · presets · roles)") and the **"PocketRoles settings" panel of the gear menu** (chat commands `/set` `/opt` and the config file work too)
 - Languages: **Japanese / Simplified Chinese / English**. Each player can pick their own with `/lang` (the language they write in is detected as well); every text is editable in `lang\*.json`
@@ -139,13 +139,13 @@ No mail client? Webmail such as Gmail in the browser is fine (attach the zip fro
 Only the host's Among Us is modified. Vanilla clients simply display whatever the host sends them, so the host sends **different content to each player** (roles, name tags, chat, game settings) and that is how the roles exist.
 
 - Kill checks, vents, sabotage, vote counting and win conditions all run on the host.
-- Sheriff and Jackal run as "Impostor" on their own client (to get a kill button) while everyone else sees them as Crewmate.
+- Sheriff, Jackal and Arsonist run as "Impostor" on their own client (to get a kill button) while everyone else sees them as Crewmate.
 - A built-in workaround prevents the vanilla "blackout" (frozen screen after a meeting).
 - The v0.4 host tools (auto start, haison, ending meetings, hotkeys …) **only use vanilla mechanisms** (the start countdown, the end-game message, the vote deadline), so players see nothing but chat notices and normal game flow.
 - The extended vanilla ranges (v0.4b) use the normal vanilla settings sync too: the value the host picks in the settings screen (say a 5-second kill cooldown) shows up unchanged in every player's lobby settings list.
 - Chat translation (v0.4b) sends chat text from the host's PC to Google / DeepL. It is on by default and runs in **combined mode** (foreign-language chat translated into the host's language for everyone, the host's words translated privately for foreign players). If you do not want text sent out, turn it off with "Chat translation" on the Chat page of the settings tab or `/opt translate off` ([chapter 13](#13-languages-japanese--chinese--english)).
 - Roles can only be handed out in a **lobby with mod-lobby registration on**. In an unregistered lobby (the "vanilla room") a single private message gets the host disconnected by the server, so roles and private notices are disabled there and only the host tools remain on top of a vanilla game ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)).
-- The host's ping display (top left) shows `PocketRoles v0.4.0 (host)` and, in an online lobby, `Lobby mm:ss left`; the in-game mod stamp is shown as well. The title screen shows a **PocketRoles panel** in the big right-hand window (icon, `v0.4.0 / Among Us 2026.8.18`, author, a clickable GitHub line, "Roles for everyone; only the host installs it" / "Players can join with vanilla Among Us") ([chapter 9](#9-pocketroles-settings-panel-in-the-gear-menu)).
+- The host's ping display (top left) shows `PocketRoles v0.4.1 (host)` and, in an online lobby, `Lobby mm:ss left`; the in-game mod stamp is shown as well. The title screen shows a **PocketRoles panel** in the big right-hand window (icon, `v0.4.1 / Among Us 2026.8.18`, author, a clickable GitHub line, "Roles for everyone; only the host installs it" / "Players can join with vanilla Among Us") ([chapter 9](#9-pocketroles-settings-panel-in-the-gear-menu)).
 - Only **Classic** mode is supported (the mod does nothing in Hide n Seek / Seek Fools).
 
 [Chapter 26](#26-what-vanilla-players-see) lists exactly what vanilla players see.
@@ -321,7 +321,7 @@ Either way the layout is a **copy of the Steam game folder** with BepInEx and th
    3. Fetches `PocketRoles-<ver>.zip` from the latest GitHub release and puts it in place (a `PocketRoles-<ver>.zip` next to the launcher is used instead, so offline installs work). An old `HostRoles.dll` is deleted
    4. Creates the "PocketRoles Launcher" shortcut on the Desktop
 5. **Start Steam, then press "Launch"**. The first launch takes **1–2 minutes** to reach the title screen while BepInEx generates interop (if a black console window appears in between, do not close it).
-6. The PocketRoles panel on the right of the title screen and `PocketRoles v0.4.0` in the top-left corner mean you are done.
+6. The PocketRoles panel on the right of the title screen and `PocketRoles v0.4.1` in the top-left corner mean you are done.
 
 If a step fails, fix the cause (internet connection, Steam location …) and press "Install" again: finished steps are skipped and it resumes where it stopped. "Language" at the top right switches the launcher between Japanese / Chinese / English. The bundled `はじめに.txt` repeats these steps in the three languages.
 
@@ -331,7 +331,7 @@ If a step fails, fix the cause (internet connection, Steam location …) and pre
 2. Extract the BepInEx zip above into the copy (`winhttp.dll`, `doorstop_config.ini` and the `BepInEx\` folder end up next to `Among Us.exe`).
 3. **With Steam running**, start the copied `Among Us.exe` **once**. The first start generates `BepInEx\interop`, so the title screen takes **1–3 minutes** to appear. Close the game once you see it.
 4. Extract `PocketRoles-<ver>.zip` from GitHub Releases into the copy (it contains `BepInEx\plugins\PocketRoles.dll`, `BepInEx\PocketRoles\lang\*.json`, the READMEs, LICENSE and NOTICE). **Delete an old `HostRoles.dll` if one is still there** (the same patches would be applied twice).
-5. Start `Among Us.exe` from the copy (not from the Steam library; keep Steam running). `PocketRoles v0.4.0` in the top-left corner and the PocketRoles panel in the right-hand window of the title screen mean the mod is loaded. `BepInEx\LogOutput.log` contains `PocketRoles v0.4.0 loaded`.
+5. Start `Among Us.exe` from the copy (not from the Steam library; keep Steam running). `PocketRoles v0.4.1` in the top-left corner and the PocketRoles panel in the right-hand window of the title screen mean the mod is loaded. `BepInEx\LogOutput.log` contains `PocketRoles v0.4.1 loaded`.
 
 The first start creates `BepInEx\config\jp.pocketroles.mod.cfg` (settings), `BepInEx\PocketRoles\lang\` (language files) and `BepInEx\PocketRoles\{hats,visors,nameplates,music,images}\` plus a `README.txt` (cosmetics). The permission files `Admin.txt` / `Moderator.txt` / `VIP.txt` / `Banlist.txt` are created in `BepInEx\PocketRoles\` when you first host a lobby. `deepl-key.txt` (only for DeepL) is a file you create yourself ([chapter 13](#13-languages-japanese--chinese--english)). If an old HostRoles config `jp.hostroles.mod.cfg` exists in the same folder and the new file does not, its contents are copied over automatically (your settings carry over).
 
@@ -520,14 +520,14 @@ The big right-hand window of the main menu (where vanilla shows the Among Us log
 | Line | Content |
 |---|---|
 | Icon and "PocketRoles" | The embedded `PocketRoles-256.png` |
-| `v0.4.0 / Among Us 2026.8.18` | Mod version and supported game version |
+| `v0.4.1 / Among Us 2026.8.18` | Mod version and supported game version |
 | `by もみじちゃ` | `[Credits] Author` (omitted when empty) |
 | `GitHub: github.com/wakayamachannel/PocketRoles (click to open)` | `[Credits] RepoUrl`; clicking opens the browser (omitted when empty) |
 | "Roles for everyone; only the host installs it" / "Players can join with vanilla Among Us" | In the lobby language |
 
 - Hidden while the Online / Account / Enter code / Game mode / Create game / Credits sub-menus are open; shown again on the main screen.
 - `[Credits] ShowInMenu = false` ("Show credits" in the settings tab, `/opt credits.show off`) removes the panel and the credit line.
-- If the panel cannot be built after a game UI change, the v0.2 credit line at the bottom right (`PocketRoles v0.4.0  © 2026 もみじちゃ` plus the URL) is shown instead, moved up so it never overlaps the vanilla version text.
+- If the panel cannot be built after a game UI change, the v0.2 credit line at the bottom right (`PocketRoles v0.4.1  © 2026 もみじちゃ` plus the URL) is shown instead, moved up so it never overlaps the vanilla version text.
 - Nothing is transmitted (host screen only).
 
 ---
@@ -540,7 +540,7 @@ Vanilla roles: Scientist, Engineer, Guardian Angel, Tracker, Noisemaker, Shapesh
 
 | Role | Team | Description | Main settings (default) |
 |---|---|---|---|
-| Sheriff (シェリフ / 警长) | Crew | Has a kill button to shoot Impostors (incl. Vampire and Mafia) and the Jackal. Shooting someone else (crew, neutral) kills the Sheriff instead. No vents, no sabotage. **Tasks are fake** (not counted). | Kill cooldown 30 s, can kill Madmate: on |
+| Sheriff (シェリフ / 警长) | Crew | Has a kill button to shoot Impostors (incl. Vampire, Mafia, Witch and Assassin), the Jackal and the Arsonist. Shooting someone else (crew, other neutrals) kills the Sheriff instead. No vents, no sabotage. **Tasks are fake** (not counted). | Kill cooldown 30 s, can kill Madmate: on |
 | Mayor (メイヤー / 市长) | Crew | The vote counts as several votes (vote icons show all of them). | 2 votes |
 | Snitch (スニッチ / 告密者) | Crew | When few tasks are left, killers (Impostors, Jackal) see a ★ before your name. Once all tasks are done you see Impostors in red and the Jackal in blue. | warn at 1 task left |
 | Lighter (ライター / 点灯人) | Crew | Wider vision. | vision ×2.0 |
@@ -549,12 +549,16 @@ Vanilla roles: Scientist, Engineer, Guardian Angel, Tracker, Noisemaker, Shapesh
 | Madmate (マッドメイト / 内鬼狂粉) | Impostor | A crewmate on the Impostor team. Sees Impostors in red but cannot kill. Wins with the Impostors. Tasks do not count, and the Madmate is not counted as crew in the Impostor win check. | known to impostors: off |
 | Vampire (ヴァンパイア / 吸血鬼) | Impostor | Takes an Impostor slot. The kill is a bite: the victim dies a few seconds later (immediately when a meeting starts). Can vent and sabotage. | 10 s from bite to death |
 | Mafia (マフィア / 黑手党) | Impostor | Takes an Impostor slot. Cannot kill until every other Impostor is dead. Can vent and sabotage. | — |
+| Witch (魔女 / 女巫) | Impostor | Takes an Impostor slot. The kill is a curse: the target does not die (and notices nothing). Right after the next meeting ends (about 2 s after the ejection screen) every cursed player dies at once. The curse fades if the Witch is ejected or dies. Can vent and sabotage. | Spell cooldown 0 (= kill cooldown), target sees mark: off |
+| Assassin (アサシン / 刺客) | Impostor | Takes an Impostor slot. Kills normally and, during a meeting, guesses a role with `/cmd guess <name> <role>`: a correct guess kills the target on the spot, a wrong one kills the Assassin (`/guess` without `/cmd` is visible to everyone; not assigned in lobbies where player commands are off). | 1 guess per meeting, first meeting: on |
 | Jester (ジェスター / 小丑) | Neutral | Wins alone when voted out. Fake tasks. | — |
 | Opportunist (オポチュニスト / 投机者) | Neutral | Joins the winners when alive at the end of the game. Fake tasks. | — |
 | Terrorist (テロリスト / 恐怖分子) | Neutral | Wins alone when killed or ejected after finishing all tasks. Tasks are real but not counted for the crew. | — |
 | Jackal (ジャッカル / 豺狼) | Neutral | A third killer who can kill anyone. No sabotage. Fake tasks. Wins by eliminating the Impostors and outnumbering the remaining crew. | Kill cooldown 30 s, can vent: on |
+| Lovers (ラバーズ / 恋人) | Neutral | One pair of two players. Each sees a ♥ on the partner's name. When one dies (kill, ejection, disconnect) the other follows. Both alive when any other end condition is met, or (with the setting on) when at most 3 players are alive = the two of them win alone. The second lover may be drawn from the Impostors (keeps the kill button; wins only as a lover). Fake tasks. | pairs 0/1, Impostor allowed: on, win as last 3: on |
+| Arsonist (放火魔 / 纵火犯) | Neutral | The kill button douses instead of killing (the target notices nothing). Wins alone the moment every other living player is doused. The douses vanish when the Arsonist dies. No sabotage; vent per setting. Fake tasks. The Sheriff may shoot it. | Douse cooldown 10 s, can vent: off |
 
-`/cmd r` lists the roles, `/cmd r <role>` shows the description and current settings. Role names may be English, Japanese, Chinese or an alias (`sh`, `my`, `sn`, `lt`, `sb`, `bt`, `mad`, `vamp`, `mf`, `js`, `opp`, `tr`, `jk` …). The first characters of a Japanese / Chinese name are enough (`シェリ`, `警`).
+`/cmd r` lists the roles, `/cmd r <role>` shows the description and current settings. Role names may be English, Japanese, Chinese or an alias (`sh`, `my`, `sn`, `lt`, `sb`, `bt`, `mad`, `vamp`, `mf`, `js`, `opp`, `tr`, `jk`, `lv`, `ars`, `wt`, `as` …). The first characters of a Japanese / Chinese name are enough (`シェリ`, `警`).
 
 ### Win conditions (decided by the host)
 
@@ -562,11 +566,13 @@ Vanilla roles: Scientist, Engineer, Guardian Angel, Tracker, Noisemaker, Shapesh
 |---|---|
 | A critical sabotage (reactor …) timer runs out | Impostors win |
 | The crew finishes its tasks (only crew-team roles with real tasks count) | Crew wins |
-| Every Impostor-side killer (Impostor, Vampire, Mafia) and every Jackal is dead | Crew wins |
+| Every Impostor-side killer (Impostor, Vampire, Mafia, Witch, Assassin, an Impostor lover) and every Jackal is dead | Crew wins |
 | No Jackal alive and Impostor-side killers ≥ other survivors (Madmates excluded) | Impostors win (Madmates too) |
 | No Impostor-side killer alive and Jackals ≥ other survivors (Madmates excluded) | Jackal wins |
 | The Jester is ejected | Jester wins alone |
 | A Terrorist who finished their tasks is killed or ejected | Terrorist wins alone |
+| The Arsonist has doused every other living player | Arsonist wins alone |
+| Both Lovers are alive when any of the ends above (except Jester / Terrorist) is met, or `WinAsLastThree` is on and at most 3 players are alive | Lovers win (the two of them) |
 | An Opportunist alive at any of the ends above | Added to the winners |
 
 While both an Impostor and a Jackal are alive the game continues however few players remain. In test mode only a critical sabotage timer and `/end` end the game. A game ended by the host with F7 ×2 / `/haison` has no winner (and no summary).
@@ -598,6 +604,7 @@ Typed in chat as `/cmd <command> …` or `/<command> …`. Settings can also be 
 | `n`, `now`, `me`, `役職` | Your role and its description (during a game) |
 | `r`, `role`, `roles` | Role list by team and the roles enabled in this lobby |
 | `r <role>` | Description and current settings of that role |
+| `guess <name> <role>`, `g` | Assassin only (during the voting phase of a meeting). Always type `/cmd guess …` (`/guess` is visible to everyone). Besides a role name, `crew` / `impostor` are accepted. Correct: the target dies on the spot; wrong: you die. Limit per meeting: `assassin.guesses` (default 1) |
 | `l`, `last` | Result of the last game (roles and winners) |
 | `lang`, `language`, `言語` | Show your language |
 | `lang ja` / `lang zh` / `lang en` | Change the language of messages sent to you (remembered until the host closes the game) |
@@ -695,6 +702,14 @@ A way to run the lobby together with friends, managed through four text files in
 | `lighter.vision` | 1–5 | `[Lighter] VisionMultiplier` |
 | `speedbooster.speed` | 1–3 | `[SpeedBooster] SpeedMultiplier` |
 | `madmate.known` | on / off | `[Madmate] KnownToImpostors` |
+| `lovers.impostor` | on / off | `[Lovers] AllowImpostor` |
+| `lovers.lastthree` | on / off | `[Lovers] WinAsLastThree` |
+| `arsonist.cooldown` | 2.5–180 | `[Arsonist] DouseCooldown` |
+| `arsonist.vent` | on / off | `[Arsonist] CanVent` |
+| `witch.cooldown` | 0–180 (0 = kill cooldown) | `[Witch] SpellCooldown` |
+| `witch.mark` | on / off | `[Witch] SpelledSeeMark` |
+| `assassin.guesses` | 1–5 | `[Assassin] GuessesPerMeeting` |
+| `assassin.firstmeeting` | on / off | `[Assassin] CanGuessFirstMeeting` |
 | `lang` | ja / zh / en | `[General] Language` (lobby default) |
 | `enabled` | on / off | `[General] Enabled` (lobby only) |
 | `register` | on / off | `[General] RegisterAsModdedLobby` (next lobby; off violates the policy) |
@@ -882,6 +897,14 @@ Terrorist.Count = 0
 Terrorist.Chance = 100
 Jackal.Count = 0
 Jackal.Chance = 100
+Lovers.Count = 0                # pairs (0 or 1; one pair = two players)
+Lovers.Chance = 100
+Arsonist.Count = 0
+Arsonist.Chance = 100
+Witch.Count = 0
+Witch.Chance = 100
+Assassin.Count = 0
+Assassin.Chance = 100
 
 [Sheriff]
 KillCooldown = 30               # seconds (2.5-180)
@@ -908,6 +931,22 @@ SpeedMultiplier = 1.5           # 1-3
 
 [Madmate]
 KnownToImpostors = false        # impostors can tell who the Madmate is
+
+[Lovers]
+AllowImpostor = true            # the second lover may be a vanilla Impostor (keeps the kill button; wins only as a lover)
+WinAsLastThree = true           # the Lovers win as soon as both are alive and at most 3 players are alive
+
+[Arsonist]
+DouseCooldown = 10              # seconds between two douses (2.5-180)
+CanVent = false
+
+[Witch]
+SpellCooldown = 0               # seconds between two spells (0-180; 0 = the lobby's kill cooldown)
+SpelledSeeMark = false          # a spelled player also sees the † on their own name (the Witch always sees it)
+
+[Assassin]
+GuessesPerMeeting = 1           # /cmd guess uses per meeting (1-5)
+CanGuessFirstMeeting = true     # guessing allowed in the first meeting of the game
 ```
 
 Test mode, `/assign` and the Dleks selection are not saved (they reset per lobby). The DeepL API key (`BepInEx\PocketRoles\deepl-key.txt`) and the permission lists (`Admin.txt` …) are separate files, not part of the config.
@@ -1306,7 +1345,7 @@ Before a real session you can check what vanilla players see with **a PC (host) 
    /assign show                        ← check
    ```
 
-   Forced roles ignore the normal pools: an Impostor-pool role (Vampire / Mafia) on a crewmate makes that player start as an Impostor. A forced role is consumed by one game (force it again for the next).
+   Forced roles ignore the normal pools: an Impostor-pool role (Vampire / Mafia / Witch / Assassin) on a crewmate makes that player start as an Impostor (Lovers keep their vanilla side: forced on an Impostor they become the Impostor lover). A forced role is consumed by one game (force it again for the next).
 5. Start (Start button or `/start`; on "waiting for sync" press again a few seconds later; the vanilla "4 players can play, but …" popup is confirmed automatically in test mode). Try the **Cancel button / F9 / `/cancel`** during the countdown and watch "Game starting in …" disappear on the phone.
 6. Check on the phone: the intro (a Sheriff sees "Impostor"), the role name above the name, the chat about 8 seconds after the start, the kill button (a Sheriff misfire …), the reply to `/cmd n`, the names in the meeting, the role description at the meeting, refused vents / sabotage.
 7. Call a meeting and press **F8 ×2** (or `/endmeeting`): the vote ends on the phone too and the results appear; `/results` shortens the results screen.
@@ -1323,7 +1362,7 @@ Trying the v0.4 tools:
 
 Trying the v0.4b features (PC + phone, about 10 minutes):
 
-1. **Title-screen panel**: the PC's main menu shows the PocketRoles panel on the right (icon, `v0.4.0 / Among Us 2026.8.18`, GitHub line); clicking the GitHub line opens the browser. It hides while the online menu is open and returns afterwards.
+1. **Title-screen panel**: the PC's main menu shows the PocketRoles panel on the right (icon, `v0.4.1 / Among Us 2026.8.18`, GitHub line); clicking the GitHub line opens the browser. It hides while the online menu is open and returns afterwards.
 2. **Settings tab**: in the lobby laptop "PocketRoles" is the top button and "Vanilla settings" expands the three vanilla buttons. Switch the Roles / Lobby / Chat / Looks / Host tools pages; hovering a "?" writes help into the left info box.
 3. **Welcome**: the phone's welcome contains the "Auto-translation is on …" line and the "English: /cmd lang en ｜ 中文: … ｜ 日本語: …" line.
 4. **Translation**: from the phone write something **in English** such as `Hello, can I be sheriff?` (with a Japanese or Chinese lobby language) → the PC shows `[訳] <name>: …` / `[译] …` with the translation. The phone receives "Display language switched to English. Type /cmd lang ja to switch back." and mod messages to the phone are in English from then on (auto-detect). Then write in the lobby language on the PC → the phone receives `[Tr] <host name>: …` in English (translate for players). `/cmd lang ja` switches back.
@@ -1364,7 +1403,7 @@ The mod also disables itself when Harmony cannot apply its patches (a large inte
 |---|---|---|
 | How | Create a lobby as usual | `/opt register off`, then create a lobby |
 | Public list | Not listed | Listed |
-| Roles | All 13 roles | **None** (vanilla roles only) |
+| Roles | All 17 roles | **None** (vanilla roles only) |
 | Private messages to players (role notices, welcome, `/cmd` replies) | Delivered (`/cmd …` is seen by the host only) | **Not sent** (the server treats them as cheating and disconnects the host; confirmed live) |
 | Chat translation | Combined (broadcast + private) | Broadcast only |
 | Host tools (time left, auto start, haison, end meeting, cancel, hotkeys, cosmetics) | Yes | Yes |
@@ -1422,10 +1461,10 @@ Players' clients are unmodified, so the mod can only combine what vanilla can di
 
 | Role | Intro |
 |---|---|
-| Sheriff, Jackal | **"Impostor"** (red screen, the only teammate is you) because the client runs as Impostor. The real role follows through the name tag and chat right after the intro |
-| Vampire, Mafia | The normal Impostor intro (other Impostors shown) |
-| Madmate, Jester, Opportunist, Terrorist, Mayor, Snitch, Lighter, Speed Booster, Bait | The normal "Crewmate" intro |
-| Regular Impostor | The normal intro; Sheriffs / Jackals are not shown as teammates and look like crewmates |
+| Sheriff, Jackal, Arsonist | **"Impostor"** (red screen, the only teammate is you) because the client runs as Impostor. The real role follows through the name tag and chat right after the intro |
+| Vampire, Mafia, Witch, Assassin | The normal Impostor intro (other Impostors shown) |
+| Madmate, Jester, Opportunist, Terrorist, Mayor, Snitch, Lighter, Speed Booster, Bait, Lovers (crew side) | The normal "Crewmate" intro |
+| Regular Impostor, Lovers (Impostor side) | The normal intro; Sheriffs / Jackals / Arsonists are not shown as teammates and look like crewmates |
 
 Role colours and names never appear in the intro. The name tag follows one second after the intro, the chat about 8 seconds after.
 
@@ -1433,8 +1472,8 @@ Role colours and names never appear in the intro. The name tag follows one secon
 
 | Role | Tasks |
 |---|---|
-| Sheriff, Jackal | Impostor on the client → **fake tasks** (the Impostor task list); consoles cannot be used; not counted for the crew |
-| Jester, Opportunist, Madmate | Tasks look and work normally but are **not counted** for the crew (the player cannot tell; the description says "fake") |
+| Sheriff, Jackal, Arsonist | Impostor on the client → **fake tasks** (the Impostor task list); consoles cannot be used; not counted for the crew |
+| Jester, Opportunist, Madmate, Lovers | Tasks look and work normally but are **not counted** for the crew (the player cannot tell; the description says "fake") |
 | Terrorist | Real tasks (win condition) but not counted for the crew |
 | Other crew roles | Real tasks |
 
@@ -1450,11 +1489,15 @@ The task bar shows the host's count of real crew tasks only.
 | Vampire bite | **Nothing visible** at the bite (only the Vampire's kill cooldown resets). The Vampire reads "You bit ○○; they die in 10 s." After the delay the victim drops on the spot (a self-kill animation on their screen). Postponed while the victim is in a vent; a report / emergency meeting kills the victim **immediately** (after the meeting when the reporter is the victim) |
 | Bait killed | The killer **reports automatically** 0.2 s later (the report runs on the killer's client) |
 | Mafia kills while another Impostor lives | A failed kill (the button works, nothing happens); "You cannot kill while other Impostors are alive." at most every 10 s |
+| Arsonist douse | **Nothing happens** to the target (only the Arsonist's kill cooldown resets). The Arsonist reads "You doused ○○ (N left)." and sees a ♨ before that name (on its own screen only). Dousing the same player again is a failed kill. The game ends the moment every living player is doused |
+| Witch spell | **Nothing happens** to the target (only the Witch's cooldown resets). The Witch reads "You cursed ○○. They die after the next meeting." About 2 s after the next ejection screen every cursed player drops on the spot (a self-kill animation on their screen; everyone reads "The witch's curse strikes."). Nothing happens if the Witch was ejected or died first |
+| Assassin guess | In the meeting the target (correct) or the Assassin (wrong) is **marked dead on the spot**: an ✕ on the vote area, no body. Everyone reads "○○ was assassinated." A vote already cast by that player is cleared |
+| Lovers follow | When one lover is killed the other drops 0.5 s later (a self-kill animation). After an ejection, assassination or disconnect: about 2 s after the ejection screen. The survivor reads "Your lover died. You follow them..." |
 | Kill while the game is ending | Treated as failed |
 
 ### Vents and sabotage
 
-- Sheriff (no vent, no sabotage), Jackal (no sabotage; vent per setting), Madmate (like a vanilla crewmate): the Impostor-side clients of Sheriff / Jackal **show** the vent / sabotage buttons and map, but the host refuses them — a vent kicks the player out after 0.5 s, sabotage and door closing are ignored, with "Your role cannot vent." / "Your role cannot sabotage." at most every 10 s.
+- Sheriff (no vent, no sabotage), Jackal / Arsonist (no sabotage; vent per setting), Madmate (like a vanilla crewmate): the Impostor-side clients of Sheriff / Jackal / Arsonist **show** the vent / sabotage buttons and map, but the host refuses them — a vent kicks the player out after 0.5 s, sabotage and door closing are ignored, with "Your role cannot vent." / "Your role cannot sabotage." at most every 10 s.
 - **Opening** doors works for everyone.
 
 ### Name tags
@@ -1462,11 +1505,14 @@ The task bar shows the host's count of real crew tasks only.
 | Viewer | Display |
 |---|---|
 | A player with a custom role | Their role name **above** their own name in the role colour (e.g. a yellow "Sheriff"); small, **next to** the name in meetings |
-| Madmate | Impostors (incl. Vampire, Mafia) in red |
+| Madmate | Impostors (incl. Vampire, Mafia, Witch, Assassin) in red |
 | Impostors (`KnownToImpostors = true`) | A red **Ⓜ** before the Madmate's name |
 | Impostors, Jackal | A **★** before the Snitch's name once its tasks left reach the setting |
 | Snitch with all tasks done | Impostors in red, the Jackal in blue |
 | Everyone (`VipMarker = true`) | A **★** in front of the names of players listed in `VIP.txt` (in-game name tags; not in the lobby) |
+| Lovers | A **♥** before the partner's name (nobody else sees it) |
+| Witch | A **†** before each cursed player's name (with `SpelledSeeMark` on, the cursed player also sees it on their own name) |
+| Arsonist | A **♨** before each doused player's name |
 | Regular roles | Nothing changes |
 
 Names are sent per client by the host. Right after a death / leave or after the ejection screen a name may flip back for a moment and is re-sent 0.5–2 s later. Back in the lobby every name is restored.
@@ -1487,6 +1533,7 @@ Names are sent per client by the host. Right after a death / leave or after the 
 - Your own role appears small next to your name (nobody else's role is shown).
 - Mayor votes show **one vote icon per vote** when the results open.
 - Ejections look normal. A Jester ejection ends the game after the ejection screen.
+- A player killed by an Assassin guess (`/cmd guess`) gets an ✕ in the meeting at once and is removed from the vote (a vote already cast is cleared); everyone reads "○○ was assassinated." Cursed players and a following lover die about 2 s after the ejection screen.
 - After `/endmeeting` / F8 ×2 the chat notice is followed by the results and ejection exactly as when the voting time runs out; `/results` ends the results screen early.
 - For a few seconds after an ejection some players' views (role look, alive / dead) may differ temporarily because of the blackout workaround; they are restored 1.5 s after the ejection screen.
 
@@ -1494,7 +1541,7 @@ Names are sent per client by the host. Right after a death / leave or after the 
 
 - Vanilla clients see **only "Victory" or "Defeat"** (the Impostor-win presentation is reused); no team name is shown.
 - The characters lined up are the **real winners** (only the Jester after a Jester win, an Opportunist joins when it won).
-- The host's screen shows the real result ("Jester wins", "Jackal wins" …) in the team colour.
+- The host's screen shows the real result ("Jester wins", "Jackal wins", "Lovers win (A & B)", "Arsonist wins" …) in the team colour.
 - A game ended by haison (F7 ×2 / `/haison`) shows the vanilla **"Impostor disconnected" end screen**, with no winner and no summary.
 
 ### Back in the lobby
@@ -1533,7 +1580,7 @@ Names are sent per client by the host. Right after a death / leave or after the 
 
 **Display**
 
-- Sheriff and Jackal see the vanilla "Impostor" intro (alone) and **see everyone else as Crewmate** ([chapter 26](#26-what-vanilla-players-see)); several Jackals cannot recognise each other. The real role arrives right after the intro through the name tag and chat (tell your players "the intro can lie").
+- Sheriff, Jackal and Arsonist see the vanilla "Impostor" intro (alone) and **see everyone else as Crewmate** ([chapter 26](#26-what-vanilla-players-see)); several Jackals cannot recognise each other. The real role arrives right after the intro through the name tag and chat (tell your players "the intro can lie").
 - Vanilla end screens only say "Victory / Defeat". The winning team and everyone's roles are on the host's screen and in the lobby chat afterwards (`/cmd l`).
 - Mod messages are chat bubbles of the host's character named "PocketRoles"; ≤ 100 characters, full-width digits, one colour per message.
 - Sending mod messages while the host is dead marks the host as alive for a moment (not in an unregistered lobby, where a dead host's messages reach ghosts only).
@@ -1542,11 +1589,13 @@ Names are sent per client by the host. Right after a death / leave or after the 
 - Settings-tab and gear-panel labels follow the lobby language (`opt.section.*` / `opt.name.*` / `ui.gear.*` in `lang\*.json`).
 - The lobby time left is an **estimate** (597 s minus elapsed until the server reports it); it can be off by a few to a dozen seconds.
 - Cosmetics affect the host's screen only; skins and pets cannot be replaced.
+- The name-tag symbols ♥ (Lovers), † (Witch) and ♨ (Arsonist) may show as □ depending on the client's font (they are the constants `Lovers.Heart` / `Witch.Mark` / `Arsonist.Mark` in the source).
 
 **Commands and chat**
 
 - Commands typed without `/cmd` (`/n` …) are visible to everyone; in an unregistered lobby (vanilla room) `/cmd …` is too, and no roles are handed out there ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)).
-- Console / Switch / mobile players restricted to quick chat **can read** role notices and replies **but cannot type commands** (nor `/lang` — set a suitable lobby language when many such players join).
+- Console / Switch / mobile players restricted to quick chat **can read** role notices and replies **but cannot type commands** (nor `/lang` — set a suitable lobby language when many such players join). The Assassin's guess is a chat command too, so such a player cannot guess as Assassin (normal kills still work).
+- The Assassin is not assigned in lobbies where `[Chat] PlayerCommands` (or `AllCommands`) is off (the slot is skipped even with a count of 1 or more; the host gets a notice). `/guess` without `/cmd` is visible to everyone (the reply carries a warning).
 - A player's `/lang` choice lasts until the host closes the game (by friend code / Puid).
 - A Game Master host's ordinary chat is invisible to living players (vanilla behaviour).
 - Chat translation is machine translation: short lines, jokes and names may come out wrong. Google's public endpoint is key-less best effort and fails when busy or when many requests are sent in a short time (at most `MaxPerMinute` per minute). Translations arrive a few seconds later.
@@ -1557,8 +1606,9 @@ Names are sent per client by the host. Right after a death / leave or after the 
 **Game flow**
 
 - **No host migration.** When the host leaves the role data is lost and the game cannot continue properly (keep the host's PC in the game until the end). Taking over someone else's lobby leaves the mod off (that lobby is unregistered; a chat notice says so).
-- Roles come from the plain Crewmate / plain Impostor pools only; vanilla special roles (Scientist, Engineer, Shapeshifter …) never get one. Vampire and Mafia use Impostor slots: with 1 Impostor and Vampire = 1 that Impostor is the Vampire (`/assign` ignores this).
-- Sheriff / Jackal / Lighter / Speed Booster effects are per-client "game settings"; right after vanilla re-sends the settings (a lobby setting change …) they may drop to the normal values for a moment (re-sent at the start, after the intro and after meetings).
+- Roles come from the plain Crewmate / plain Impostor pools only; vanilla special roles (Scientist, Engineer, Shapeshifter …) never get one. Vampire, Mafia, Witch and Assassin use Impostor slots: with 1 Impostor and Vampire = 1 that Impostor is the Vampire (`/assign` ignores this). The first lover comes from the crew pool, the second from the crew pool (or the Impostor pool when `AllowImpostor` is on); at most one pair per game.
+- The Lovers' win comes after the Jester / Terrorist solo wins (a Jester ejection is a Jester win even with both lovers alive). An Impostor lover counts as an Impostor in the Impostor win check but only ever wins as a lover.
+- Sheriff / Jackal / Arsonist / Witch (with a spell cooldown set) / Lighter / Speed Booster effects are per-client "game settings"; right after vanilla re-sends the settings (a lobby setting change …) they may drop to the normal values for a moment (re-sent at the start, after the intro and after meetings).
 - Win checks are off in test mode; `/test off` before a real game (recreating the lobby does it too).
 - A lobby re-created by auto re-host, `/move` or the high-ping dialog has a **new room code** (haison keeps it). Share it again (and fix the guide room's name if you use one).
 - Re-creating lobbies again and again in a short time, or leaving games half-way, adds **ban points** on the official servers and temporarily blocks lobby creation ([3.4](#34-bans-and-kicks)).
@@ -1593,7 +1643,7 @@ Send bugs, requests and questions any of these ways (Japanese, Chinese or Englis
 ### Making the report zip (launcher)
 
 1. Press **"Create report zip"** in the launcher (PocketRoles Launcher). `PocketRoles-report-YYYYMMDD-HHMM.zip` appears on the Desktop.
-2. In the dialog press **"Open mail (bug)"** (or "(request)"): your mail client opens with the address, the subject (`[PocketRoles] bug report v0.4.0`) and a body template (what happened / when, room code, player count / what the players saw). **Attach the zip from the Desktop yourself** (no mail client? "Show zip location" reveals the file; send it from webmail such as Gmail in the browser).
+2. In the dialog press **"Open mail (bug)"** (or "(request)"): your mail client opens with the address, the subject (`[PocketRoles] bug report v0.4.1`) and a body template (what happened / when, room code, player count / what the players saw). **Attach the zip from the Desktop yourself** (no mail client? "Show zip location" reveals the file; send it from webmail such as Gmail in the browser).
 3. Describe what happened / when (lobby, game, meeting) / the player count / whether the players were vanilla / anything else you noticed, and send.
 
 Contents of the zip: `LogOutput.log` (the mod's log), `jp.pocketroles.mod.cfg` (settings), `launcher-state.json`, `launcher.log`, `system.txt` (Windows version, game / mod / BepInEx versions, the plugins list, Steam state). Paths containing your user name are replaced by `%USERPROFILE%` and anything shaped like an API key by `<api-key-masked>`. **`deepl-key.txt` (the DeepL API key) is never included.** Player names stay in the log — edit the log inside the zip if you want to hide them.
@@ -1618,7 +1668,7 @@ build.cmd
 - Another game folder: `build.cmd -p:GameDir="C:\path\to\Among Us"`
 - Target net6.0, C# latest, Nullable off, ImplicitUsings off; no NuGet game libraries, no Reactor.
 - `lang\*.json` and `assets\PocketRoles-256.png` (the title-screen icon) are embedded resources; the language files are written to `BepInEx\PocketRoles\lang\` on first start — edit the written files instead of rebuilding to change texts.
-- Verification: start `Among Us.exe` from the modded copy and check `PocketRoles v0.4.0 loaded` and the absence of Harmony patch errors in `BepInEx\LogOutput.log`.
+- Verification: start `Among Us.exe` from the modded copy and check `PocketRoles v0.4.1 loaded` and the absence of Harmony patch errors in `BepInEx\LogOutput.log`.
 
 Release zips: `powershell -NoProfile -ExecutionPolicy Bypass -File build-release.ps1` (`-SkipBuild` skips the build). It produces `dist\PocketRoles-<ver>.zip` (`BepInEx\plugins\PocketRoles.dll`, `BepInEx\PocketRoles\lang\*.json`, the three READMEs, LICENSE, NOTICE), `dist\PocketRoles-Setup-<ver>.zip` (`PocketRolesLauncher.ps1`, `PocketRoles Launcher.cmd`, `assets\PocketRoles.ico`, `はじめに.txt`) and `SHA256SUMS.txt`. The version comes from `<Version>` in `PocketRoles.csproj`. Attach both zips to a GitHub release and the launcher's "Check for updates" / "Install" find the latest version (they look for an asset named `PocketRoles-<ver>.zip`).
 

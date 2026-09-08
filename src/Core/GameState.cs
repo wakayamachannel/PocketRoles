@@ -66,8 +66,33 @@ namespace PocketRoles.Core
         public static Dictionary<byte, RoleTypes> VanillaRoles = new Dictionary<byte, RoleTypes>();
         public static Dictionary<byte, string> OriginalNames = new Dictionary<byte, string>();
 
-        public struct VampireBite { public byte Killer; public float DueAt; }
+        /// <summary>Delayed, host-executed death (Kills.Tick). Reason: null = vampire bite, "lovers", "curse", "assassin" (log only).</summary>
+        public struct VampireBite { public byte Killer; public float DueAt; public string Reason; }
         public static Dictionary<byte, VampireBite> Bites = new Dictionary<byte, VampireBite>();
+
+        // ---- v0.4.1 role state (cleared in Reset / ResetForNewLobby)
+        /// <summary>Lovers pair (255 = none). Set by Lovers.Assign during AssignCustomRoles.</summary>
+        public static byte LoverA = 255, LoverB = 255;
+        /// <summary>arsonist playerId → players it doused.</summary>
+        public static Dictionary<byte, HashSet<byte>> Doused = new Dictionary<byte, HashSet<byte>>();
+        /// <summary>spelled target playerId → witch playerId (cleared at ExileController.WrapUp).</summary>
+        public static Dictionary<byte, byte> Spelled = new Dictionary<byte, byte>();
+        /// <summary>assassin playerId → guesses used in the current meeting (cleared at MeetingHud.Start).</summary>
+        public static Dictionary<byte, int> GuessesThisMeeting = new Dictionary<byte, int>();
+        /// <summary>Meetings started in this game (MeetingHud.Start postfix; the first meeting is 1).</summary>
+        public static int MeetingsHeld;
+
+        public static bool IsLover(byte id) => id != 255 && (id == LoverA || id == LoverB);
+        public static byte PartnerOf(byte id) => id == 255 ? (byte)255 : (id == LoverA ? LoverB : (id == LoverB ? LoverA : (byte)255));
+
+        private static void ResetRoleState()
+        {
+            LoverA = LoverB = 255;
+            Doused.Clear();
+            Spelled.Clear();
+            GuessesThisMeeting.Clear();
+            MeetingsHeld = 0;
+        }
 
         public static HashSet<byte> ExtraWinners = new HashSet<byte>();
         public static CustomRole SoloWinner = CustomRole.None;
@@ -99,6 +124,7 @@ namespace PocketRoles.Core
             VanillaRoles.Clear();
             OriginalNames.Clear();
             Bites.Clear();
+            ResetRoleState();
             ExtraWinners.Clear();
             SoloWinner = CustomRole.None;
             SoloWinnerId = 255;
@@ -170,6 +196,7 @@ namespace PocketRoles.Core
                 Ending = false;
                 AssigningRoles = false;
                 Bites.Clear();
+                ResetRoleState();
                 SoloWinner = CustomRole.None;
                 SoloWinnerId = 255;
                 LastExiled = 255;
@@ -248,11 +275,12 @@ namespace PocketRoles.Core
             return IsVanillaImpostorRole(VanillaRoleOf(id)) ? Team.Impostor : Team.Crew;
         }
 
-        /// <summary>Vanilla impostor-type role incl. Vampire/Mafia — NOT Madmate.</summary>
+        /// <summary>Vanilla impostor-type role incl. Vampire/Mafia/Witch/Assassin (and an impostor lover) — NOT Madmate.</summary>
         public static bool IsImpostorTeamKiller(byte id)
         {
             var role = RoleOf(id);
-            if (role == CustomRole.Vampire || role == CustomRole.Mafia) return true;
+            if (role == CustomRole.Vampire || role == CustomRole.Mafia || role == CustomRole.Witch || role == CustomRole.Assassin) return true;
+            if (role == CustomRole.Lovers) return IsVanillaImpostorRole(VanillaRoleOf(id)); // an impostor lover keeps its kill button and counts as an impostor
             if (role != CustomRole.None) return false;
             return IsVanillaImpostorRole(VanillaRoleOf(id));
         }

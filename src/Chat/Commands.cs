@@ -147,6 +147,14 @@ namespace PocketRoles.Chat
                     case "time": case "timer": case "時間":
                         ReplyThrottled(sender, isHost, TimeText(isHost));
                         return true;
+                    case "guess": case "g": case "推理":
+                        // An alive Assassin is never throttled (the guess itself is limited per meeting); everyone else
+                        // only gets the "not the assassin" / "dead" refusal, which is throttled like any other reply.
+                        bool assassinAlive = Core.Game.RoleOf(sender.PlayerId) == CustomRole.Assassin && Core.Game.IsAlive(sender.PlayerId);
+                        string guessReply = Assassin.Guess(sender, JoinArgs(tokens, 1), explicitCmd);
+                        if (isHost || assassinAlive) Reply(sender, guessReply);
+                        else ReplyThrottled(sender, isHost, guessReply);
+                        return true;
                 }
 
                 // ---- host-only commands
@@ -284,6 +292,7 @@ namespace PocketRoles.Chat
                 case "l": case "last":
                 case "lang": case "language": case "言語":
                 case "time": case "timer": case "時間":
+                case "guess": case "g": case "推理":
                     return true;
                 default:
                     return false;
@@ -337,7 +346,8 @@ namespace PocketRoles.Chat
             }
             if (k.StartsWith("vanilla.") || k.StartsWith("sheriff.") || k.StartsWith("jackal.") || k.StartsWith("vampire.")
                 || k.StartsWith("mayor.") || k.StartsWith("snitch.") || k.StartsWith("lighter.") || k.StartsWith("speedbooster.")
-                || k.StartsWith("speed.") || k.StartsWith("sb.") || k.StartsWith("madmate."))
+                || k.StartsWith("speed.") || k.StartsWith("sb.") || k.StartsWith("madmate.")
+                || k.StartsWith("lovers.") || k.StartsWith("arsonist.") || k.StartsWith("witch.") || k.StartsWith("assassin."))
                 return true;
             // <role>.count / <role>.chance
             int dot = k.LastIndexOf('.');
@@ -738,6 +748,18 @@ namespace PocketRoles.Chat
                 case CustomRole.Lighter: return Lang.TF("cmd.ro.lighter", "視界 x{0:0.#}", "Vision x{0:0.#}", Options.LighterVision);
                 case CustomRole.SpeedBooster: return Lang.TF("cmd.ro.speed", "速度 x{0:0.#}", "Speed x{0:0.#}", Options.SpeedBoosterSpeed);
                 case CustomRole.Madmate: return Options.MadmateKnownToImpostors ? Lang.T("cmd.ro.madmate", "インポスターはマッドメイトが誰か分かる", "Impostors know who the Madmate is") : null;
+                // v0.4.1
+                case CustomRole.Lovers:
+                    return Lang.TF("cmd.ro.lovers", "インポスターも恋人になる: {0}、残り3人で勝利: {1}", "Impostor may be a lover: {0}, win as last 3: {1}", OnOff(Options.LoversAllowImpostor), OnOff(Options.LoversWinAsLastThree));
+                case CustomRole.Arsonist:
+                    return Options.ArsonistCanVent
+                        ? Lang.TF("cmd.ro.arsonist.vent", "油CD {0:0.#}秒、ベント可", "Douse cooldown {0:0.#}s, vent on", Options.ArsonistDouseCooldown)
+                        : Lang.TF("cmd.ro.arsonist", "油CD {0:0.#}秒、ベント不可", "Douse cooldown {0:0.#}s, vent off", Options.ArsonistDouseCooldown);
+                case CustomRole.Witch:
+                    return Lang.TF("cmd.ro.witch", "呪いCD {0}、呪われた本人に印: {1}", "Spell cooldown {0}, target sees mark: {1}",
+                        Options.WitchSpellCooldown > 0f ? Options.WitchSpellCooldown.ToString("0.#") + "s" : Lang.T("cmd.ro.witch.samecd", "キルと同じ", "same as kill"), OnOff(Options.WitchSpelledSeeMark));
+                case CustomRole.Assassin:
+                    return Lang.TF("cmd.ro.assassin", "会議ごとに {0} 回推理、初回会議: {1}", "{0} guess(es) per meeting, first meeting: {1}", Options.AssassinGuessesPerMeeting, OnOff(Options.AssassinCanGuessFirstMeeting));
                 default: return null;
             }
         }

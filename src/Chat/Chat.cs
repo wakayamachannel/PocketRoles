@@ -676,16 +676,29 @@ namespace PocketRoles.Chat
             string sep = Lang.T("roleinfo.sep", " — ", " - ");
             string line = head + sep + info.Desc;
             int limit = MessageChars;
-            if (line.Length <= limit) return line;
-            if (meeting && Rpc.SafeMode)
+            string result;
+            if (line.Length <= limit) result = line;
+            else if (meeting && Rpc.SafeMode)
             {
                 // Unregistered lobby: one chat message per player at a meeting (never a split reminder). The colour
                 // tag counts toward the 100-character limit, so measure the raw head, not the stripped one.
                 int room = limit - head.Length - sep.Length - 1;
-                if (room < 8) return head;
-                return head + sep + info.Desc.Substring(0, Math.Min(info.Desc.Length, room)) + "…";
+                return room < 8 ? head : head + sep + info.Desc.Substring(0, Math.Min(info.Desc.Length, room)) + "…";
             }
-            return head + "\n" + info.Desc;
+            else result = head + "\n" + info.Desc;
+
+            // v0.4.1 extras (skipped in the SafeMode meeting branch above: one message only there)
+            if (role == CustomRole.Lovers)
+            {
+                byte partner = Core.Game.PartnerOf(playerId);
+                if (partner != 255) result += "\n" + Lang.TF("roleinfo.lovers.partner", "あなたの恋人: {0}", "Your lover: {0}", Core.Game.NameOf(partner));
+            }
+            if (role == CustomRole.Witch && meeting)
+            {
+                string spelled = Game.Witch.SpelledNamesFor(playerId);
+                if (!string.IsNullOrEmpty(spelled)) result += "\n" + Lang.TF("roleinfo.witch.spelled", "呪い中: {0}", "Cursed: {0}", spelled);
+            }
+            return result;
         }
 
         /// <summary>Compact result of the last game (packed lines), or null when nothing is recorded.</summary>

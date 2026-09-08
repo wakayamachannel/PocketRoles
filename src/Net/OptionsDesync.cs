@@ -78,6 +78,13 @@ namespace PocketRoles.Net
                     case CustomRole.SpeedBooster:
                         opts.SetFloat(FloatOptionNames.PlayerSpeedMod, opts.GetFloat(FloatOptionNames.PlayerSpeedMod) * Options.SpeedBoosterSpeed);
                         break;
+                    // v0.4.1: the douse / spell cooldown drives the client's kill button timer.
+                    case CustomRole.Arsonist:
+                        opts.SetFloat(FloatOptionNames.KillCooldown, Mathf.Max(0.02f, Options.ArsonistDouseCooldown));
+                        break;
+                    case CustomRole.Witch:
+                        if (Options.WitchSpellCooldown > 0f) opts.SetFloat(FloatOptionNames.KillCooldown, Mathf.Max(0.02f, Options.WitchSpellCooldown));
+                        break;
                     // Vampire / Mafia: vanilla impostor kill cooldown (base value) unless overridden below.
                 }
                 if (killCooldownOverride.HasValue)
@@ -98,7 +105,10 @@ namespace PocketRoles.Net
                 case CustomRole.Jackal:
                 case CustomRole.Lighter:
                 case CustomRole.SpeedBooster:
+                case CustomRole.Arsonist:
                     return true;
+                case CustomRole.Witch:
+                    return Options.WitchSpellCooldown > 0f;
                 default:
                     return false;
             }
@@ -254,6 +264,8 @@ namespace PocketRoles.Net
                 {
                     case CustomRole.Sheriff: __result = Mathf.Max(0.02f, Options.SheriffKillCooldown); break;
                     case CustomRole.Jackal: __result = Mathf.Max(0.02f, Options.JackalKillCooldown); break;
+                    case CustomRole.Arsonist: __result = Mathf.Max(0.02f, Options.ArsonistDouseCooldown); break;
+                    case CustomRole.Witch: if (Options.WitchSpellCooldown > 0f) __result = Mathf.Max(0.02f, Options.WitchSpellCooldown); break;
                 }
             }
             catch (Exception e)

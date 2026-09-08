@@ -165,7 +165,8 @@ namespace PocketRoles.Game
                     bool vanillaImp = IsImpostorRole(vanilla);
                     RoleTypes basis = vanilla;
                     if (info.FromImpostorPool && !vanillaImp) basis = RoleTypes.Impostor;
-                    else if (!info.FromImpostorPool && vanillaImp) basis = RoleTypes.Crewmate;
+                    // A forced lover keeps its vanilla side (so "/assign X lovers" on an impostor tests the impostor-lover).
+                    else if (!info.FromImpostorPool && vanillaImp && role != CustomRole.Lovers) basis = RoleTypes.Crewmate;
                     if (basis != vanilla)
                     {
                         Core.Game.VanillaRoles[id] = basis;
@@ -206,7 +207,7 @@ namespace PocketRoles.Game
         }
 
         /// <summary>"#3" / "3" → player id; otherwise exact name (case-insensitive), then unique prefix / substring.</summary>
-        private static PlayerControl FindPlayer(string text)
+        internal static PlayerControl FindPlayer(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
             string t = NormName(text);
