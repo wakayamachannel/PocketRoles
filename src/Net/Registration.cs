@@ -148,6 +148,7 @@ namespace PocketRoles.Net
                 Registration.Registered = Options.HostAuthorityMode && !inert;
                 Registration.Hosting = true;
                 PocketRolesPlugin.Logger.LogInfo($"Registration: creating lobby, register(+25)={Registration.Registered}" + (inert && Options.HostAuthorityMode ? " (not registered: game version mismatch, the mod is inert)" : ""));
+                try { PocketRoles.Game.VanillaRanges.LogHealth("lobby creation"); if (!Registration.Registered && !inert) PocketRoles.Game.VanillaRanges.ClampToVanilla("unregistered lobby creation"); } catch (Exception) { }
                 if (!Registration.Registered && !inert) Registration.LogCompatDetails();
             }
             catch (Exception e)

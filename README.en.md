@@ -1451,7 +1451,7 @@ The other way round: gather people in a listed vanilla room (registration off), 
 - The top-left display carries a yellow `(unregistered)`; sends are spaced 0.3 s and packets are smaller.
 - Broadcasts sent while the host is dead are, as in vanilla, visible to ghosts only. Do not combine it with Game Master mode.
 - Even in a vanilla room the server may still treat a host broadcast as cheating and disconnect the host (open item in v0.4.0; `/rehost on` re-creates the lobby after a disconnect). If it happens, send a [report zip](#28-reporting-bugs).
-- **Dleks (mirrored Skeld) is off by default** in an unregistered lobby (v0.4.1): the official server once disconnected the host ("Hacking") right after Dleks was picked there (other mods report Dleks works unregistered, so the real trigger may have been another setting). Opt in at your own risk with `/opt lobby.dleks.compat on` (`[Lobby] DleksWhenUnregistered`). A Hacking disconnect is not re-hosted automatically: re-create the lobby by hand.
+- Dleks (mirrored Skeld) now uses the same method as AUR (the option map stays The Skeld; only the ship prefab is swapped on the host), so it is offered in both registered and unregistered lobbies (v0.4.2). An unregistered lobby still has the known host-disconnect-on-join issue above, which is unrelated to Dleks; a registered role lobby plays it fine.
 - Registration off is saved in the config file and **stays off after a restart**. To go back to roles, type `/opt register on` and re-create the lobby.
 
 ---

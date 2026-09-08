@@ -107,7 +107,7 @@ namespace PocketRoles.Game
         {
             float vMin = s.SeenMin ?? s.VanMin, vMax = s.SeenMax ?? s.VanMax, vStep = s.SeenStep ?? s.VanStep;
             min = vMin; max = vMax; step = vStep;
-            if (!Options.ExtendedRanges) return;
+            if (!Options.ExtendedRanges || Net.Rpc.CompatMode) return; // unregistered lobby: vanilla ranges only (server validation)
             try
             {
                 float m = s.Min(), x = s.Max(), st = s.Step();
@@ -149,7 +149,7 @@ namespace PocketRoles.Game
                 }
                 catch (Exception) { }
             }
-            if (!Options.ExtendedRanges) return false;
+            if (!Options.ExtendedRanges || Net.Rpc.CompatMode) return false;
             Limits(s, out float min, out float max, out float step);
             n.ValidRange = new FloatRange(min, max);
             n.Increment = step;
@@ -189,6 +189,81 @@ namespace PocketRoles.Game
                 PocketRolesPlugin.Logger.LogError($"VanillaRanges.Show: {e}");
                 return Usage();
             }
+        }
+
+        /// <summary>
+        /// Logs the current vanilla numeric settings and the vanilla validator's verdict (2026-09-09: an unregistered
+        /// lobby gets its host disconnected for "Hacking" when the synced options fail the official validation, which the
+        /// relaxed +25 anti-cheat tolerates — suspected cause of the compat-mode kicks at settings close / player join).
+        /// </summary>
+        public static void LogHealth(string where)
+        {
+            try
+            {
+                var gom = GameOptionsManager.Instance;
+                var o = gom != null ? gom.CurrentGameOptions : null;
+                if (o == null) { PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: options not loaded ({where})"); return; }
+                bool invalid = false;
+                try { invalid = o.AreInvalid(MaxExpectedPlayers); } catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"VanillaRanges: AreInvalid: {e.Message}"); }
+                string line;
+                using (Lang.Scope("en")) line = Show();
+                PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: {where}: vanilla validation {(invalid ? "FAILS" : "ok")}; map={o.MapId} imps={o.NumImpostors} maxPlayers={o.MaxPlayers}; {line}");
+                if (invalid) PocketRolesPlugin.Logger.LogWarning("VanillaRanges: the current options fail the vanilla validation - an unregistered (compat) lobby will disconnect the host when they are synced");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"VanillaRanges.LogHealth: {e}");
+            }
+        }
+
+        /// <summary>
+        /// Unregistered (compat) lobby: pull every /vset-able option back into its vanilla range and step. The extended
+        /// values a registered lobby tolerates (3 common tasks, 10x impostor vision, a 27-s emergency cooldown …) fail the
+        /// official server's option validation in an unregistered lobby, which disconnects the host ("Hacking") at the
+        /// next options sync — settings close or a player join (2026-09-08/09). Returns the number of changed options.
+        /// </summary>
+        public static int ClampToVanilla(string where)
+        {
+            int changed = 0;
+            try
+            {
+                var gom = GameOptionsManager.Instance;
+                var o = gom != null ? gom.CurrentGameOptions : null;
+                if (o == null) return 0;
+                var sb = new StringBuilder();
+                foreach (var s in Specs)
+                {
+                    float vMin = s.SeenMin ?? s.VanMin, vMax = s.SeenMax ?? s.VanMax, vStep = s.SeenStep ?? s.VanStep;
+                    float cur;
+                    try { cur = s.IsInt ? o.GetInt(s.Int) : o.GetFloat(s.Float); } catch (Exception) { continue; }
+                    float v = cur;
+                    if (v < vMin) v = vMin;
+                    if (v > vMax) v = vMax;
+                    if (vStep > 0f) v = vMin + (float)Math.Round((v - vMin) / vStep) * vStep;
+                    if (v > vMax) v = vMax;
+                    if (s.IsInt) v = (float)Math.Round(v);
+                    if (Math.Abs(v - cur) < 0.001f) continue;
+                    try
+                    {
+                        if (s.IsInt) o.SetInt(s.Int, (int)v); else o.SetFloat(s.Float, v);
+                        changed++;
+                        sb.Append($" {s.Key} {Fmt(cur)}→{Fmt(v)};");
+                    }
+                    catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"VanillaRanges: clamp {s.Key}: {e.Message}"); }
+                }
+                if (changed > 0)
+                {
+                    try { o.SetInt(Int32OptionNames.RulePreset, (int)RulesPresets.Custom); } catch (Exception) { }
+                    try { gom.GameHostOptions = o; } catch (Exception) { }
+                    PocketRolesPlugin.Logger.LogWarning($"VanillaRanges: {where}: {changed} option(s) pulled back into the vanilla range for the unregistered lobby:{sb}");
+                }
+                else PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: {where}: every option is inside the vanilla range");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"VanillaRanges.ClampToVanilla: {e}");
+            }
+            return changed;
         }
 
         /// <summary>

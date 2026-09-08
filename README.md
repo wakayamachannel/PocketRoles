@@ -766,7 +766,6 @@ MOD が読み込まれた後、ゲームのバージョンが対応版と違う�
 | `lobby.extenddelay` | 0〜60 | `[Lobby] ExtendNoticeDelay` |
 | `lobby.autoregion` | on / off | `[Lobby] AutoRegion` |
 | `lobby.dleks` | on / off | `[Lobby] EnableDleks` |
-| `lobby.dleks.compat` | on / off | `[Lobby] DleksWhenUnregistered`（登録オフの部屋でも Dleks。既定オフ） |
 | `hotkeys` | on / off | `[Hotkeys] Enabled` |
 | `hotkeys.haison` | キー名（`F7`、`F5`、`Escape` など UnityEngine.KeyCode の名前） | `[Hotkeys] Haison` |
 | `hotkeys.endmeeting` | キー名 | `[Hotkeys] EndMeeting` |
@@ -1455,7 +1454,7 @@ Harmony のパッチ適用に失敗した場合（ゲームの内部が大きく
 - 画面左上に黄字で `(unregistered)` が付き、送信間隔は 0.3 秒、1 パケットは小さめになります。
 - ホストが死亡中の全体メッセージは、バニラの仕様どおり死者にしか見えません。ゲームマスターモードとは併用しないでください。
 - 便利ホスト部屋でも、サーバーがホストの全体メッセージを不正と見なして切断する可能性は残っています（v0.4.0 の未解決事項。切断されたら `/rehost on` の自動再ホストが使えます）。困ったら [報告 zip](#28-不具合の報告方法) を送ってください。
-- **逆スケルド（Dleks）は既定では出ません**（v0.4.1）。登録オフの部屋で Dleks を選んで設定画面を閉じた直後に、サーバーがホストを Hacking として切断した実例があるためです（他の MOD では登録なしでも Dleks が動くとの報告があるので、原因は別の設定値だった可能性もあります）。自己責任で出すなら `/opt lobby.dleks.compat on`（`[Lobby] DleksWhenUnregistered`）。Hacking で切断された部屋は自動再ホストが作り直さないので手動で作り直してください。
+- 逆スケルド（Dleks）は AUR と同じ方式（設定上のマップは常に The Skeld のまま、ホスト側でマップの実体だけ差し替え）に変更したので、登録オン・オフどちらの部屋でも出せます（v0.4.2）。ただし登録オフの部屋は、上に書いたとおり参加者が入ってきた瞬間にホストが切断される既知の不具合が残っています（Dleks とは無関係）。役職ありで遊ぶ登録オンの部屋では問題なく遊べます。
 - 登録オフは設定ファイルに保存され、ゲームを起動し直しても **登録オフのまま** です。役職ありに戻すときは `/opt register on` を打ってから部屋を作り直してください。
 
 ---

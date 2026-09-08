@@ -15,11 +15,12 @@ namespace PocketRoles.Lobby
     /// Tommy-XL "Unlock-dlekS-ehT" pattern, which works with vanilla clients because the host spawns the ship).
     /// <para>
     /// How it works: a Dleks entry is inserted into every picker's <c>AllMapIcons</c> at index 3 reusing the Skeld
-    /// sprites; the renderers showing it are flipped horizontally ("dlekS ehT"). While Dleks is selected the lobby keeps
-    /// <c>MapId = 0</c> (vanilla clamps 3 away outside April Fools) and a static flag remembers the choice; when the
-    /// start countdown begins <c>MapId</c> becomes 3, and a replacement of <c>AmongUsClient.CoStartGameHost</c> loads
-    /// <c>ShipPrefabs[3]</c> (vanilla would redirect it to Skeld). Vanilla clients receive the spawned Dleks ship like any
-    /// other map. A mirrored Airship does not exist in the game and cannot be offered.
+    /// sprites; the renderers showing it are flipped horizontally ("dlekS ehT"). The option keeps <c>MapId = 0</c> at
+    /// ALL times (v0.4.2, AUR method): while Dleks is selected the host swaps <c>ShipPrefabs[0]</c> and
+    /// <c>ShipPrefabs[3]</c>, so the vanilla start loads the Dleks prefab under MapId 0 and nothing non-vanilla is ever
+    /// sent to the server (the old method wrote MapId 3 at the start and got the host disconnected in an unregistered
+    /// lobby). Vanilla clients receive the spawned Dleks ship like any other map. A mirrored Airship does not exist in the
+    /// game and cannot be offered.
     /// </para>
     /// </summary>
     public static class DleksMap
@@ -36,8 +37,39 @@ namespace PocketRoles.Lobby
 
         private static bool _compatLogged;
 
-        /// <summary>Registered lobby, or the host opted in for unregistered lobbies ([Lobby] DleksWhenUnregistered).</summary>
-        private static bool AllowedInThisLobby => Options.HostAuthorityMode || Options.DleksWhenUnregistered;
+        /// <summary>
+        /// v0.4.2: Dleks is offered in every lobby again. The 2026-09-08 "Hacking" disconnect happened with the old
+        /// method (MapId = 3 written into the options at the start); the AUR method below never puts MapId 3 on the
+        /// wire, so registered and unregistered lobbies are treated the same.
+        /// </summary>
+        private static bool AllowedInThisLobby => true;
+
+        private static bool _flipped;
+
+        /// <summary>
+        /// AUR method (AmongUsRevamped CreateOptionsPickerPatch.FlippedSkeld): swap ShipPrefabs[0] (Skeld) and
+        /// ShipPrefabs[3] (Dleks) on the HOST. The options keep MapId 0 everywhere — lobby, settings sync and the start —
+        /// so nothing non-vanilla ever reaches the server; the vanilla CoStartGameHost loads ShipPrefabs[MapId = 0],
+        /// which is now the Dleks prefab, and the clients instantiate the ship the host spawns as usual.
+        /// </summary>
+        private static void SetFlipped(bool on)
+        {
+            try
+            {
+                if (_flipped == on) return;
+                var client = AmongUsClient.Instance;
+                if (client == null || client.ShipPrefabs == null || client.ShipPrefabs.Count <= DleksIndex) return;
+                var tmp = client.ShipPrefabs[DleksIndex];
+                client.ShipPrefabs[DleksIndex] = client.ShipPrefabs[0];
+                client.ShipPrefabs[0] = tmp;
+                _flipped = on;
+                PocketRolesPlugin.Logger.LogInfo($"DleksMap: ShipPrefabs[0] is now {(on ? "Dleks (swapped)" : "Skeld (restored)")}");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"DleksMap.SetFlipped({on}): {e}");
+            }
+        }
 
         /// <summary>Compat mode (no +25): the server closes the host for anything non-vanilla, and a Dleks start spawns a non-vanilla ship.</summary>
         private static void CompatSkip(string where)
@@ -119,13 +151,14 @@ namespace PocketRoles.Lobby
 
         // ------------------------------------------------------------------ start / cancel (called by AutoStart too)
 
-        /// <summary>A start countdown began: the option must carry MapId 3 when the game loads.</summary>
+        /// <summary>A start countdown began: make sure the prefab swap is in place (the option stays MapId 0).</summary>
         internal static void OnStartRequested()
         {
             try
             {
                 if (!Enabled || !Selected || !AmHost() || !AllowedInThisLobby) return;
-                SetMapId(DleksIndex, "start requested");
+                if (CurrentMapId() == DleksIndex) SetMapId(0, "start requested: MapId stays 0 (AUR method)");
+                SetFlipped(true);
             }
             catch (Exception e)
             {
@@ -170,7 +203,7 @@ namespace PocketRoles.Lobby
                 }
             }
             if (!Enabled) Selected = false;
-            if (!AllowedInThisLobby && Selected) { Selected = false; PocketRolesPlugin.Logger.LogInfo("DleksMap: compat mode (no +25): Dleks deselected"); }
+            SetFlipped(Selected);
             _createScreenChoice = false;
         }
 
@@ -189,6 +222,7 @@ namespace PocketRoles.Lobby
                 return;
             }
             Selected = false;
+            SetFlipped(false);
             PocketRolesPlugin.Logger.LogInfo("DleksMap: new lobby, Dleks deselected");
         }
 
@@ -198,6 +232,7 @@ namespace PocketRoles.Lobby
             if (!on) _createScreenChoice = false;
             if (Selected == on) return;
             Selected = on;
+            SetFlipped(on);
             PocketRolesPlugin.Logger.LogInfo($"DleksMap: {(on ? "Dleks selected" : "Dleks deselected")}");
         }
 
@@ -743,22 +778,21 @@ namespace PocketRoles.Lobby
 
     // ---------------------------------------------------------------------- patch: host ship load
 
-    /// <summary>Vanilla CoStartGameHost redirects map 3 to Skeld outside April Fools: load ShipPrefabs[3] ourselves.</summary>
+    /// <summary>
+    /// v0.4.2: no custom ship load any more — with the ShipPrefabs swap (AUR method) the vanilla CoStartGameHost loads
+    /// ShipPrefabs[MapId = 0], which is the Dleks prefab while Dleks is selected. The prefix only logs.
+    /// </summary>
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.CoStartGameHost))]
     [HarmonyPriority(Priority.First)]
     internal static class Dleks_CoStartGameHostPatch
     {
-        private static bool Prefix(AmongUsClient __instance, ref Il2CppSystem.Collections.IEnumerator __result)
+        private static bool Prefix(AmongUsClient __instance)
         {
             try
             {
-                if (!Options.EnableDleks || !DleksMap.Selected || __instance == null || !__instance.AmHost) return true;
-                var gom = GameOptionsManager.Instance;
-                if (gom == null || gom.currentGameMode != GameModes.Normal) return true;
-                if (gom.currentNormalGameOptions == null || gom.currentNormalGameOptions.MapId != 3) return true;
-                PocketRolesPlugin.Logger.LogInfo("DleksMap: hosting a Dleks game (custom CoStartGameHost)");
-                __result = DleksMap.CoStartGameHostDleks(__instance).WrapToIl2Cpp();
-                return false;
+                if (Options.EnableDleks && DleksMap.Selected && __instance != null && __instance.AmHost)
+                    PocketRolesPlugin.Logger.LogInfo("DleksMap: hosting a Dleks game (vanilla CoStartGameHost with swapped ShipPrefabs)");
+                return true;
             }
             catch (Exception e)
             {

@@ -91,3 +91,10 @@ OK だったもの: 起動（ランチャー・ウィンドウモード）、ロ
 | 51 | 修正済み（1 人実機で原因確認） | `SuppressVanillaRoles` で Shapeshifter / Phantom / Viper の rate を 0 にすると、V11 の impostor pass のリストが空になり default（Crewmate）が配られて **インポスターが 1 人もいない試合** になる（VanillaRoles=false の既定で常に。V11 は素のインポスター数を保存済みの特殊役職数から決めるため）。VanillaRoles=on だとリストは Shapeshifter Phantom Viper で正常 | インポスター特殊役職は 0 にせず本体に配らせ、`DowngradeImpostorSpecials` で素の Impostor に格下げ（ホストの役職表と見え方）。クルーの特殊役職だけ 0 に。`EnsureImpostorPresent` は安全網として残す |
 | 52 | 修正済み（3 人実機で確認: 修正後は 2 試合連続で切断なし、役職の見え方・幽霊役・アサシンの推理まで正常） | 3 人テストの Hacking 切断 6 回すべてに共通し、1 クライアントでは一度も起きない条件: **1 つの reliable パケットに 2 クライアント宛ての GameDataTo を詰めていた**（`Rpc.MultiBatch` が 900 バイトまで複数クライアント分を同じ writer に書く）。0.3 秒間隔でも（パケットが分かれないので）切断、インポスターの有無も無関係（6 回目は Viper＋Judge×2 の表でも切断） | `MultiBatch.For()` でクライアントごとに writer を切り替え、1 パケット 1 宛先に。v0.4.0 も同じ詰め方なので **クライアントが 2 台以上いる公開部屋では開始直後に必ず切断されていた** はず（重大） |
 | 48 | 仕様（本体） | 2 人だけの試合では、会議のあと参加者が黒画面になる（部屋に戻れば復帰）。クライアントの `IsGameOverDueToDeath`（imp 0 人、または imp ≥ その他）が 2 人では必ず真になるため。黒画面防止（AntiBlackout）は「imp 1 人＋他 2 人以上」を見せる方式で、2 人では成立しない | 2 人テストでは会議後の動作は検証対象外。**AntiBlackout の一時的な SetRole が #46 の制約で効くかは 3 人以上で要検証**（効かない場合は IsDead の付け替えだけで組み直す）。README に「2 人だけの試合は会議後に黒画面」を明記 |
+
+## v0.4.2（2026-09-09 早朝）
+| # | 状態 | 事象 | 対処 |
+|---|---|---|---|
+| 53 | 修正済み（1 人実機で確認: 逆スケルドのマップが出て MapId は 0 のまま） | Dleks の旧実装は開始時に options の MapId を 3 に書き込んでいた（登録オフの部屋でサーバーがホストを Hacking 切断する一因の疑い）。AUR / Tommy-XL は options を常に MapId 0 のままにして ShipPrefabs[0]↔[3] を入れ替える | `DleksMap.SetFlipped`（ShipPrefabs スワップ）に変更、MapId は常に 0。カスタム CoStartGameHost は廃止（バニラが ShipPrefabs[0]=Dleks を読む）。登録オン・オフの区別（`AllowedInThisLobby`）と `[Lobby] DleksWhenUnregistered` を撤去。登録オンの部屋で逆スケルドが出ることを確認 |
+| 54 | 未解決（実機で切り分け） | 登録オフ（便利ホスト）の部屋で **参加者が入室した瞬間**にホストが Hacking 切断（Player.log: 「Player … joined」→「DC because Hacking」）。Dleks・設定値・テストモードとは無関係（プレーンな Skeld でも、設定をバニラ範囲に丸めても発生）。以前からの互換モード制限（#21/#28） | 原因未特定。AUR は登録オフでも多人数で動くので、入室時に mod が送る何か（要調査）か、モッド DLL 自体の検出。当面は「登録オフの部屋は入室で切断されうる」既知の不具合として明記。役職ありは登録オンの部屋で |
+| 55 | 追加（緩和策） | 登録オフの部屋で拡張範囲の設定値（インポスター視界 10 倍、緊急 CD 27 秒、コモン 3 個など）が公式検証に落ちる | 登録オフの部屋作成時に `VanillaRanges.ClampToVanilla` で全設定をバニラの範囲・刻みに丸める。設定画面・/vset も登録オフではバニラ範囲のみ。部屋作成時に検証可否をログ出力 |
