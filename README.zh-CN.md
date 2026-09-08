@@ -1,6 +1,7 @@
 # PocketRoles — Among Us 房主专用职业模组
 
 [日本語](README.md) | [简体中文](README.zh-CN.md) | [English](README.en.md)
+▶ 视频: [安装篇（bilibili・1 分半）](https://www.bilibili.com/video/BV17obV6CESH) / [玩法篇（bilibili・3 分半）](https://www.bilibili.com/video/BV1qobV6kERQ)　日本語: [导入篇（YouTube）](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [玩法篇（YouTube）](https://www.youtube.com/watch?v=UyvmPzYSrRM)
 
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
