@@ -20,7 +20,7 @@
 
 ```
 SHA256
-PocketRoles-Setup-0.4.0.zip  69947d3793c1981146181590d3ed0672f898bed3d887bbb0208e7c1d4179e410
+PocketRoles-Setup-0.4.0.zip  768d5b6a9ae8a1677828182a8af509a712edcbdb6af9c66a5ae426d1354bed17
 PocketRoles-0.4.0.zip        2994d42461dfea712f9e690ba7fc26fd7441870caa63ac5b9cc2c3c74ddd4ae7
 ```
 

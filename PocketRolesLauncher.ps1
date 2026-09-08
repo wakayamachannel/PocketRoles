@@ -1086,7 +1086,7 @@ function Show-ReportDialog([string]$zip) {
     $f.StartPosition = 'CenterScreen'
     $f.FormBorderStyle = 'FixedDialog'
     $f.MaximizeBox = $false; $f.MinimizeBox = $false
-    $f.Font = New-Object System.Drawing.Font('Meiryo UI', 9)
+    $f.Font = Get-UiFont 9
     if (Test-Path $script:IconPath) { try { $f.Icon = New-Object System.Drawing.Icon($script:IconPath) } catch { } }
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.Text = (T 'rp_msg' ([Environment]::NewLine) $name $script:MailBug $script:MailReq)
@@ -1402,7 +1402,26 @@ $script:LogBox.Size = New-Object System.Drawing.Size(596, 245)
 $script:LogBox.Font = New-Object System.Drawing.Font('MS Gothic', 9)
 $form.Controls.Add($script:LogBox)
 
+# UI fonts per language: the Japanese UI fonts have no Simplified-Chinese glyphs (boxes in the 中文 mode).
+function Get-UiFont([single]$size, [System.Drawing.FontStyle]$style = [System.Drawing.FontStyle]::Regular, [switch]$Mono) {
+    $name = if ($Mono) { 'MS Gothic' } else { 'Meiryo UI' }
+    if ($script:Lang -eq 'zh-CN') { $name = if ($Mono) { 'Microsoft YaHei' } else { 'Microsoft YaHei UI' } }
+    elseif ($script:Lang -eq 'en') { $name = if ($Mono) { 'Consolas' } else { 'Segoe UI' } }
+    try { return New-Object System.Drawing.Font($name, $size, $style) } catch { return New-Object System.Drawing.Font('Meiryo UI', $size, $style) }
+}
+
+function Apply-Fonts {
+    try {
+        $form.Font = Get-UiFont 9
+        $script:TitleLabel.Font = Get-UiFont 13 ([System.Drawing.FontStyle]::Bold)
+        $script:AlertLabel.Font = Get-UiFont 9 ([System.Drawing.FontStyle]::Bold)
+        $script:StatusLabel.Font = Get-UiFont 10 -Mono
+        $script:LogBox.Font = Get-UiFont 9 -Mono
+    } catch { }
+}
+
 function Apply-Language {
+    Apply-Fonts
     $form.Text = 'PocketRoles Launcher'
     $script:TitleLabel.Text = if ($script:DevMode) { T 'title_dev' } else { T 'title_friend' }
     $script:LangLabel.Text = (T 'lang')
