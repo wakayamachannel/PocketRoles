@@ -520,6 +520,11 @@ namespace PocketRoles.Game
                         if (t.Complete) done++;
                     }
                 }
+                // No task-counting crew at all (e.g. Sheriff + Madmate only): vanilla reads 0/0 as "all tasks done" —
+                // it requests CrewmatesByTask every check and, treating the game as over, refuses emergency reports
+                // (2-player live test, 2026-09-08). Keep one phantom open task so vanilla sees a live game; the mod's
+                // crew task win needs real tasks anyway (Evaluate: Completed >= Total with Total > 0 never holds).
+                if (total == 0) { total = 1; done = 0; }
                 __instance.TotalTasks = total;
                 __instance.CompletedTasks = done;
                 return false;
@@ -571,6 +576,23 @@ namespace PocketRoles.Game
                 if (!Core.Game.InProgress) return true;  // not a modded game (lobby / not started)
                 if (Core.Game.HaisonActive) return true; // 廃村 / host end: Lobby.Haison sends the vanilla end as is
                 WinConditions.EndFromVanilla(endReason);
+                // Ignored (test mode / the game goes on by the true roles): vanilla already stopped its own end checks
+                // before asking (ShouldCheckForGameEnd = false) and, with that flag down, refuses emergency reports —
+                // a player pressing the button sat on "waiting for host" forever (2-player live test, 2026-09-08).
+                // The game continues, so vanilla must keep running like a live game.
+                if (Core.Game.InProgress && !Core.Game.Ending)
+                {
+                    try
+                    {
+                        var gm = GameManager.Instance;
+                        if (gm != null && !gm.ShouldCheckForGameEnd)
+                        {
+                            gm.ShouldCheckForGameEnd = true;
+                            PocketRolesPlugin.Logger.LogInfo($"Win: vanilla end ({endReason}) ignored, ShouldCheckForGameEnd re-enabled so meetings and reports keep working");
+                        }
+                    }
+                    catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Win: ShouldCheckForGameEnd re-enable failed: {e.Message}"); }
+                }
                 return false;
             }
             catch (Exception e)

@@ -299,6 +299,7 @@ namespace PocketRoles.Core
                 if (inGame && GameStuck(out why))
                 {
                     PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {haisonKey} → haison immediately, game stuck ({why})");
+                    Diagnostics.DumpBuffer("game stuck: " + why);
                     ClearPending();
                     if (!Lobby.Haison.Run())
                         Notify(Lang.T("cmd.haison.busy", "今は実行できません（開始処理中か、すでに廃村中です）。", "Not possible now (a start is in progress or a haison is already running)."), true);

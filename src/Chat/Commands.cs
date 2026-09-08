@@ -224,6 +224,15 @@ namespace PocketRoles.Chat
                     case "region": Reply(sender, RegionText(), RegionMessages); return true;
                     case "diag": case "diagnostics": case "診断":
                         // "/diag on|off" toggles the verbose trace (Game.Diagnostics.Verbose); "/diag" prints the snapshot.
+                        // "/diag dump" writes the black-box recorder to the log; "/diag skipmeeting on|off" isolates the report prefix.
+                        if (arg1 != null && arg1.Equals("dump", StringComparison.OrdinalIgnoreCase)) { Diagnostics.DumpBuffer("manual /diag dump"); Reply(sender, "diag: recorded trace written to the log"); return true; }
+                        if (arg1 != null && arg1.Equals("skipmeeting", StringComparison.OrdinalIgnoreCase))
+                        {
+                            bool skip = arg2 == null || !TryParseOnOff(arg2, out var s2) || s2;
+                            Meetings.SkipPrefixWork = skip;
+                            Reply(sender, "diag: meeting prefix work " + (skip ? "SKIPPED" : "normal"));
+                            return true;
+                        }
                         if (arg1 != null && TryParseOnOff(arg1, out var verbose)) { Reply(sender, DiagVerbose(verbose)); return true; }
                         Reply(sender, DiagText(), DiagMessages);
                         return true;

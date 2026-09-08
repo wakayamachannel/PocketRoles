@@ -644,7 +644,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `code` / `code on|off` | 切换房间左上角的 **房间代码大字显示**（`[Guide] ShowCodeOverlay`，默认关闭），并在聊天中显示当前代码 |
 | `announce`, `guide` | 把房间代码 **复制到剪贴板**，并显示用副手机做引导房的 4 个步骤（[第 25 章](#25-便利房关闭注册与引导房)）。在未注册的房间里复制的是用 `/move <代码>` 设置的职业房代码 |
 | `move` / `migrate` / `move <代码>` / `move cancel` | 在便利房（关闭注册）里，用三种语言告诉所有人“有职业的房间是 ○○”。`/move <代码>` 指定代码（`[Guide] RoleRoomCode`），不带代码时提示“看引导房房主的名字”。`[Guide] AutoRecreateRegistered = true` 时 30 秒后把本房间重建为注册房间（`/move cancel` 取消）。在已注册的房间里输入则显示 `/announce` 的步骤 |
-| `diag` / `diag on|off` | 把开始按钮、测试模式、废村、对局状态和画面的快照输出到聊天和日志（黑屏时用于报告）。`on` 在日志中开启开局流程的详细追踪，`off` 停止 |
+| `diag` / `diag on|off` / `diag dump` | 把开始按钮、测试模式、废村、对局状态和画面的快照输出到聊天和日志（黑屏时用于报告）。`on` 在日志中开启开局流程的详细追踪，`off` 停止 详细跟踪始终在后台记录（最近 400 行），开始卡住或会议请求未通过时会自动写入日志。`diag dump` 可随时写出记录 |
 | `admin` / `admin list` | 管理员列表和用法（`Admin.txt`） |
 | `admin add <名字|编号|好友代码>` | 把该玩家设为管理员（写入 `Admin.txt`。不在房间里的人用好友代码 `name#1234` 或 Puid） |
 | `admin remove <名字|代码>` / `admin reload` | 删除 / 重新读取文件 |

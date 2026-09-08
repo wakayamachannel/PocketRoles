@@ -49,10 +49,39 @@ namespace PocketRoles.Game
             catch (Exception) { }
         }
 
-        /// <summary>A detail line of the start trace: written only while <see cref="Verbose"/> is on.</summary>
+        /// <summary>
+        /// Black-box recorder: every detail line is kept in a ring buffer (last <see cref="RingMax"/> lines) even while
+        /// <see cref="Verbose"/> is off, and written to the log when something goes wrong (<see cref="DumpBuffer"/>:
+        /// stuck start, refused emergency report, /diag dump).
+        /// </summary>
+        private const int RingMax = 400;
+        private static readonly System.Collections.Generic.Queue<string> _ring = new System.Collections.Generic.Queue<string>();
+
         internal static void LogVerbose(string what)
         {
+            try
+            {
+                lock (_ring)
+                {
+                    _ring.Enqueue(Time.realtimeSinceStartup.ToString("0.0") + "s " + what);
+                    while (_ring.Count > RingMax) _ring.Dequeue();
+                }
+            }
+            catch (Exception) { }
             if (Verbose) Log(what);
+        }
+
+        /// <summary>Writes the recorded detail lines to the log and clears the recorder.</summary>
+        internal static void DumpBuffer(string reason)
+        {
+            try
+            {
+                string[] lines;
+                lock (_ring) { lines = _ring.ToArray(); _ring.Clear(); }
+                PocketRolesPlugin.Logger.LogInfo($"Trace dump ({reason}): {lines.Length} recorded line(s) follow");
+                foreach (var l in lines) PocketRolesPlugin.Logger.LogInfo("  | " + l);
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Trace dump failed: {e.Message}"); }
         }
 
         /// <summary>A game start began (CoStartGame): the watchdog runs until IntroCutscene.OnDestroy.</summary>
@@ -90,9 +119,8 @@ namespace PocketRoles.Game
                 _startedAt = -1f;
                 return;
             }
-            if (!Verbose) return; // bookkeeping only (Describe still reports the running trace): no watchdog lines
             _watchdogLines++;
-            Log($"watchdog +{now - _startedAt:0.0}s: " + StateLine());
+            LogVerbose($"watchdog +{now - _startedAt:0.0}s: " + StateLine()); // recorded always, written only while Verbose
         }
 
         /// <summary>One-line snapshot of everything the start path depends on.</summary>
@@ -767,4 +795,146 @@ namespace PocketRoles.Game
         }
     }
 
+
+    // ------------------------------------------------------------------ emergency meeting request flow (2026-09-08)
+
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.CmdReportDeadBody))]
+    internal static class Diag_CmdReportDeadBodyPatch
+    {
+        private static void Prefix(PlayerControl __instance, NetworkedPlayerInfo target)
+        {
+            try
+            {
+                if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                Diagnostics.LogVerbose($"PlayerControl.CmdReportDeadBody: reporter=#{__instance.PlayerId} target={(target == null ? "emergency" : "#" + target.PlayerId)} amOwner={__instance.AmOwner}");
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Diag_CmdReportDeadBodyPatch: {e}"); }
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.ReportDeadBody))]
+    [HarmonyPriority(Priority.High)]
+    internal static class Diag_ReportDeadBodyPatch
+    {
+        private static void Prefix(PlayerControl __instance, NetworkedPlayerInfo target)
+        {
+            try
+            {
+                if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                var gd = GameData.Instance;
+                var ship = ShipStatus.Instance;
+                var gm = GameManager.Instance;
+                Diagnostics.LogVerbose($"PlayerControl.ReportDeadBody (host handling): reporter=#{__instance.PlayerId} target={(target == null ? "emergency" : "#" + target.PlayerId)}"
+                    + $" isGameOver={AmongUsClient.Instance.IsGameOver} reporterDead={(__instance.Data != null && __instance.Data.IsDead)} emergencyCd={(ship != null ? ship.EmergencyCooldown : -1f):0.0}"
+                    + $" meetingHud={(MeetingHud.Instance != null)} remainingEmergencies={__instance.RemainingEmergencies} tasks={(gd != null ? gd.CompletedTasks + "/" + gd.TotalTasks : "?")}"
+                    + $" gameHasStarted={(gm != null && gm.GameHasStarted)} checkEnd={(gm != null && gm.ShouldCheckForGameEnd)}");
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Diag_ReportDeadBodyPatch: {e}"); }
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.RpcStartMeeting))]
+    internal static class Diag_RpcStartMeetingPatch
+    {
+        private static void Prefix(PlayerControl __instance, NetworkedPlayerInfo info)
+        {
+            try
+            {
+                if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                Diagnostics.LogVerbose($"PlayerControl.RpcStartMeeting: reporter=#{__instance.PlayerId} target={(info == null ? "emergency" : "#" + info.PlayerId)}");
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Diag_RpcStartMeetingPatch: {e}"); }
+        }
+    }
+
+    /// <summary>Did the host's ReportDeadBody lead to a meeting? If not within 2 s, dump the recorder.</summary>
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.ReportDeadBody))]
+    internal static class Diag_ReportDeadBodyOutcomePatch
+    {
+        internal static float LastMeetingRpcAt = -1f;
+
+        private static void Postfix(PlayerControl __instance)
+        {
+            try
+            {
+                if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                byte id = __instance.PlayerId;
+                float at = Time.realtimeSinceStartup;
+                Diagnostics.LogVerbose($"PlayerControl.ReportDeadBody returned for #{id} (meetingHud={(MeetingHud.Instance != null)})");
+                Scheduler.After(2f, () =>
+                {
+                    if (MeetingHud.Instance != null || LastMeetingRpcAt >= at) return;
+                    PocketRolesPlugin.Logger.LogWarning($"Trace: emergency report by #{id} was NOT followed by a meeting within 2 s (vanilla refused it silently)");
+                    Diagnostics.DumpBuffer("report refused");
+                }, "diag.report." + id);
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Diag_ReportDeadBodyOutcomePatch: {e}"); }
+        }
+
+        private static Exception Finalizer(Exception __exception)
+        {
+            if (__exception != null) PocketRolesPlugin.Logger.LogError($"Trace: PlayerControl.ReportDeadBody threw: {__exception}");
+            return __exception;
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.RpcStartMeeting))]
+    internal static class Diag_RpcStartMeetingOutcomePatch
+    {
+        private static void Prefix() { Diag_ReportDeadBodyOutcomePatch.LastMeetingRpcAt = Time.realtimeSinceStartup; }
+
+        private static Exception Finalizer(Exception __exception)
+        {
+            if (__exception != null) PocketRolesPlugin.Logger.LogError($"Trace: PlayerControl.RpcStartMeeting threw: {__exception}");
+            return __exception;
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.StartMeeting), new[] { typeof(NetworkedPlayerInfo) })]
+    internal static class Diag_StartMeetingPatch
+    {
+        private static void Prefix(PlayerControl __instance, NetworkedPlayerInfo target)
+        {
+            try
+            {
+                if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                Diagnostics.LogVerbose($"PlayerControl.StartMeeting: reporter=#{__instance.PlayerId} target={(target == null ? "emergency" : "#" + target.PlayerId)}");
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Diag_StartMeetingPatch: {e}"); }
+        }
+
+        private static Exception Finalizer(Exception __exception)
+        {
+            if (__exception != null) PocketRolesPlugin.Logger.LogError($"Trace: PlayerControl.StartMeeting threw: {__exception}");
+            return __exception;
+        }
+    }
+
+    [HarmonyPatch(typeof(MeetingRoomManager), nameof(MeetingRoomManager.AssignSelf))]
+    internal static class Diag_AssignSelfPatch
+    {
+        private static void Prefix(PlayerControl reporter, NetworkedPlayerInfo target)
+        {
+            try
+            {
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                Diagnostics.LogVerbose($"MeetingRoomManager.AssignSelf: reporter=#{(reporter != null ? reporter.PlayerId.ToString() : "null")} target={(target == null ? "emergency" : "#" + target.PlayerId)}");
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Diag_AssignSelfPatch: {e}"); }
+        }
+    }
+
+    [HarmonyPatch(typeof(HudManager), nameof(HudManager.OpenMeetingRoom))]
+    internal static class Diag_OpenMeetingRoomPatch
+    {
+        private static void Prefix(PlayerControl reporter)
+        {
+            try
+            {
+                if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                Diagnostics.LogVerbose($"HudManager.OpenMeetingRoom: reporter=#{(reporter != null ? reporter.PlayerId.ToString() : "null")}");
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Diag_OpenMeetingRoomPatch: {e}"); }
+        }
+    }
 }

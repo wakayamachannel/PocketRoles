@@ -20,8 +20,8 @@
 
 ```
 SHA256
-PocketRoles-Setup-0.4.0.zip  58f6f972d0e744652eacb7fad183091bd631cd3b7d67e2f4bb0aea6570949ed5
-PocketRoles-0.4.0.zip        3ab1cb68a01d2cadfd0939dab7ae31b68ee9860e99493c11eeb3521a9c8354ec
+PocketRoles-Setup-0.4.0.zip  69947d3793c1981146181590d3ed0672f898bed3d887bbb0208e7c1d4179e410
+PocketRoles-0.4.0.zip        2994d42461dfea712f9e690ba7fc26fd7441870caa63ac5b9cc2c3c74ddd4ae7
 ```
 
 必要なもの: Windows 10 / 11、Steam 版 Among Us **2026.8.18**、Steam クライアント起動中。参加者側には何も要りません。

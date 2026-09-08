@@ -15,6 +15,9 @@ namespace PocketRoles.Game
     /// </summary>
     public static class Meetings
     {
+        /// <summary>Diagnostics (/diag skipmeeting): skip the ReportDeadBody prefix work to isolate it.</summary>
+        internal static bool SkipPrefixWork;
+
         private static readonly RoleTypes[] ImpostorLikeViews =
         {
             RoleTypes.Impostor, RoleTypes.Shapeshifter, RoleTypes.Phantom, RoleTypes.Viper
@@ -161,6 +164,7 @@ namespace PocketRoles.Game
             try
             {
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return true;
+                if (Meetings.SkipPrefixWork) return true;     // /diag skipmeeting: isolate this prefix
                 if (MeetingHud.Instance != null) return true; // already in a meeting
                 // Vanilla rejects these reports: do not switch names to the meeting layout for nothing.
                 if (__instance == null || __instance.Data == null || __instance.Data.IsDead) return true;
