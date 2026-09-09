@@ -51,6 +51,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<bool> _welcome;
         private static ConfigEntry<bool> _roleInfoAtMeeting;
         private static ConfigEntry<string> _welcomeText;
+        private static ConfigEntry<string> _compatWelcomeText;
         private static ConfigEntry<bool> _welcomeIncludeSettings;
         private static ConfigEntry<bool> _antiCheatKick;
         private static ConfigEntry<bool> _wireLog;
@@ -227,6 +228,7 @@ namespace PocketRoles.Core
             _welcomeText = cfg.Bind("Chat", "WelcomeText", "",
                 "Custom welcome text sent to joining players (empty = built-in text). \\n = line break; placeholders: {rules} {roles} {settings} {help} {version}. The mandatory mod notice line is always prepended");
             _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", false, "Append the current role settings to the welcome message (off by default: the welcome stays short, the settings summary is always available with /cmd s)");
+            _compatWelcomeText = cfg.Bind("Chat", "CompatWelcomeText", "", "Unregistered (compat) lobby only: your own one-line public welcome for every joiner (empty = built-in line 'ようこそ! この部屋は普通のAmong Us(役職なし)です…'). One chat message, at most 86 characters; characters a vanilla player cannot type ([ ] < > full-width ！（） etc.) are converted or dropped automatically");
             _wireLog = cfg.Bind("Diagnostics", "WireLog", false, "Investigation aid: log every packet this client sends (InnerNetClient.SendOrDisconnect) and receives (HandleMessage), decoded one level (GameData / GameDataTo -> Data / RPC / Spawn ...), plus every disconnect, to LogOutput.log. Off (default) = no effect");
             _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
 
@@ -401,6 +403,8 @@ namespace PocketRoles.Core
         public static bool RoleInfoAtMeeting { get => _roleInfoAtMeeting == null || _roleInfoAtMeeting.Value; set { if (_roleInfoAtMeeting != null) _roleInfoAtMeeting.Value = value; } }
         /// <summary>Custom welcome text ("" = built-in). Raw value: "\n" two-character sequences and {placeholders} are expanded by Chat.</summary>
         public static string WelcomeText { get => _welcomeText == null ? "" : (_welcomeText.Value ?? ""); set { if (_welcomeText != null) _welcomeText.Value = value ?? ""; } }
+        /// <summary>[Chat] CompatWelcomeText: custom one-line public welcome of an unregistered lobby ("" = built-in).</summary>
+        public static string CompatWelcomeText { get => _compatWelcomeText == null ? "" : (_compatWelcomeText.Value ?? ""); set { if (_compatWelcomeText != null) _compatWelcomeText.Value = value ?? ""; } }
         /// <summary>Append the settings summary to the welcome (off by default; /cmd s shows it on demand).</summary>
         public static bool WelcomeIncludeSettings { get => _welcomeIncludeSettings != null && _welcomeIncludeSettings.Value; set { if (_welcomeIncludeSettings != null) _welcomeIncludeSettings.Value = value; } }
         public static bool AntiCheatKick { get => _antiCheatKick != null && _antiCheatKick.Value; set { if (_antiCheatKick != null) _antiCheatKick.Value = value; } }

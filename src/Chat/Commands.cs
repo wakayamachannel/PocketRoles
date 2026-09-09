@@ -546,6 +546,25 @@ namespace PocketRoles.Chat
         private static string HelpText(bool isHost, PermLevel level, bool hostCmds)
         {
             var sb = new StringBuilder();
+            if (Registration.CompatMode && !isHost)
+            {
+                // Unregistered (compat) lobby, player view: no roles here and every reply is public — two short lines.
+                sb.Append(Lang.T("help.compat.1",
+                    "コマンド: /cmd h ヘルプ, /cmd time 部屋の残り時間, /cmd s この部屋の設定, /cmd lang ja|zh|en 言語",
+                    "Commands: /cmd h help, /cmd time lobby time left, /cmd s settings, /cmd lang ja|zh|en language",
+                    "命令: /cmd h 帮助, /cmd time 房间剩余时间, /cmd s 本房间设置, /cmd lang ja|zh|en 语言"));
+                sb.Append('\n');
+                sb.Append(Lang.T("help.compat.2",
+                    "この部屋は役職なしの普通のAmong Usです。コマンドの返事は全員に見えます",
+                    "This lobby has no roles (normal Among Us). Command replies are visible to everyone",
+                    "本房间没有职业(普通Among Us)。命令的回复所有人可见"));
+                if (Chat.TranslationActive)
+                {
+                    sb.Append('\n');
+                    sb.Append(Lang.T("help.translate", "外国語のチャットは自動翻訳されます。", "Foreign-language chat is translated automatically.", "外语聊天会自动翻译。"));
+                }
+                return sb.ToString();
+            }
             sb.Append(Lang.T("help.1",
                 "コマンド: /cmd h ヘルプ, /cmd n 自分の役職, /cmd r [役職名] 役職の説明, /cmd l 前回の結果, /cmd lang ja|zh|en 言語",
                 "Commands: /cmd h help, /cmd n my role, /cmd r [role] role info, /cmd l last game, /cmd lang ja|zh|en"));
@@ -707,7 +726,7 @@ namespace PocketRoles.Chat
                 return Lang.T("cmd.modoff", "MODは現在オフです（バニラの試合）。", "The mod is currently off (vanilla game).");
             // Unregistered (便利ホスト) lobby: no custom roles at all (findings #21/#22).
             if (Registration.CompatMode)
-                return Lang.T("compat.norole", "この部屋では役職はありません（便利ホスト）", "This lobby has no roles (helper-host lobby).", "本房间没有职业（便利房）。");
+                return Lang.T("compat.norole", "この部屋は役職なしの普通のAmong Usです。そのまま遊んでください", "This lobby has no roles: it is normal Among Us, just play.", "本房间没有职业，就是普通的Among Us，直接玩即可。");
             if (!Core.Game.InProgress)
                 return Lang.T("cmd.nogame", "試合が始まってから使えます。", "Available once the game has started.");
             string text = Chat.RoleInfoText(sender.PlayerId, false);

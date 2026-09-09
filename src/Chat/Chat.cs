@@ -299,10 +299,13 @@ namespace PocketRoles.Chat
         /// </summary>
         internal static string CompatWelcomeLine()
         {
+            // [Chat] CompatWelcomeText replaces the built-in line (one public message; Rpc.SanitizeForVanillaChat trims it to typeable characters).
+            string custom = Options.CompatWelcomeText;
+            if (!string.IsNullOrWhiteSpace(custom)) return custom.Replace("\\n", " ").Trim();
             return Lang.T("compat.welcome",
-                "ようこそ！この部屋は便利ホスト（役職なし）。役職ありの部屋は案内に従ってください",
-                "Welcome! This is a helper-host lobby (no roles). For the lobby with roles, follow the guide.",
-                "欢迎！本房间是便利房（无职业）。想玩职业请按引导进入职业房。");
+                "ようこそ! この部屋は普通のAmong Us(役職なし)です。何も入れなくてOK、そのまま遊べます。困ったら /cmd h",
+                "Welcome! This is a normal Among Us lobby (no roles). Nothing to install, just play. Type /cmd h for help",
+                "欢迎! 本房间是普通的Among Us(无职业)，无需安装任何东西，直接玩即可。需要帮助请输入 /cmd h");
         }
 
         /// <summary>
