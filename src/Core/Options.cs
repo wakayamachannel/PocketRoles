@@ -130,6 +130,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<int> _vanEmergencyMax;
         private static ConfigEntry<int> _vanTaskMax;
         private static ConfigEntry<bool> _vanClampUnreg;
+        private static ConfigEntry<bool> _permAdminLobby;
 
         // v0.4e [Guide] guide-room support (room-code overlay, /announce, /move)
         private static ConfigEntry<bool> _guideShowCodeOverlay;
@@ -309,6 +310,7 @@ namespace PocketRoles.Core
             // ---- v0.4b permissions (Admin.txt / Moderator.txt / VIP.txt under BepInEx/PocketRoles)
             _permAdminSettings = cfg.Bind("Permissions", "AdminsCanChangeSettings", true, "Players listed in Admin.txt may use the host commands (/set /opt /show /start /cancel /autostart /welcome /rules /kick)");
             _permModKick = cfg.Bind("Permissions", "ModeratorsCanKick", true, "Players listed in Moderator.txt may use /kick and /ban");
+            _permAdminLobby = cfg.Bind("Permissions", "AdminLobbyControl", false, "Admins may also run /start, /cancel, /autostart and /vset and change the lobby timer / auto-start / vanilla-range keys with /opt (off = admins only change roles, welcome / rules text and the moderator / VIP / ban lists; the host keeps everything that can break the lobby)");
             _permVipMarker = cfg.Bind("Permissions", "VipMarker", true, "Show a star marker next to the name of players listed in VIP.txt and greet them personally");
 
             // ---- v0.4b vanilla extended ranges (settings screen + /vset); the values reach vanilla clients through the normal settings sync
@@ -578,6 +580,8 @@ namespace PocketRoles.Core
 
         public static bool AdminsCanChangeSettings { get => _permAdminSettings == null || _permAdminSettings.Value; set { if (_permAdminSettings != null) _permAdminSettings.Value = value; } }
         public static bool ModeratorsCanKick { get => _permModKick == null || _permModKick.Value; set { if (_permModKick != null) _permModKick.Value = value; } }
+        /// <summary>[Permissions] AdminLobbyControl: admins may /start /cancel /autostart /vset and change lobby.* / vanilla.* keys (default false).</summary>
+        public static bool AdminLobbyControl { get => _permAdminLobby != null && _permAdminLobby.Value; set { if (_permAdminLobby != null) _permAdminLobby.Value = value; } }
         public static bool VipMarker { get => _permVipMarker == null || _permVipMarker.Value; set { if (_permVipMarker != null) _permVipMarker.Value = value; } }
 
         // ------------------------------------------------------------------ v0.4b [Vanilla] extended ranges
@@ -1088,6 +1092,7 @@ namespace PocketRoles.Core
                 case "lobby.maxping": case "lobby.maxhostping": case "maxping": case "maxhostping": return SetInt(_maxHostPing, value, 0, 300, "lobby.maxping", out message);
                 case "compat.risky": case "compat.allowrisky": case "compat.allowriskyroles": case "risky": return SetBool(_compatAllowRisky, value, "compat.risky", out message);
                 case "chat.welcometext": case "welcometext": return SetString(_welcomeText, value, "chat.welcometext", out message);
+                case "chat.compatwelcome": case "compatwelcome": case "chat.compatwelcometext": return SetString(_compatWelcomeText, value, "chat.compatwelcome", out message);
                 case "chat.welcomesettings": case "welcomesettings": return SetBool(_welcomeIncludeSettings, value, "chat.welcomesettings", out message);
                 case "credits.author": return SetString(_creditAuthor, value, "credits.author", out message);
                 case "credits.url": case "credits.repourl": return SetString(_creditRepoUrl, value, "credits.url", out message);
@@ -1135,6 +1140,7 @@ namespace PocketRoles.Core
                 // v0.4b permissions
                 case "perm.adminsettings": case "perm.admin": case "adminsettings": case "permissions.adminscanchangesettings": return SetBool(_permAdminSettings, value, "perm.adminsettings", out message);
                 case "perm.modkick": case "perm.mod": case "modkick": case "permissions.moderatorscankick": return SetBool(_permModKick, value, "perm.modkick", out message);
+                case "perm.adminlobby": case "perm.lobby": case "adminlobby": case "permissions.adminlobbycontrol": return SetBool(_permAdminLobby, value, "perm.adminlobby", out message);
                 case "perm.vipmarker": case "perm.vip": case "vipmarker": case "permissions.vipmarker": return SetBool(_permVipMarker, value, "perm.vipmarker", out message);
                 // v0.4b vanilla extended ranges
                 case "vanilla.ranges": case "vanilla.extendedranges": case "vanilla.extended": case "ranges": return SetBool(_vanExtendedRanges, value, "vanilla.ranges", out message);
@@ -1297,6 +1303,52 @@ namespace PocketRoles.Core
         public static void Save()
         {
             _cfg?.Save();
+        }
+
+        // ------------------------------------------------------------------ backup / restore (v0.4.4)
+
+        /// <summary>
+        /// Copies the config file to "&lt;config&gt;&lt;suffix&gt;" (".backup" = /backup, ".startup" = the state at game launch,
+        /// written by PocketRolesPlugin.Load). Returns the copy's path, null on failure.
+        /// </summary>
+        public static string Backup(string suffix = ".backup")
+        {
+            try
+            {
+                string p = _cfg?.ConfigFilePath;
+                if (string.IsNullOrEmpty(p)) return null;
+                try { _cfg.Save(); } catch (Exception) { }
+                if (!File.Exists(p)) return null;
+                string b = p + suffix;
+                File.Copy(p, b, true);
+                return b;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Options.Backup({suffix}): {e}");
+                return null;
+            }
+        }
+
+        /// <summary>Restores the config file from "&lt;config&gt;&lt;suffix&gt;" and re-reads it. False when there is no such copy.</summary>
+        public static bool Restore(string suffix = ".backup")
+        {
+            try
+            {
+                string p = _cfg?.ConfigFilePath;
+                if (string.IsNullOrEmpty(p)) return false;
+                string b = p + suffix;
+                if (!File.Exists(b)) return false;
+                File.Copy(b, p, true);
+                _cfg.Reload();
+                PocketRolesPlugin.Logger.LogInfo($"Options: config restored from {Path.GetFileName(b)}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Options.Restore({suffix}): {e}");
+                return false;
+            }
         }
     }
 }
