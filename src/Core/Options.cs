@@ -53,6 +53,9 @@ namespace PocketRoles.Core
         private static ConfigEntry<string> _welcomeText;
         private static ConfigEntry<string> _compatWelcomeText;
         private static ConfigEntry<bool> _welcomeIncludeSettings;
+        private static ConfigEntry<string> _discordWebhookUrl;
+        private static ConfigEntry<bool> _discordAnnounce;
+        private static ConfigEntry<string> _discordText;
         private static ConfigEntry<bool> _antiCheatKick;
         private static ConfigEntry<bool> _wireLog;
 
@@ -234,6 +237,9 @@ namespace PocketRoles.Core
             _compatWelcomeInterval = cfg.Bind("Chat", "CompatWelcomeInterval", 60f, new ConfigDescription("Unregistered (compat) lobby: the welcome is ONE public message for everyone, so it is sent at most once per this many seconds no matter how many players join in between (a full public lobby gets a join every few seconds; 12 welcomes a minute drove players out on 2026-09-09). 0 = every join", new AcceptableValueRange<float>(0f, 600f)));
             _revealOnDeath = cfg.Bind("Roles", "RevealRoleOnDeath", false, "Announce a player's role to everyone when they are killed or ejected ('X was Sheriff'; the vanilla role's name when there is no PocketRoles role, e.g. in an unregistered lobby)");
             _compatWelcomeText = cfg.Bind("Chat", "CompatWelcomeText", "", "Unregistered (compat) lobby only: your own one-line public welcome for every joiner (empty = built-in line 'ようこそ! この部屋は普通のAmong Us(役職なし)です…'). One chat message, at most 86 characters; characters a vanilla player cannot type ([ ] < > full-width ！（） etc.) are converted or dropped automatically");
+            _discordWebhookUrl = cfg.Bind("Discord", "WebhookUrl", "", "Discord webhook URL (channel settings → 連携サービス → ウェブフック → URL をコピー). When set, the host posts one message per lobby ('部屋コード ABCDEF — 3/15人 募集中') and edits it as players join / leave and games start / end. No bot needed. Keep this URL private (anyone with it can post to the channel). Not editable from chat");
+            _discordAnnounce = cfg.Bind("Discord", "Announce", true, "Post / update the lobby line on Discord when WebhookUrl is set");
+            _discordText = cfg.Bind("Discord", "Text", "", "Your own lobby line (empty = built-in). Placeholders: {code} {count} {max} {state} {kind}; \\n = line break; Discord markdown works (**bold**, @here)");
             _wireLog = cfg.Bind("Diagnostics", "WireLog", false, "Investigation aid: log every packet this client sends (InnerNetClient.SendOrDisconnect) and receives (HandleMessage), decoded one level (GameData / GameDataTo -> Data / RPC / Spawn ...), plus every disconnect, to LogOutput.log. Off (default) = no effect");
             _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
 
@@ -413,6 +419,9 @@ namespace PocketRoles.Core
         public static string CompatWelcomeText { get => _compatWelcomeText == null ? "" : (_compatWelcomeText.Value ?? ""); set { if (_compatWelcomeText != null) _compatWelcomeText.Value = value ?? ""; } }
         /// <summary>Append the settings summary to the welcome (off by default; /cmd s shows it on demand).</summary>
         public static bool WelcomeIncludeSettings { get => _welcomeIncludeSettings != null && _welcomeIncludeSettings.Value; set { if (_welcomeIncludeSettings != null) _welcomeIncludeSettings.Value = value; } }
+        public static string DiscordWebhookUrl => _discordWebhookUrl == null ? "" : (_discordWebhookUrl.Value ?? "").Trim();
+        public static bool DiscordAnnounce { get => _discordAnnounce == null || _discordAnnounce.Value; set { if (_discordAnnounce != null) _discordAnnounce.Value = value; } }
+        public static string DiscordText => _discordText == null ? "" : (_discordText.Value ?? "");
         public static bool AntiCheatKick { get => _antiCheatKick != null && _antiCheatKick.Value; set { if (_antiCheatKick != null) _antiCheatKick.Value = value; } }
         /// <summary>[Diagnostics] WireLog: packet-level send/receive trace (Net.WireLog), off by default.</summary>
         public static bool WireLog { get => _wireLog != null && _wireLog.Value; set { if (_wireLog != null) _wireLog.Value = value; } }
