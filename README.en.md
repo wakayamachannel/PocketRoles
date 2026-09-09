@@ -672,6 +672,7 @@ Typed in chat as `/cmd <command> …` or `/<command> …`. Settings can also be 
 | `announce`, `guide` | **Copy the room code to the clipboard** (paste it into Discord etc.) and print the four steps for the spare-phone guide room ([chapter 25](#25-vanilla-room-registration-off-and-the-guide-room)). In an unregistered lobby it copies the role-room code set with `/move <code>` |
 | `move` / `migrate` / `move <code>` / `move cancel` | In a vanilla room (registration off): tell everyone in three languages where the lobby with roles is. `/move <code>` stores the code (`[Guide] RoleRoomCode`); without a code the message says "look at the guide-room host's name". With `[Guide] AutoRecreateRegistered = true` the lobby is re-created as registered 30 s later (`/move cancel` aborts). In a registered lobby it prints the `/announce` steps |
 | `diag` / `diag on|off` / `diag dump` | Print a snapshot of the start button, test mode, haison, the game flags and the screen to chat and to the log (for black-screen reports). `on` enables the detailed start trace in the log, `off` stops it The detailed trace is always recorded in the background (last 400 lines) and written to the log automatically when a start gets stuck or an emergency report is refused; `diag dump` writes it at any time |
+| `who`, `生存` | After you (the host) die: every player's role (alive / dead) on your screen only (v0.4.6). It appears 1.5 s after your death, again at each meeting, plus one line per later death; not available while you are alive. `/opt ghostlist off` disables it. Works in vanilla rooms (registration off) with the vanilla role names |
 | `admin` / `admin list` | The admin list and usage (`Admin.txt`) |
 | `admin add <name|id|friend code>` | Makes that player an admin (written to `Admin.txt`; someone who is not in the lobby by friend code `name#1234` or Puid) |
 | `admin remove <name|code>` / `admin reload` | Remove / re-read the file |
@@ -790,6 +791,8 @@ A way to run the lobby together with friends, managed through four text files in
 | `guide.autoreg` | on / off | `[Guide] AutoRecreateRegistered` (re-create as registered 30 s after `/move`) |
 | `lobby.autostart` | on / off | `[Lobby] AutoStart` |
 | `lobby.autostartplayers` | 4–15 | `[Lobby] AutoStartPlayers` |
+| `lobby.afkkick` (`afkkick`) | 0–30 (0 = off) | `[Lobby] AfkKickMinutes` (a lobby player who neither moves nor chats for this many minutes is warned 30 s ahead, then kicked; VIPs / moderators / admins exempt; v0.4.6) |
+| `roles.ghostlist` (`ghostlist`) | on / off | `[Roles] HostGhostRoleList` (role list on the dead host's own screen; default on; v0.4.6) |
 | `lobby.autostartcountdown` | 1–30 | `[Lobby] AutoStartCountdown` |
 | `lobby.timermode` | extend / haison / notify | `[Lobby] TimerMode` |
 | `lobby.timerwarnat` | 30–300 | `[Lobby] TimerWarnAt` |
@@ -879,6 +882,7 @@ RehostMaxAttempts = 3           # consecutive re-host attempts before giving up 
 MaxHostPing = 0                 # ask "Re-create the lobby?" when the ping stays above this (ms) for 5 s right after creation while the lobby is empty (0-300, 0 = never ask, 3 times max)
 AutoStart = false               # start automatically once AutoStartPlayers players are in (/autostart on|off|<n>)
 AutoStartPlayers = 10           # players needed for the automatic start (4-15)
+AfkKickMinutes = 0              # kick (not ban) a lobby player who neither moves nor chats for this many minutes, after a warning 30 s before (0-30, 0 = off; host / VIP / moderator / admin exempt; vanilla rooms too)
 AutoStartCountdown = 5          # countdown seconds for the automatic start and /start (1-30)
 TimerWarnAt = 60                # lobby seconds left at which the mod acts (30-300)
 ExtendNoticeDelay = 5           # seconds between the "time is running out" notice and the extension / haison (0-60)
@@ -1541,6 +1545,8 @@ The other way round: gather people in a listed vanilla room (registration off), 
 - A re-creation counts as a deliberate disconnect, so do not chain them ([3.4](#34-bans-and-kicks)).
 
 ### 25.4 Notes on the vanilla room
+- v0.4.6: when a game ends and everyone is back in the lobby, the host posts the result to everyone ("Last game: Impostors win / ×name:Judge Wname:Viper … / Kills: name=2" — vanilla roles, winners, deaths, kills; also `/cmd l`). A player's `/cmd s` is one line here (no 4-message role list).
+- v0.4.6: the dead host's role list (`/who`) and the AFK kick (`[Lobby] AfkKickMinutes`) work in vanilla rooms too.
 
 - No roles, name tags or private messages at all. The welcome and the notices become one broadcast, and every command, `/cmd …` included, is visible to everyone (the second welcome line says so).
 - The top-left display carries a yellow `(unregistered)`; sends are spaced 0.3 s and packets are smaller.

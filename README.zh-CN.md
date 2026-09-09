@@ -676,6 +676,7 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `announce`, `guide` | 把房间代码 **复制到剪贴板**（可直接贴到 Discord 等），并显示用副手机做引导房的 4 个步骤（[第 25 章](#25-便利房关闭注册与引导房)）。在未注册的房间里复制的是用 `/move <代码>` 设置的职业房代码 |
 | `move` / `migrate` / `move <代码>` / `move cancel` | 在便利房（关闭注册）里，用三种语言告诉所有人“有职业的房间是 ○○”。`/move <代码>` 指定代码（`[Guide] RoleRoomCode`），不带代码时提示“看引导房房主的名字”。`[Guide] AutoRecreateRegistered = true` 时 30 秒后把本房间重建为注册房间（`/move cancel` 取消）。在已注册的房间里输入则显示 `/announce` 的步骤 |
 | `diag` / `diag on|off` / `diag dump` | 把开始按钮、测试模式、废村、对局状态和画面的快照输出到聊天和日志（黑屏时用于报告）。`on` 在日志中开启开局流程的详细追踪，`off` 停止 详细跟踪始终在后台记录（最近 400 行），开始卡住或会议请求未通过时会自动写入日志。`diag dump` 可随时写出记录 |
+| `who`, `生存` | 房主死亡后：所有玩家的职业（存活 / 死亡）只显示在自己的屏幕上（v0.4.6）。死亡 1.5 秒后自动显示，每次会议再显示，之后每有人死亡显示一行；存活时不能用。`/opt ghostlist off` 关闭。便利房（关闭注册）也可用，显示原版职业名 |
 | `admin` / `admin list` | 管理员列表和用法（`Admin.txt`） |
 | `admin add <名字|编号|好友代码>` | 把该玩家设为管理员（写入 `Admin.txt`。不在房间里的人用好友代码 `name#1234` 或 Puid） |
 | `admin remove <名字|代码>` / `admin reload` | 删除 / 重新读取文件 |
@@ -794,6 +795,8 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `guide.autoreg` | on / off | `[Guide] AutoRecreateRegistered`（`/move` 30 秒后重建为注册房间） |
 | `lobby.autostart` | on / off | `[Lobby] AutoStart` |
 | `lobby.autostartplayers` | 4〜15 | `[Lobby] AutoStartPlayers` |
+| `lobby.afkkick`（`afkkick`） | 0〜30（0 = 关闭） | `[Lobby] AfkKickMinutes`（大厅中这么多分钟既不移动也不发言的玩家，提前 30 秒警告后移出；VIP・版主・管理员除外。v0.4.6） |
+| `roles.ghostlist`（`ghostlist`） | on / off | `[Roles] HostGhostRoleList`（死亡后的职业一览，仅房主屏幕。默认 on。v0.4.6） |
 | `lobby.autostartcountdown` | 1〜30 | `[Lobby] AutoStartCountdown` |
 | `lobby.timermode` | extend / haison / notify | `[Lobby] TimerMode` |
 | `lobby.timerwarnat` | 30〜300 | `[Lobby] TimerWarnAt` |
@@ -883,6 +886,7 @@ RehostMaxAttempts = 3           # 连续尝试重建房间的次数（1〜10）
 MaxHostPing = 0                 # 创建房间后 5 秒内延迟一直高于此值(ms)且只有自己时询问“要重新创建房间吗？”（0〜300，0 = 不询问，最多连续 3 次）
 AutoStart = false               # 凑齐 AutoStartPlayers 人后自动开始（/autostart on|off|<人数>）
 AutoStartPlayers = 10           # 自动开始的人数（4〜15）
+AfkKickMinutes = 0              # 大厅中这么多分钟既不移动也不发言的玩家，提前 30 秒警告后移出（不是封禁）（0〜30，0 = 关闭。房主・VIP・版主・管理员除外。便利房也可用）
 AutoStartCountdown = 5          # 自动开始 / /start 的倒计时秒数（1〜30）
 TimerWarnAt = 60                # 房间剩余时间到达此秒数时执行动作（30〜300）
 ExtendNoticeDelay = 5           # 从“剩余时间不多”提示到延长 / 废村的秒数（0〜60）
@@ -1545,6 +1549,8 @@ Harmony 补丁应用失败时（游戏内部变化较大时）模组也会自动
 - 重建会被计为故意断线，请不要连续使用（[3.4](#34-关于封禁与踢出)）。
 
 ### 25.4 便利房的注意事项
+- v0.4.6：游戏结束回到大厅后，房主会向所有人发布结果（“上局结果: 内鬼胜利 / ×名字:审判官 胜名字:毒蛇 … / 击杀数: 名字=2”——原版职业、胜者、死亡、击杀数；`/cmd l` 也能看）。玩家的 `/cmd s` 在这里只回一行（不再刷 4 条职业列表）。
+- v0.4.6：房主死亡后的职业一览（`/who`）和挂机踢出（`[Lobby] AfkKickMinutes`）在便利房也可用。
 
 - 完全不发送职业、名字标签和私密消息。欢迎语和提示合并为一条广播，包括 `/cmd …` 在内的所有命令都对所有人可见（欢迎语第二行会说明这一点）。
 - 屏幕左上角显示黄色的 `(unregistered)`，发送间隔 0.3 秒，数据包更小。
