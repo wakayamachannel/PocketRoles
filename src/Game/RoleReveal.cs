@@ -12,6 +12,25 @@ namespace PocketRoles.Game
     /// </summary>
     public static class RoleReveal
     {
+        /// <summary>
+        /// Role each player held while alive, recorded from RoleManager.SetRole on the host (vanilla specials and the
+        /// mod's plain roles alike; ghost roles are skipped). The live NetworkedPlayerInfo already shows the ghost role
+        /// at the exile screen, and RoleWhenAlive is not reliable for the host's own player (2026-09-09 live test).
+        /// </summary>
+        internal static readonly System.Collections.Generic.Dictionary<byte, RoleTypes> AliveRoles = new System.Collections.Generic.Dictionary<byte, RoleTypes>();
+
+        internal static bool IsGhostRole(RoleTypes t) => t == RoleTypes.CrewmateGhost || t == RoleTypes.ImpostorGhost || t == RoleTypes.GuardianAngel;
+
+        internal static void Record(PlayerControl player, RoleTypes roleType)
+        {
+            try
+            {
+                if (player == null || IsGhostRole(roleType)) return;
+                AliveRoles[player.PlayerId] = roleType;
+            }
+            catch (Exception) { }
+        }
+
         private static bool Active()
         {
             if (!Options.RevealRoleOnDeath) return false;
@@ -62,16 +81,20 @@ namespace PocketRoles.Game
             var custom = Core.Game.RoleOf(id);
             if (custom != CustomRole.None) return Roles.Info(custom).Name;
             var type = Core.Game.VanillaRoleOf(id);
-            // After the death the live role is already the ghost role (Guardian Angel / CrewmateGhost, seen at the exile
-            // screen): the vanilla NetworkedPlayerInfo keeps the role the player had while alive.
-            try
+            // After the death the live role is already the ghost role (seen at the exile screen): prefer the role
+            // recorded at assignment, then the vanilla RoleWhenAlive, then the live role.
+            if (AliveRoles.TryGetValue(id, out var recorded)) type = recorded;
+            else
             {
-                var pc = Core.Game.Player(id);
-                var info = pc != null ? pc.Data : null;
-                var alive = info != null ? info.RoleWhenAlive : null;
-                if (alive != null && alive.HasValue) type = alive.Value;
+                try
+                {
+                    var pc = Core.Game.Player(id);
+                    var info = pc != null ? pc.Data : null;
+                    var alive = info != null ? info.RoleWhenAlive : null;
+                    if (alive != null && alive.HasValue) type = alive.Value;
+                }
+                catch (Exception) { }
             }
-            catch (Exception) { }
             string own = VanillaRoleName(type);
             if (own != null) return own;
             // Unknown role type: the game's own NiceName, unless it is the "STRMISS" placeholder (seen for Viper on 2026.8.18)
@@ -104,6 +127,33 @@ namespace PocketRoles.Game
                 case RoleTypes.Judge: return Lang.T("vanrole.judge", "ジャッジ", "Judge", "审判官");
                 default: return null;
             }
+        }
+    }
+
+    /// <summary>Every role the host assigns (vanilla SelectRoles, the mod's plain roles, /assign) is recorded while it is not a ghost role.</summary>
+    [HarmonyLib.HarmonyPatch(typeof(RoleManager), nameof(RoleManager.SetRole))]
+    internal static class RoleReveal_SetRolePatch
+    {
+        private static void Prefix(PlayerControl targetPlayer, RoleTypes roleType)
+        {
+            try
+            {
+                var client = AmongUsClient.Instance;
+                if (client == null || !client.AmHost) return;
+                RoleReveal.Record(targetPlayer, roleType);
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"RoleReveal_SetRolePatch: {e}"); }
+        }
+    }
+
+    /// <summary>A new selection starts: forget the previous game's roles.</summary>
+    [HarmonyLib.HarmonyPatch(typeof(RoleManager), nameof(RoleManager.SelectRoles))]
+    internal static class RoleReveal_SelectRolesPatch
+    {
+        private static void Prefix()
+        {
+            try { RoleReveal.AliveRoles.Clear(); }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"RoleReveal_SelectRolesPatch: {e}"); }
         }
     }
 }
