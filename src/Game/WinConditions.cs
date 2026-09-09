@@ -337,6 +337,7 @@ namespace PocketRoles.Game
             {
                 if (Core.Game.GameMasterActive && Core.Game.IsHost(id)) continue; // the Game Master is not part of the result
                 var info = Core.Game.Info(id);
+                Core.Game.KillCounts.TryGetValue(id, out int kills);
                 list.Add(new Core.Game.SummaryEntry
                 {
                     Id = id,
@@ -344,7 +345,8 @@ namespace PocketRoles.Game
                     Role = Core.Game.RoleOf(id),
                     Vanilla = Core.Game.VanillaRoleOf(id),
                     Dead = info == null || info.Disconnected || Core.Game.IsDead(id),
-                    Winner = winners.Contains(id)
+                    Winner = winners.Contains(id),
+                    Kills = kills
                 });
             }
             Core.Game.LastSummary = list;
@@ -406,7 +408,64 @@ namespace PocketRoles.Game
         internal static void OnLobby()
         {
             _endedByMod = false;
+            _vanillaSummaryBuilt = false;
             _lastTestLine = null; _lastCounts = "";
+        }
+
+        private static bool _vanillaSummaryBuilt;
+
+        /// <summary>
+        /// v0.4.6: a vanilla game end in an unregistered (compat) lobby — the mod ran no roles, but the host still knows
+        /// everyone's vanilla role, who died and who killed (Game.KillCounts). Fills LastSummary / LastWinnerText exactly
+        /// like BuildSummary so the lobby summary (Win_LobbyStartPatch → Chat.SendSummary, one public set in compat) and
+        /// /cmd l work there too. Winners: the impostor side for impostor reasons, everyone else otherwise. The end
+        /// screen itself stays vanilla (_endedByMod is not set).
+        /// </summary>
+        internal static void BuildVanillaSummary(GameOverReason reason)
+        {
+            try
+            {
+                if (_vanillaSummaryBuilt) return;
+                var mapped = MapVanillaReason(reason);
+                if (mapped == null) return;
+                _vanillaSummaryBuilt = true;
+                bool impostorsWin = mapped == Outcome.Impostor;
+                var list = new List<Core.Game.SummaryEntry>();
+                foreach (var id in Core.Game.AllPlayerIds())
+                {
+                    var info = Core.Game.Info(id);
+                    var type = VanillaTypeWhileAlive(id);
+                    bool impSide = type == RoleTypes.Impostor || type == RoleTypes.Shapeshifter || type == RoleTypes.Phantom || type == RoleTypes.Viper || type == RoleTypes.ImpostorGhost;
+                    Core.Game.KillCounts.TryGetValue(id, out int kills);
+                    list.Add(new Core.Game.SummaryEntry
+                    {
+                        Id = id,
+                        Name = Core.Game.NameOf(id),
+                        Role = CustomRole.None,
+                        Vanilla = type,
+                        Dead = info == null || info.Disconnected || Core.Game.IsDead(id),
+                        Winner = impostorsWin == impSide,
+                        Kills = kills
+                    });
+                }
+                Core.Game.LastSummary = list;
+                SummaryShown = false;
+                string plain = impostorsWin ? Lang.T("win.impostor", "インポスター勝利", "Impostors win") : Lang.T("win.crew", "クルー勝利", "Crewmates win");
+                Core.Game.LastWinnerText = "<color=" + (impostorsWin ? Roles.ImpostorColor : Roles.CrewColor) + ">" + plain + "</color>";
+                PocketRolesPlugin.Logger.LogInfo($"Win: vanilla summary recorded ({reason} → {(impostorsWin ? "impostors" : "crew")}, {list.Count} players, kills={Core.Game.KillCounts.Count} killer(s))");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"WinConditions.BuildVanillaSummary: {e}");
+            }
+        }
+
+        /// <summary>Vanilla role a player held while alive (the SetRole recorder first: a dead player's live role is the ghost role).</summary>
+        private static RoleTypes VanillaTypeWhileAlive(byte id)
+        {
+            if (Core.Game.VanillaRoles.TryGetValue(id, out var r)) return r;
+            if (RoleReveal.AliveRoles.TryGetValue(id, out var recorded)) return recorded;
+            return Core.Game.VanillaRoleOf(id);
         }
 
         internal static bool ThrottledCheck()
@@ -638,7 +697,14 @@ namespace PocketRoles.Game
             {
                 if (!Core.Game.IsHostActive) return true;
                 if (Core.Game.Ending) return true;      // our own delayed RpcEndGame
-                if (!Core.Game.InProgress) return true;  // not a modded game (lobby / not started)
+                if (!Core.Game.InProgress)
+                {
+                    // Not a modded game: an unregistered (compat) lobby's vanilla game still gets the post-game summary (v0.4.6).
+                    var client = AmongUsClient.Instance;
+                    if (Registration.CompatMode && !Core.Game.HaisonActive && client != null && client.IsGameStarted)
+                        WinConditions.BuildVanillaSummary(endReason);
+                    return true;
+                }
                 if (Core.Game.HaisonActive) return true; // 廃村 / host end: Lobby.Haison sends the vanilla end as is
                 WinConditions.EndFromVanilla(endReason);
                 // Ignored (test mode / the game goes on by the true roles): vanilla already stopped its own end checks

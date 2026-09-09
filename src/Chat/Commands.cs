@@ -134,6 +134,16 @@ namespace PocketRoles.Chat
                         return true;
                     case "s": case "settings": case "設定": case "设置":
                         // The settings summary left the welcome (v0.4.1): everyone can read it here instead.
+                        // Compat lobby (v0.4.6): a player's "/cmd s" is a public 4-message role list that applies to nothing
+                        // there — one line instead (the host still gets the full text for its own config).
+                        if (!isHost && Registration.CompatMode)
+                        {
+                            ReplyThrottled(sender, isHost, Lang.T("cmd.show.compat.player",
+                                "この部屋は役職なしの普通のAmong Usです（便利ホスト）。設定は本体のロビー設定のとおりです。/cmd time で残り時間。",
+                                "This lobby is plain Among Us without roles (utility host). The settings are the vanilla lobby settings. /cmd time shows the time left.",
+                                "本房间是没有职业的普通 Among Us（便利房主）。设置即原版大厅设置。/cmd time 查看剩余时间。"));
+                            return true;
+                        }
                         ReplyThrottled(sender, isHost, ShowText(), SettingsMessages);
                         return true;
                     case "l": case "last":
@@ -212,6 +222,8 @@ namespace PocketRoles.Chat
                         Reply(sender, SetOption(arg1, JoinArgs(tokens, 2)));
                         return true;
                     case "show": Reply(sender, ShowText()); return true;
+                    // v0.4.6: every player's role on the (dead) host's own screen — host-local, never a remote admin's (not in IsAdminCommand)
+                    case "who": case "生存": Reply(sender, GhostRoleList.OnDemandText(), 6); return true;
                     case "reset": Reply(sender, ResetRoles()); return true;
                     case "reload":
                         // The file may contain Enabled=false: re-reading it mid-game would switch every host patch off
@@ -301,6 +313,7 @@ namespace PocketRoles.Chat
                 case "kick": case "ban": case "unban": case "vset":
                 case "code": case "コード": case "announce": case "guide": case "案内": case "move": case "migrate": case "移動":
                 case "backup": case "restore": case "復元":
+                case "who": case "生存":
                     return true;
                 default:
                     return false;
@@ -636,7 +649,7 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>Messages allowed for the host help page (8 lines ≤ 100 chars; host screen or a remote admin).</summary>
-        private const int HostHelpMessages = 8;
+        private const int HostHelpMessages = 9;
 
         /// <summary>
         /// Messages allowed for the settings summary a player asks for with /cmd s (one short line per enabled role
@@ -676,6 +689,11 @@ namespace PocketRoles.Chat
                 "診断: /diag 開始処理・画面の状態をチャットとログに出力（画面が真っ暗な時など）。F7 は 2 回押しで廃村",
                 "Diag: /diag prints the start / screen state to chat and the log (e.g. on a black screen). F7 twice = haison",
                 "诊断: /diag 将开局与画面状态输出到聊天和日志（例如黑屏时）。按两次 F7 = 废村"));
+            sb.Append('\n');
+            sb.Append(Lang.T("help.host.8",
+                "観戦: 死亡後は全員の役職一覧が自分の画面だけに出ます（会議ごとに再表示）。/who で再表示、/opt ghostlist off で停止",
+                "Spectating: once you are dead, every player's role is listed on your screen only (again at each meeting). /who shows it, /opt ghostlist off disables it",
+                "观战: 你死亡后，所有玩家的职业只显示在你的屏幕上（每次会议再显示）。/who 再次查看，/opt ghostlist off 关闭"));
             sb.Append('\n');
             sb.Append(Lang.T("help.host.8",
                 "案内: /code コードの大表示, /announce 案内部屋の手順＋コードをコピー, /move [コード]|cancel 役職部屋へ案内, /diag on|off",

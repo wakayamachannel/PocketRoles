@@ -79,7 +79,7 @@ namespace PocketRoles.Game
         }
 
         /// <summary>The PocketRoles role name, else the vanilla role's name in the lobby language (Crewmate / Impostor / Judge …).</summary>
-        private static string RoleNameOf(byte id)
+        internal static string RoleNameOf(byte id)
         {
             var custom = Core.Game.RoleOf(id);
             if (custom != CustomRole.None) return Roles.Info(custom).Name;

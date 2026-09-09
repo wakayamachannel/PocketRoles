@@ -336,6 +336,8 @@ namespace PocketRoles
                 {
                     SerialKiller.Tick(); // v0.5.0: counts down, queues a time-out death as a bite …
                     Kills.Tick();        // … which executes in this same frame
+                    GhostRoleList.Tick(); // dead host → role list on the host screen (4 Hz poll, compat games too)
+                    Lobby.AfkKick.Tick();  // [Lobby] AfkKickMinutes (0.5 Hz, lobby only)
                 }
             }
             catch (Exception e)

@@ -64,6 +64,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<int> _autoPublicDelay;
         private static ConfigEntry<int> _rehostMaxAttempts;
         private static ConfigEntry<int> _maxHostPing;
+        private static ConfigEntry<int> _afkKickMinutes;
         // [Compat] unregistered-compatible mode (RegisterAsModdedLobby=false)
         private static ConfigEntry<bool> _compatAllowRisky;
 
@@ -135,6 +136,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<bool> _vanClampUnreg;
         private static ConfigEntry<bool> _permAdminLobby;
         private static ConfigEntry<bool> _revealOnDeath;
+        private static ConfigEntry<bool> _hostGhostRoleList;
         private static ConfigEntry<float> _compatWelcomeInterval;
 
         // v0.4e [Guide] guide-room support (room-code overlay, /announce, /move)
@@ -236,6 +238,7 @@ namespace PocketRoles.Core
             _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", false, "Append the current role settings to the welcome message (off by default: the welcome stays short, the settings summary is always available with /cmd s)");
             _compatWelcomeInterval = cfg.Bind("Chat", "CompatWelcomeInterval", 60f, new ConfigDescription("Unregistered (compat) lobby: the welcome is ONE public message for everyone, so it is sent at most once per this many seconds no matter how many players join in between (a full public lobby gets a join every few seconds; 12 welcomes a minute drove players out on 2026-09-09). 0 = every join", new AcceptableValueRange<float>(0f, 600f)));
             _revealOnDeath = cfg.Bind("Roles", "RevealRoleOnDeath", false, "Announce a player's role to everyone when they are killed or ejected ('X was Sheriff'; the vanilla role's name when there is no PocketRoles role, e.g. in an unregistered lobby)");
+            _hostGhostRoleList = cfg.Bind("Roles", "HostGhostRoleList", true, "Once the host is dead, list every player's role (alive / dead) on the HOST's screen only: at the host's death, again at every meeting, plus one line per later death. Works in unregistered (compat) lobbies too (vanilla roles). Never sent to other players; /who shows it on demand");
             _compatWelcomeText = cfg.Bind("Chat", "CompatWelcomeText", "", "Unregistered (compat) lobby only: your own one-line public welcome for every joiner (empty = built-in line 'ようこそ! この部屋は普通のAmong Us(役職なし)です…'). One chat message, at most 86 characters; characters a vanilla player cannot type ([ ] < > full-width ！（） etc.) are converted or dropped automatically");
             _discordWebhookUrl = cfg.Bind("Discord", "WebhookUrl", "", "Discord webhook URL (channel settings → 連携サービス → ウェブフック → URL をコピー). When set, the host posts one message per lobby ('部屋コード ABCDEF — 3/15人 募集中') and edits it as players join / leave and games start / end. No bot needed. Keep this URL private (anyone with it can post to the channel). Not editable from chat");
             _discordAnnounce = cfg.Bind("Discord", "Announce", true, "Post / update the lobby line on Discord when WebhookUrl is set");
@@ -247,6 +250,7 @@ namespace PocketRoles.Core
             _autoPublic = cfg.Bind("Lobby", "AutoPublic", false, "Automatically make the lobby public a few seconds after it is created / re-hosted");
             _autoPublicDelay = cfg.Bind("Lobby", "AutoPublicDelay", 3, new ConfigDescription("Seconds to wait before making the lobby public", new AcceptableValueRange<int>(0, 60)));
             _rehostMaxAttempts = cfg.Bind("Lobby", "RehostMaxAttempts", 3, new ConfigDescription("Give up auto re-hosting after this many consecutive attempts", new AcceptableValueRange<int>(1, 10)));
+            _afkKickMinutes = cfg.Bind("Lobby", "AfkKickMinutes", 0, new ConfigDescription("Kick (not ban) a lobby player who neither moves nor chats for this many minutes; one warning 30 s before. Host, VIPs, moderators and admins are exempt; nothing happens during the start countdown or a game. Works in unregistered lobbies too. 0 = off", new AcceptableValueRange<int>(0, 30)));
             _maxHostPing = cfg.Bind("Lobby", "MaxHostPing", 0, new ConfigDescription("Offer to re-create the lobby (same settings) while it is still empty when the host's ping to the game server stays above this many ms for 5 s right after the lobby is created (official regions mix near and far servers). The host is ASKED on screen first (Yes/No, once per lobby, or /rehost yes|no) because short-lived lobbies count as deliberate disconnects (ban points). 0 = off; at most 3 re-creations in a row, then the lobby is kept (/opt maxping <ms>)", new AcceptableValueRange<int>(0, 300)));
             _compatAllowRisky = cfg.Bind("Compat", "AllowRiskyRoles", false,
                 "Unregistered-compatible mode (RegisterAsModdedLobby=false, the lobby shows in the vanilla public list): also assign roles whose kills come from a non-Impostor (Sheriff, Jackal). " +
@@ -433,6 +437,8 @@ namespace PocketRoles.Core
         public static int RehostMaxAttempts { get => _rehostMaxAttempts?.Value ?? 3; set { if (_rehostMaxAttempts != null) _rehostMaxAttempts.Value = Math.Max(1, Math.Min(10, value)); } }
         /// <summary>Ping (ms, 0..300) above which a freshly created, still empty lobby is re-created automatically; 0 = off.</summary>
         public static int MaxHostPing { get => _maxHostPing?.Value ?? 0; set { if (_maxHostPing != null) _maxHostPing.Value = Math.Max(0, Math.Min(300, value)); } }
+        /// <summary>[Lobby] AfkKickMinutes: kick a lobby player idle (no movement / chat) for this many minutes; 0 = off (default).</summary>
+        public static int AfkKickMinutes { get => _afkKickMinutes?.Value ?? 0; set { if (_afkKickMinutes != null) _afkKickMinutes.Value = Math.Max(0, Math.Min(30, value)); } }
         /// <summary>[Compat] AllowRiskyRoles: assign Sheriff / Jackal even in the unregistered compat mode (default off).</summary>
         public static bool AllowRiskyRoles { get => _compatAllowRisky != null && _compatAllowRisky.Value; set { if (_compatAllowRisky != null) _compatAllowRisky.Value = value; } }
 
@@ -627,6 +633,8 @@ namespace PocketRoles.Core
         public static bool AdminLobbyControl { get => _permAdminLobby != null && _permAdminLobby.Value; set { if (_permAdminLobby != null) _permAdminLobby.Value = value; } }
         /// <summary>[Roles] RevealRoleOnDeath: "X was ROLE" to everyone on every kill / eject (default false).</summary>
         public static bool RevealRoleOnDeath { get => _revealOnDeath != null && _revealOnDeath.Value; set { if (_revealOnDeath != null) _revealOnDeath.Value = value; } }
+        /// <summary>[Roles] HostGhostRoleList: every player's role on the dead host's own screen (default true; host-local, also in compat lobbies).</summary>
+        public static bool HostGhostRoleList { get => _hostGhostRoleList == null || _hostGhostRoleList.Value; set { if (_hostGhostRoleList != null) _hostGhostRoleList.Value = value; } }
         /// <summary>[Chat] CompatWelcomeInterval: seconds between two public welcomes in an unregistered lobby (default 60, 0 = every join).</summary>
         public static float CompatWelcomeInterval { get => _compatWelcomeInterval?.Value ?? 60f; set { if (_compatWelcomeInterval != null) _compatWelcomeInterval.Value = Math.Max(0f, Math.Min(600f, value)); } }
         public static bool VipMarker { get => _permVipMarker == null || _permVipMarker.Value; set { if (_permVipMarker != null) _permVipMarker.Value = value; } }
@@ -817,6 +825,10 @@ namespace PocketRoles.Core
         {
             _descriptors.Clear();
 
+            _descriptors.Add(Bool("roles.ghostlist", "全般", "General", "死亡後に役職一覧（ホストのみ）", "Role list after death (host only)", _hostGhostRoleList)
+                .Tip("ホストが死んだあと、全員の役職（生存・死亡）をホストの画面だけに表示します。会議のたびに再表示、以後の死亡も1行ずつ。未登録の部屋でも動きます（本体の役職名）。他の人には送られません。/who でも表示。",
+                    "Once you (the host) are dead, every player's role (alive / dead) is shown on your screen only: again at each meeting, plus one line per later death. Works in unregistered lobbies too (vanilla roles). Never sent to others; /who shows it on demand.",
+                    "房主死亡后，所有玩家的职业（存活/死亡）只显示在房主的屏幕上：每次会议再次显示，之后每有人死亡显示一行。未注册房间也可用（原版职业名）。不会发给其他人；/who 可随时查看。"));
             _descriptors.Add(Bool("roles.vanilla", "全般", "General", "本体の特殊役職も配る", "Also assign vanilla special roles", _vanillaRoles)
                 .Tip("オン = サイエンティスト・エンジニア・ジャッジなど本体の役職も本体の設定どおりに出ます。オフ（既定）= クルーとインポスターだけにして、そこから PocketRoles の役職を配ります。",
                     "On = vanilla roles (Scientist, Engineer, Judge, ...) are assigned as set in the vanilla role settings. Off (default) = only Crewmates and Impostors, from which the PocketRoles roles are drawn.",
@@ -995,6 +1007,8 @@ namespace PocketRoles.Core
                 .Tip("登録オフ（互換モード）の部屋でもシェリフとジャッカルを配役します。ホスト権限がないためサーバーにキルを拒否されることがあります。", "Also assigns Sheriff and Jackal in an unregistered (compat mode) lobby. Without host authority the server may reject their kills.", "在未注册（兼容模式）房间中也分配警长和豺狼。没有房主权限时服务器可能拒绝其击杀。"));
             _descriptors.Add(Int("lobby.maxping", lJa, lEn, "高PINGなら部屋を作り直す(ms)", "Re-host when ping above (ms)", _maxHostPing, 0, 300, 10)
                 .Tip("部屋を作った直後5秒間PINGがこの値(ms)を超え、まだ自分しかいなければ自動で部屋を作り直します（最大3回、0 = しない）。", "Right after creating the lobby, if the ping stays above this (ms) for 5 s while you are alone, the lobby is re-created automatically (up to 3 times; 0 = off).", "创建房间后 5 秒内延迟一直高于此值(ms)且房间里只有自己时，自动重新创建房间（最多 3 次，0 = 关闭）。"));
+            _descriptors.Add(Int("lobby.afkkick", lJa, lEn, "AFKキック(分, 0=なし)", "AFK kick (min, 0 = off)", _afkKickMinutes, 0, 30, 1)
+                .Tip("ロビーでこの分数だけ動きも発言もない人に30秒前に警告し、退出させます（BANではありません）。ホスト・VIP・モデレーター・管理者は対象外。未登録の部屋でも動きます。0 = しない。", "A lobby player who neither moves nor chats for this many minutes is warned 30 s ahead and then kicked (not banned). Host, VIPs, moderators and admins are exempt. Works in unregistered lobbies too. 0 = off.", "在大厅中这段分钟数内既不移动也不发言的玩家会在 30 秒前收到警告，然后被移出（不是封禁）。房主、VIP、管理员除外。未注册房间也可用。0 = 关闭。"));
             _descriptors.Add(Bool("lobby.autostart", lJa, lEn, "自動開始", "Auto start", _autoStart)
                 .Tip("設定した人数が揃ったら自動でゲームを開始します。", "Starts the game automatically once enough players are in.", "凑齐设定人数后自动开始游戏。"));
             _descriptors.Add(Int("lobby.autostartplayers", lJa, lEn, "自動開始の人数", "Auto start players", _autoStartPlayers, 4, 15, 1)
@@ -1237,6 +1251,7 @@ namespace PocketRoles.Core
                 case "credits.show": return SetBool(_showCredits, value, "credits.show", out message);
                 case "roles.vanilla": case "vanillaroles": case "vanilla.roles": return SetBool(_vanillaRoles, value, "roles.vanilla", out message);
                 case "roles.reveal": case "reveal": case "revealdeath": case "roles.revealroleondeath": return SetBool(_revealOnDeath, value, "roles.reveal", out message);
+                case "roles.ghostlist": case "ghostlist": case "roles.hostghostrolelist": case "who": return SetBool(_hostGhostRoleList, value, "roles.ghostlist", out message);
                 case "chat.compatwelcomeinterval": case "compatwelcomeinterval": case "chat.welcomeinterval":
                 {
                     if (!float.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float sec) || sec < 0f || sec > 600f)
@@ -1246,6 +1261,7 @@ namespace PocketRoles.Core
                 // v0.4 lobby
                 case "lobby.autostart": case "autostart": return SetBool(_autoStart, value, "lobby.autostart", out message);
                 case "lobby.autostartplayers": case "autostartplayers": case "autostart.players": return SetInt(_autoStartPlayers, value, 4, 15, "lobby.autostartplayers", out message);
+                case "lobby.afkkick": case "afkkick": case "afk": case "lobby.afkkickminutes": return SetInt(_afkKickMinutes, value, 0, 30, "lobby.afkkick", out message);
                 case "lobby.autostartcountdown": case "autostartcountdown": case "autostart.countdown": return SetInt(_autoStartCountdown, value, 1, 30, "lobby.autostartcountdown", out message);
                 case "lobby.timermode": case "timermode": return SetChoiceValue(_timerMode, TimerModeChoices, value, "lobby.timermode", out message);
                 case "lobby.timerwarnat": case "timerwarnat": case "lobby.warnat": return SetInt(_timerWarnAt, value, 30, 300, "lobby.timerwarnat", out message);
