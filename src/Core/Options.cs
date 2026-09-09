@@ -51,6 +51,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<bool> _welcome;
         private static ConfigEntry<bool> _roleInfoAtMeeting;
         private static ConfigEntry<string> _welcomeText;
+        private static ConfigEntry<string> _compatWelcomeText;
         private static ConfigEntry<bool> _welcomeIncludeSettings;
         private static ConfigEntry<bool> _antiCheatKick;
         private static ConfigEntry<bool> _wireLog;
@@ -128,6 +129,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<int> _vanDiscussMax;
         private static ConfigEntry<int> _vanEmergencyMax;
         private static ConfigEntry<int> _vanTaskMax;
+        private static ConfigEntry<bool> _vanClampUnreg;
 
         // v0.4e [Guide] guide-room support (room-code overlay, /announce, /move)
         private static ConfigEntry<bool> _guideShowCodeOverlay;
@@ -219,6 +221,7 @@ namespace PocketRoles.Core
             _welcomeText = cfg.Bind("Chat", "WelcomeText", "",
                 "Custom welcome text sent to joining players (empty = built-in text). \\n = line break; placeholders: {rules} {roles} {settings} {help} {version}. The mandatory mod notice line is always prepended");
             _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", false, "Append the current role settings to the welcome message (off by default: the welcome stays short, the settings summary is always available with /cmd s)");
+            _compatWelcomeText = cfg.Bind("Chat", "CompatWelcomeText", "", "Unregistered (compat) lobby only: your own one-line public welcome for every joiner (empty = built-in line 'ようこそ! この部屋は普通のAmong Us(役職なし)です…'). One chat message, at most 86 characters; characters a vanilla player cannot type ([ ] < > full-width ！（） etc.) are converted or dropped automatically");
             _wireLog = cfg.Bind("Diagnostics", "WireLog", false, "Investigation aid: log every packet this client sends (InnerNetClient.SendOrDisconnect) and receives (HandleMessage), decoded one level (GameData / GameDataTo -> Data / RPC / Spawn ...), plus every disconnect, to LogOutput.log. Off (default) = no effect");
             _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
 
@@ -318,6 +321,7 @@ namespace PocketRoles.Core
             _vanDiscussMax = cfg.Bind("Vanilla", "DiscussionTimeMax", 600, new ConfigDescription("Highest discussion time (seconds) offered by the settings screen (vanilla: 120)", new AcceptableValueRange<int>(0, 3600)));
             _vanEmergencyMax = cfg.Bind("Vanilla", "EmergencyCooldownMax", 120, new ConfigDescription("Highest emergency-meeting cooldown (seconds) offered by the settings screen (vanilla: 60)", new AcceptableValueRange<int>(0, 600)));
             _vanTaskMax = cfg.Bind("Vanilla", "TaskCountMax", 30, new ConfigDescription("Highest common / short / long task count offered by the settings screen (vanilla: 2 / 5 / 3)", new AcceptableValueRange<int>(1, 60)));
+            _vanClampUnreg = cfg.Bind("Vanilla", "ClampInUnregistered", true, "Unregistered (compat) lobby: pull every vanilla numeric setting back into its vanilla range when the lobby is created and offer only vanilla ranges in the settings screen / /vset (precaution against the official server's option validation). false = keep the extended values in unregistered lobbies too (AUR does this for task counts); the host takes the risk of a server disconnect");
 
             // ---- v0.4e guide room (a second, vanilla, PUBLIC lobby on a sub-phone whose host name / chat carry this room's code)
             _guideShowCodeOverlay = cfg.Bind("Guide", "ShowCodeOverlay", false, "Show the room code large on the host's screen while hosting a lobby (top-left; off by default because vanilla already shows the code at the bottom; /code on turns it on). Hidden in game");
@@ -369,6 +373,8 @@ namespace PocketRoles.Core
         public static bool RoleInfoAtMeeting { get => _roleInfoAtMeeting == null || _roleInfoAtMeeting.Value; set { if (_roleInfoAtMeeting != null) _roleInfoAtMeeting.Value = value; } }
         /// <summary>Custom welcome text ("" = built-in). Raw value: "\n" two-character sequences and {placeholders} are expanded by Chat.</summary>
         public static string WelcomeText { get => _welcomeText == null ? "" : (_welcomeText.Value ?? ""); set { if (_welcomeText != null) _welcomeText.Value = value ?? ""; } }
+        /// <summary>[Chat] CompatWelcomeText: custom one-line public welcome of an unregistered lobby ("" = built-in).</summary>
+        public static string CompatWelcomeText { get => _compatWelcomeText == null ? "" : (_compatWelcomeText.Value ?? ""); set { if (_compatWelcomeText != null) _compatWelcomeText.Value = value ?? ""; } }
         /// <summary>Append the settings summary to the welcome (off by default; /cmd s shows it on demand).</summary>
         public static bool WelcomeIncludeSettings { get => _welcomeIncludeSettings != null && _welcomeIncludeSettings.Value; set { if (_welcomeIncludeSettings != null) _welcomeIncludeSettings.Value = value; } }
         public static bool AntiCheatKick { get => _antiCheatKick != null && _antiCheatKick.Value; set { if (_antiCheatKick != null) _antiCheatKick.Value = value; } }
@@ -593,6 +599,8 @@ namespace PocketRoles.Core
         public static int EmergencyCooldownMax { get => _vanEmergencyMax?.Value ?? 120; set { if (_vanEmergencyMax != null) _vanEmergencyMax.Value = Math.Max(0, Math.Min(600, value)); } }
         /// <summary>Per-category task count (1..60), vanilla 2 / 5 / 3.</summary>
         public static int TaskCountMax { get => _vanTaskMax?.Value ?? 30; set { if (_vanTaskMax != null) _vanTaskMax.Value = Math.Max(1, Math.Min(60, value)); } }
+        /// <summary>[Vanilla] ClampInUnregistered: clamp the vanilla numeric settings to their vanilla ranges in an unregistered lobby (default true).</summary>
+        public static bool ClampInUnregistered { get => _vanClampUnreg == null || _vanClampUnreg.Value; set { if (_vanClampUnreg != null) _vanClampUnreg.Value = value; } }
 
         // ------------------------------------------------------------------ v0.4e [Guide]
 

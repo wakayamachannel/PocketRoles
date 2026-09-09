@@ -7,7 +7,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>PocketRoles</AssemblyName>
     <RootNamespace>PocketRoles</RootNamespace>
-    <Version>0.4.3</Version>
+    <Version>0.4.4</Version>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <GenerateDependencyFile>false</GenerateDependencyFile>

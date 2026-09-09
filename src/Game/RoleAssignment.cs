@@ -480,9 +480,20 @@ namespace PocketRoles.Game
             try
             {
                 RestoreVanillaRoles();
-                if (!Core.Game.IsHostActive || Core.Game.HaisonActive || Registration.CompatMode)
+                if (!Core.Game.IsHostActive)
                 {
                     Core.Game.AssigningRoles = false;
+                    return;
+                }
+                if (Core.Game.HaisonActive || Registration.CompatMode)
+                {
+                    // v0.4.4: the plain-role gap described below hits vanilla-only games as well — an unregistered
+                    // (compat) lobby with a plain-Crewmate host froze before the intro (2026-09-09, 15 players, the
+                    // host never got a role → no intro → "black screen", then a Hacking disconnect after the forced
+                    // end). AssigningRoles is false here, so every RpcSetRole is the plain vanilla broadcast
+                    // (same shape as the special roles the vanilla SelectRoles just sent); no custom roles, no views.
+                    Core.Game.AssigningRoles = false;
+                    AssignPlainRoles();
                     return;
                 }
                 // 2026.8.18 (options V11): SelectRoles hands out only the special roles — the crew pass runs with

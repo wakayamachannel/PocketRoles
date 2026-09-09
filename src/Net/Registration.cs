@@ -148,7 +148,16 @@ namespace PocketRoles.Net
                 Registration.Registered = Options.HostAuthorityMode && !inert;
                 Registration.Hosting = true;
                 PocketRolesPlugin.Logger.LogInfo($"Registration: creating lobby, register(+25)={Registration.Registered}" + (inert && Options.HostAuthorityMode ? " (not registered: game version mismatch, the mod is inert)" : ""));
-                try { PocketRoles.Game.VanillaRanges.LogHealth("lobby creation"); if (!Registration.Registered && !inert) PocketRoles.Game.VanillaRanges.ClampToVanilla("unregistered lobby creation"); } catch (Exception) { }
+                try
+                {
+                    PocketRoles.Game.VanillaRanges.LogHealth("lobby creation");
+                    if (!Registration.Registered && !inert)
+                    {
+                        if (Options.ClampInUnregistered) PocketRoles.Game.VanillaRanges.ClampToVanilla("unregistered lobby creation");
+                        else PocketRolesPlugin.Logger.LogWarning("VanillaRanges: unregistered lobby creation: clamp skipped ([Vanilla] ClampInUnregistered=false) — extended values go to the server as they are");
+                    }
+                }
+                catch (Exception) { }
                 if (!Registration.Registered && !inert) Registration.LogCompatDetails();
             }
             catch (Exception e)
