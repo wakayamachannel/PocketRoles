@@ -666,6 +666,7 @@ MOD が読み込まれた後、ゲームのバージョンが対応版と違う�
 | `announce`, `guide`, `案内` | 部屋コードを **クリップボードにコピー**（Discord などにそのまま貼れます）し、案内部屋（サブスマホ）の作り方 4 手順を表示（[第 25 章](#25-便利ホスト登録オフと案内部屋)）。登録オフの部屋では `/move <コード>` で設定した役職部屋のコードをコピー |
 | `move` / `migrate` / `move <コード>` / `move cancel` | 便利ホスト（登録オフ）の部屋で、全員に「役職ありの部屋は ○○ です」の案内を 3 言語で送る。`/move <コード>` でコードを指定（`[Guide] RoleRoomCode`）、コード無しなら「案内部屋のホストの名前を見てね」。`[Guide] AutoRecreateRegistered = true` なら 30 秒後にこの部屋を登録オンで作り直す（`/move cancel` で中止）。登録済みの部屋で打つと `/announce` の案内 |
 | `diag` / `diag on|off` / `diag dump` | 開始ボタン・テストモード・廃村・試合の状態と画面のスナップショットをチャットとログに出す（真っ暗な時の報告用）。`on` で開始処理の詳細トレースをログに出し、`off` で止める 詳細トレースは常に裏で記録され（直近 400 行）、開始が固まった時や会議要求が通らなかった時に自動でログへ書き出されます。`diag dump` で任意の時点の記録を書き出せます |
+| `who`, `生存` | 死亡後に全員の役職一覧（生存 / 死亡）を自分の画面だけに表示（v0.4.6）。死ぬと 1.5 秒後に自動で出て、会議のたびに再表示、以後の死亡は「【死亡】名前: 役職（生存 N 人）」を 1 行ずつ。生存中は使えません。`/opt ghostlist off` で止める。便利ホスト（登録オフ）の部屋でも本体の役職名で動きます |
 | `admin` / `admin list` | アドミン一覧と使い方（`Admin.txt`） |
 | `admin add <名前|番号|フレンドコード>` | その人をアドミンにする（`Admin.txt` に書き込み。部屋にいない人はフレンドコード `name#1234` か Puid で） |
 | `admin remove <名前|コード>` / `admin reload` | 削除 / ファイルを読み直す |
@@ -763,6 +764,8 @@ MOD が読み込まれた後、ゲームのバージョンが対応版と違う�
 | `guide.autoreg` | on / off | `[Guide] AutoRecreateRegistered`（`/move` の 30 秒後に登録部屋として作り直す） |
 | `lobby.autostart` | on / off | `[Lobby] AutoStart` |
 | `lobby.autostartplayers` | 4〜15 | `[Lobby] AutoStartPlayers` |
+| `lobby.afkkick`（`afkkick`） | 0〜30（0 = しない） | `[Lobby] AfkKickMinutes`（ロビーでその分数だけ動きも発言もない人を 30 秒前に警告してから退出。VIP・モデレーター・アドミンは対象外。v0.4.6） |
+| `roles.ghostlist`（`ghostlist`） | on / off | `[Roles] HostGhostRoleList`（死亡後の役職一覧をホストの画面だけに出す。既定 on。v0.4.6） |
 | `lobby.autostartcountdown` | 1〜30 | `[Lobby] AutoStartCountdown` |
 | `lobby.timermode` | extend / haison / notify | `[Lobby] TimerMode` |
 | `lobby.timerwarnat` | 30〜300 | `[Lobby] TimerWarnAt` |
@@ -852,6 +855,7 @@ RehostMaxAttempts = 3           # 連続で再ホストを試みる回数（1〜
 MaxHostPing = 0                 # 部屋を作った直後 5 秒間 PING がこの値(ms)を超え、自分しかいなければ「作り直しますか？」と確認する（0〜300、0 = 確認しない、連続 3 回まで）
 AutoStart = false               # AutoStartPlayers 人が揃ったら自動で開始（/autostart on|off|<人数>）
 AutoStartPlayers = 10           # 自動開始の人数（4〜15）
+AfkKickMinutes = 0              # ロビーでこの分数だけ動きも発言もない人を 30 秒前に警告してから退出させる（0〜30、0 = しない。ホスト・VIP・モデレーター・アドミンは対象外。登録オフの部屋でも動く）
 AutoStartCountdown = 5          # 自動開始 / /start のカウントダウン秒数（1〜30）
 TimerWarnAt = 60                # ロビーの残りがこの秒数になったら動作する（30〜300）
 ExtendNoticeDelay = 5           # 「残り時間が少ない」の案内から延長 / 廃村までの秒数（0〜60）
@@ -1457,6 +1461,8 @@ Harmony のパッチ適用に失敗した場合（ゲームの内部が大きく
 - 作り直しは「意図的な切断」として数えられるので、連発しないでください（[3.4](#34-ban-とキックについて)）。
 
 ### 25.4 便利ホスト部屋の注意
+- v0.4.6: 試合が終わってロビーに戻ると、ホストが「前回の結果: インポスター勝利 / ×名前:ジャッジ 勝名前:ヴァイパー … / キル数: 名前=2」（本体の役職・勝者・死亡・キル数）を全員向けに投稿します（`/cmd l` でも見られます）。参加者の `/cmd s` はここでは 1 行の案内だけです（4 通の役職一覧は流しません）。
+- v0.4.6: ホストが死んだ後の役職一覧（`/who`）とロビーの AFK キック（`[Lobby] AfkKickMinutes`）は便利ホストの部屋でも使えます。
 
 - 役職・名前タグ・個別メッセージは一切送りません。挨拶と案内は全員向けの 1 通にまとまり、`/cmd …` を含むコマンドも全員に見えます（挨拶の 2 行目が「この部屋では『/cmd …』を含むコマンドは全員に見えます」に変わります）。
 - 画面左上に黄字で `(unregistered)` が付き、送信間隔は 0.3 秒、1 パケットは小さめになります。
