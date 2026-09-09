@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using AmongUs.GameOptions;
 using Hazel;
 using PocketRoles.Core;
@@ -265,6 +266,7 @@ namespace PocketRoles.Net
             var host = PlayerControl.LocalPlayer;
             if (client == null || host == null || text == null) return null;
             string line = string.IsNullOrEmpty(title) ? text : "[" + title + "] " + text;
+            line = SanitizeForVanillaChat(line);
             int max = PocketRoles.Chat.Chat.MaxChars;
             if (line.Length > max)
             {
@@ -286,6 +288,73 @@ namespace PocketRoles.Net
                 if (w != null) { try { w.Recycle(); } catch { } }
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Unregistered lobby (verify finding #54, wire capture 2026-09-09): the official server disconnects the host
+        /// ("DC because Hacking") 70 ms after a public SendChat that contains a character the vanilla chat field never
+        /// lets a player type — '[' ']' '！' '（' '）' in the old welcome line; length (190-byte messages pass) and the
+        /// RPC bytes (identical to PlayerControl.RpcSendChat) are not the reason. Full-width ASCII becomes ASCII,
+        /// '[' ']' become '【' '】' (the vanilla filter accepts CJK brackets) and every character the vanilla
+        /// TextBoxTMP filter of the chat field rejects is dropped, exactly as the vanilla client drops it while typing.
+        /// </summary>
+        internal static string SanitizeForVanillaChat(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            TextBoxTMP box = null;
+            try
+            {
+                var hud = HudManager.Instance;
+                if (hud != null && hud.Chat != null && hud.Chat.freeChatField != null) box = hud.Chat.freeChatField.textArea;
+            }
+            catch (Exception) { }
+            LogSymbolsOnce();
+            var sb = new StringBuilder(s.Length);
+            int dropped = 0;
+            foreach (char c0 in s)
+            {
+                char c = c0;
+                if (c >= '！' && c <= '～') c = (char)(c - 0xFEE0);   // full-width ASCII (！（）：１２Ａ) → ASCII
+                else if (c == '　') c = ' ';
+                switch (c)
+                {
+                    // vanilla SymbolChars (2026.8.18): ?!,.':;()/\%^&-=¿？# — everything else below is rejected
+                    case '[': c = '【'; break;
+                    case ']': c = '】'; break;
+                    case '|': c = '/'; break;
+                    case '_': case '~': c = '-'; break;
+                    case '"': c = '\''; break;
+                }
+                bool ok;
+                if (box != null) { try { ok = box.IsCharAllowed(c); } catch (Exception) { ok = FallbackAllowed(c); } }
+                else ok = FallbackAllowed(c);
+                if (ok) sb.Append(c); else dropped++;
+            }
+            if (dropped > 0) PocketRolesPlugin.Logger.LogInfo($"Rpc.SanitizeForVanillaChat: dropped {dropped} character(s) the vanilla chat filter rejects ({(box != null ? "vanilla filter" : "fallback table")})");
+            return sb.ToString();
+        }
+
+        /// <summary>No chat field yet: letters, digits, space and the symbols seen to pass the vanilla filter (2026.8.18 probe).</summary>
+        private static bool FallbackAllowed(char c)
+        {
+            return char.IsLetterOrDigit(c) || c == ' ' || "()#&=\\/:;,.?!。、・ー【】「」『』".IndexOf(c) >= 0;
+        }
+
+        private static bool _symbolsLogged;
+
+        private static void LogSymbolsOnce()
+        {
+            if (_symbolsLogged) return;
+            _symbolsLogged = true;
+            try
+            {
+                var set = TextBoxTMP.SymbolChars;
+                if (set == null) return;
+                var sb = new StringBuilder();
+                foreach (char c in set) sb.Append(c);
+                PocketRolesPlugin.Logger.LogInfo($"Vanilla chat SymbolChars ({set.Count}): {sb}");
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"SymbolChars: {e.Message}"); }
         }
 
         public static void SendChatAll(string title, string text)

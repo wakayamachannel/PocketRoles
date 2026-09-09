@@ -53,6 +53,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<string> _welcomeText;
         private static ConfigEntry<bool> _welcomeIncludeSettings;
         private static ConfigEntry<bool> _antiCheatKick;
+        private static ConfigEntry<bool> _wireLog;
 
         private static ConfigEntry<bool> _autoRehost;
         private static ConfigEntry<bool> _autoPublic;
@@ -218,6 +219,7 @@ namespace PocketRoles.Core
             _welcomeText = cfg.Bind("Chat", "WelcomeText", "",
                 "Custom welcome text sent to joining players (empty = built-in text). \\n = line break; placeholders: {rules} {roles} {settings} {help} {version}. The mandatory mod notice line is always prepended");
             _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", false, "Append the current role settings to the welcome message (off by default: the welcome stays short, the settings summary is always available with /cmd s)");
+            _wireLog = cfg.Bind("Diagnostics", "WireLog", false, "Investigation aid: log every packet this client sends (InnerNetClient.SendOrDisconnect) and receives (HandleMessage), decoded one level (GameData / GameDataTo -> Data / RPC / Spawn ...), plus every disconnect, to LogOutput.log. Off (default) = no effect");
             _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
 
             _autoRehost = cfg.Bind("Lobby", "AutoRehost", false, "Automatically create a new lobby after an unexpected disconnect (server error, timeout) while hosting");
@@ -370,6 +372,8 @@ namespace PocketRoles.Core
         /// <summary>Append the settings summary to the welcome (off by default; /cmd s shows it on demand).</summary>
         public static bool WelcomeIncludeSettings { get => _welcomeIncludeSettings != null && _welcomeIncludeSettings.Value; set { if (_welcomeIncludeSettings != null) _welcomeIncludeSettings.Value = value; } }
         public static bool AntiCheatKick { get => _antiCheatKick != null && _antiCheatKick.Value; set { if (_antiCheatKick != null) _antiCheatKick.Value = value; } }
+        /// <summary>[Diagnostics] WireLog: packet-level send/receive trace (Net.WireLog), off by default.</summary>
+        public static bool WireLog { get => _wireLog != null && _wireLog.Value; set { if (_wireLog != null) _wireLog.Value = value; } }
 
         public static bool AutoRehost { get => _autoRehost != null && _autoRehost.Value; set { if (_autoRehost != null) _autoRehost.Value = value; } }
         public static bool AutoPublic { get => _autoPublic != null && _autoPublic.Value; set { if (_autoPublic != null) _autoPublic.Value = value; } }

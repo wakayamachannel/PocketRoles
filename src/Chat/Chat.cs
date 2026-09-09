@@ -128,6 +128,8 @@ namespace PocketRoles.Chat
                 string name = Lang.StripTags(Core.Game.NameOf(playerId) ?? "").Trim();
                 if (name.Length == 0) return "";
                 if (name.Length > 12) name = name.Substring(0, 12);
+                // Compat mode: '@' is not a vanilla chat character (Rpc.SanitizeForVanillaChat would drop it), so "name: ".
+                if (Registration.CompatMode) return name + ": ";
                 return "@" + name + " ";
             }
             catch (Exception e)
