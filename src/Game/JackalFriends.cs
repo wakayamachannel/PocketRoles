@@ -1,39 +1,42 @@
-using System;
 using System.Collections.Generic;
-using System.Text;
 using PocketRoles.Core;
-using PocketRoles.Net;
 
 namespace PocketRoles.Game
 {
-    // Inside namespace PocketRoles.Game the bare names "Game" and "Chat" resolve to the sibling namespaces, so alias the classes here.
+    // Inside namespace PocketRoles.Game the bare name "Game" resolves to the sibling namespace, so alias the class here.
     using Game = PocketRoles.Core.Game;
-    using HrChat = PocketRoles.Chat.Chat;
 
     /// <summary>
-    /// ジャッカルフレンズ / Jackal Friends (v0.5.0): the Jackal's Madmate — vanilla Crewmate on its client, Team.Neutral, wins with the
-    /// Jackal (WinConditions.ComputeWinners), sees the Jackal in blue (NameTags rule 3a). Only assigned in games with a Jackal
-    /// (RoleAssignment.AssignCustomRoles gate). Hooks are wired in RoleAssignment, NameTags, WinConditions, Kills.CanSheriffKill and Chat.RoleInfoText.
-    /// SKELETON (Implementer A, design-v0.5.0.md §1.14): stub bodies — the owner (Implementer D, §6) fills them in.
+    /// ジャッカルフレンズ / Jackal Friends (v0.5.0): the Jackal's Madmate. A vanilla Crewmate on its own client (no kill
+    /// button, Team.Neutral, fake tasks) that sees every Jackal in blue (NameTags rule 3a), is not counted as crew by
+    /// WinConditions.EvaluateBase and wins whenever the Jackal wins (ComputeWinners, dead or alive). Only drawn in games
+    /// that have a Jackal (RoleAssignment.AssignCustomRoles gate). No ability state: nothing to reset.
     /// </summary>
     public static class JackalFriends
     {
-        /// <summary>A Jackal is in the role table (alive or dead) — the assignment gate for the Friends.</summary>
+        /// <summary>Any Jackal in the role table (forced or drawn) — the assignment gate and LogAssignment.</summary>
         internal static bool AnyJackal()
         {
+            foreach (var kv in Game.Roles) if (kv.Value == CustomRole.Jackal) return true;
             return false;
         }
 
-        /// <summary>Any Jackal Friends in the role table.</summary>
+        /// <summary>Any Jackal Friends in the role table (LogAssignment).</summary>
         internal static bool Any()
         {
+            foreach (var kv in Game.Roles) if (kv.Value == CustomRole.JackalFriends) return true;
             return false;
         }
 
-        /// <summary>Names of the living Jackals ("" when none) for the Friends' role info.</summary>
+        /// <summary>Names of the alive Jackals joined by Lang.ListSep ("" when none) — Chat.RoleInfoText.</summary>
         internal static string JackalNames()
         {
-            return "";
+            var names = new List<string>();
+            foreach (var id in Game.AllPlayerIds())
+            {
+                if (Game.RoleOf(id) == CustomRole.Jackal && Game.IsAlive(id)) names.Add(Game.NameOf(id));
+            }
+            return string.Join(Lang.ListSep, names);
         }
     }
 }
