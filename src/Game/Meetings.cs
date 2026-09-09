@@ -200,10 +200,8 @@ namespace PocketRoles.Game
                 // Its bite stays parked (Kills.Tick pauses while the report is held and during the meeting) and executes
                 // after the exile screen (Meetings_ExileWrapUpPatch re-arms it).
                 byte reporterId = __instance.PlayerId;
-                bool reporterBitten = Core.Game.Bites.TryGetValue(reporterId, out var ownBite);
-                if (reporterBitten) Core.Game.Bites.Remove(reporterId);
-                Kills.FlushBites();
-                if (reporterBitten)
+                if (!deferredPass) Kills.FlushBites(reporterId); // the second pass flushes nothing: it would move LastMurderAt and chain holds
+                if (Core.Game.Bites.TryGetValue(reporterId, out var ownBite))
                 {
                     ownBite.DueAt = UnityEngine.Time.time;
                     Core.Game.Bites[reporterId] = ownBite;

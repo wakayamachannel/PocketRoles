@@ -152,7 +152,9 @@ namespace PocketRoles.Net
                 // 2026-09-09 15-player public lobby). The host-only list is a host-authority (+25) rule: skip it here.
                 // Also every lobby the mod did not create as a registered host: a vanilla lobby we inherited by host
                 // migration, or a LAN game — no +25 was ever sent there, so clients kill with a plain MurderPlayer too.
-                if (Registration.CompatMode || !Registration.ShouldRegister)
+                // (IsHostActive is false in a lobby the mod did not create as a registered host, on a version mismatch,
+                // after a patch failure and in Hide and Seek — the anti-cheat only makes sense where the role logic runs.)
+                if (Registration.CompatMode || !PocketRoles.Core.Game.IsHostActive)
                 {
                     if (AntiCheat.ShouldLogUnknownSender())
                         PocketRolesPlugin.Logger.LogInfo($"AntiCheat: no host authority in this lobby, RPC {callId} on '{(__instance.Data != null ? __instance.Data.PlayerName : "?")}' passed through");
@@ -193,7 +195,7 @@ namespace PocketRoles.Net
                 if (!AntiCheat.IsHostOnlyMeetingRpc(callId)) return true;
                 var client = AmongUsClient.Instance;
                 if (client == null || !client.AmHost || !Options.ModEnabled) return true;
-                if (Registration.CompatMode || !Registration.ShouldRegister) return true; // v0.4.4: no host authority in an unregistered lobby (see the PlayerControl patch)
+                if (Registration.CompatMode || !PocketRoles.Core.Game.IsHostActive) return true; // v0.4.4: no host authority in an unregistered lobby (see the PlayerControl patch)
                 // The sender is not identifiable here (MeetingHud is host-owned); just drop and log (rate-limited).
                 if (AntiCheat.ShouldLogUnknownSender())
                     PocketRolesPlugin.Logger.LogWarning($"AntiCheat: dropped forged MeetingHud RPC {callId} (sender unknown)");

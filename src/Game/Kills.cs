@@ -53,8 +53,13 @@ namespace PocketRoles.Game
             Scratch.Clear();
         }
 
-        /// <summary>Executes every pending bite immediately (called by Meetings from the ReportDeadBody prefix).</summary>
-        public static void FlushBites()
+        /// <summary>
+        /// Executes every pending bite immediately (called by Meetings from the ReportDeadBody prefix). Deaths chained
+        /// off a flushed one (a lover following its partner) are queued by OnMurder during the loop and execute in the
+        /// same flush, so they too land before the meeting; <paramref name="exceptId"/> (the reporter) is never touched —
+        /// its entry stays parked for after the exile screen.
+        /// </summary>
+        public static void FlushBites(byte exceptId = 255)
         {
             if (Game.Bites.Count == 0) return;
             if (!Game.IsHostActive || !Game.InProgress || Game.Ending)
@@ -62,13 +67,19 @@ namespace PocketRoles.Game
                 Game.Bites.Clear();
                 return;
             }
-            Scratch.Clear();
-            foreach (var kv in Game.Bites) Scratch.Add(kv.Key);
-            for (int i = 0; i < Scratch.Count; i++) ExecuteBite(Scratch[i], false);
-            // Only the snapshot goes: a death chained off a flushed one (a lover following its partner) is queued by
-            // OnMurder during the loop and must survive to the exile screen (Meetings_ExileWrapUpPatch re-arms it).
-            for (int i = 0; i < Scratch.Count; i++) Game.Bites.Remove(Scratch[i]);
-            Scratch.Clear();
+            for (int round = 0; round < 6; round++)
+            {
+                Scratch.Clear();
+                foreach (var kv in Game.Bites) if (kv.Key != exceptId) Scratch.Add(kv.Key);
+                if (Scratch.Count == 0) break;
+                for (int i = 0; i < Scratch.Count; i++)
+                {
+                    if (Game.Ending || !Game.InProgress) break;
+                    ExecuteBite(Scratch[i], false);
+                }
+                for (int i = 0; i < Scratch.Count; i++) Game.Bites.Remove(Scratch[i]);
+                Scratch.Clear();
+            }
         }
 
         // ------------------------------------------------------------------ role capability helpers

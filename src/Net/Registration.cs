@@ -258,7 +258,7 @@ namespace PocketRoles.Net
             try
             {
                 var client = AmongUsClient.Instance;
-                if (client == null || !client.AmHost || !Options.ModEnabled) return true;
+                if (client == null || !client.AmHost) return true; // the serialization guard is host-local: also with /mod off
                 var all = PlayerControl.AllPlayerControls;
                 if (all == null) return true;
                 foreach (var pc in all)

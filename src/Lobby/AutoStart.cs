@@ -134,6 +134,8 @@ namespace PocketRoles.Lobby
             }
         }
 
+        private static bool _lastAutoStart;
+
         /// <summary>Turns auto-start on/off (saved to the config).</summary>
         public static void SetEnabled(bool on)
         {
@@ -447,6 +449,12 @@ namespace PocketRoles.Lobby
                 _phase = Phase.Idle;
             }
 
+            // Auto-start switched back on (settings tab, /opt, /reload — paths that never call SetEnabled): re-arm rule 1,
+            // or the latch from a cancelled countdown keeps it silent until somebody leaves.
+            bool autoOn = Options.AutoStart;
+            if (autoOn && !_lastAutoStart) _rearmBelow = false;
+            _lastAutoStart = autoOn;
+
             // ---- rule 2: the lobby timer runs out
             int remaining = LobbyTimer.Remaining;
             if (remaining < 0) return;
@@ -500,6 +508,15 @@ namespace PocketRoles.Lobby
                     break;
 
                 case Phase.Warned:
+                    // The host clicked the vanilla extension popup (or the server extended on its own) while we were
+                    // waiting: same confirmation exit as Extending, or rule 1 stays dead and a haison runs at the floor.
+                    if (LobbyTimer.LastExtendedAt >= _phaseAt || (LobbyTimer.ServerValueSeen && remaining > warnAt + 30))
+                    {
+                        _phase = Phase.Idle;
+                        _warnedThisLobby = false;
+                        PocketRolesPlugin.Logger.LogInfo("AutoStart: lobby extended out of band during the warning → idle");
+                        break;
+                    }
                     if (now - _phaseAt < Options.ExtendNoticeDelay) break;
                     if (state != GameStartManager.StartingStates.NotStarting)
                     {
@@ -837,7 +854,8 @@ namespace PocketRoles.Lobby
             try
             {
                 var client = AmongUsClient.Instance;
-                if (client == null || !client.AmHost || !Core.Game.IsHostActive) return true;
+                // host-local safety net, not role logic: it must also cover /mod off, Hide and Seek and a migrated lobby
+                if (client == null || !client.AmHost) return true;
                 return AutoStart.OnFinallyBegin(__instance);
             }
             catch (Exception e)
