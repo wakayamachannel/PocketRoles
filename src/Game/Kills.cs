@@ -318,7 +318,13 @@ namespace PocketRoles.Game
             }
             LastMurderAt = Time.time;
             if (target != null) RoleReveal.OnKilled(target.PlayerId); // [Roles] RevealRoleOnDeath (also in compat games, where InProgress stays false)
-            if (!Game.InProgress || target == null) return;
+            if (target == null) return;
+            if (!Game.InProgress)
+            {
+                // Compat / 廃村 game: no role bookkeeping, but the kill count feeds the vanilla post-game summary (v0.4.6).
+                if (killer != null && killer.PlayerId != target.PlayerId) Game.CountKill(killer.PlayerId);
+                return;
+            }
 
             byte targetId = target.PlayerId;
             byte reporterId = killer != null ? killer.PlayerId : targetId;
@@ -329,6 +335,8 @@ namespace PocketRoles.Game
                 if (killer == null || killer.PlayerId == targetId) reporterId = bite.Killer;
                 Game.Bites.Remove(targetId);
             }
+            // Post-game summary kill count: the real killer (a lover's follow / a Serial Killer's time-out are self-credited → not counted).
+            if (reporterId != targetId) Game.CountKill(reporterId);
 
             // v0.4.1 role bookkeeping on any death
             Witch.OnPlayerDied(targetId);     // dead witch → curse fades; dead target → forgotten

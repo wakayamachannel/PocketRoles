@@ -332,7 +332,12 @@ namespace PocketRoles
                 // restore, lobby summary) still leave after /mod off or a game-mode switch.
                 var client = AmongUsClient.Instance;
                 if (client != null && client.AmHost) Rpc.Queue.Tick();
-                if (Core.Game.IsHostActive) Kills.Tick();
+                if (Core.Game.IsHostActive)
+                {
+                    Kills.Tick();
+                    GhostRoleList.Tick(); // dead host → role list on the host screen (4 Hz poll, compat games too)
+                    Lobby.AfkKick.Tick();  // [Lobby] AfkKickMinutes (0.5 Hz, lobby only)
+                }
             }
             catch (Exception e)
             {

@@ -773,20 +773,24 @@ namespace PocketRoles.Chat
             string winner = Lang.StripTags(Core.Game.LastWinnerText);
             lines.Add(Lang.T("summary.head", "前回の結果", "Last game") + (string.IsNullOrEmpty(winner) ? "" : ": " + winner));
 
+            // Compat mode: the public chat filter drops ☆ (finding 2026-09-10: "=勝者" arrived without its mark) → a letter marker there.
+            bool compat = Registration.CompatMode;
+            string win = compat ? Lang.T("summary.win.compat", "勝", "W", "胜") : "☆";
             var entries = new List<string>();
             foreach (var e in summary)
             {
                 if (e == null) continue;
                 string name = e.Name ?? ("#" + e.Id);
                 string roleName = e.Role != CustomRole.None ? Roles.Info(e.Role).Name : VanillaRoleName(e.Vanilla);
-                string mark = (e.Winner ? "☆" : "") + (e.Dead ? "×" : "");
+                string mark = (e.Winner ? win : "") + (e.Dead ? "×" : "");
                 entries.Add(mark + name + ":" + roleName);
             }
             string sep = "  ";
+            int limit = MessageChars; // compat mode: 86 (the "[PocketRoles] " prefix travels inside the text)
             var cur = new StringBuilder();
             foreach (var en in entries)
             {
-                if (cur.Length > 0 && cur.Length + sep.Length + en.Length > MaxChars)
+                if (cur.Length > 0 && cur.Length + sep.Length + en.Length > limit)
                 {
                     lines.Add(cur.ToString());
                     cur.Clear();
@@ -795,7 +799,19 @@ namespace PocketRoles.Chat
                 cur.Append(en);
             }
             if (cur.Length > 0) lines.Add(cur.ToString());
-            lines.Add(Lang.T("summary.legend", "☆=勝者 ×=死亡", "☆=winner ×=dead"));
+            // v0.4.6: kill counts (one line; only killers with at least one kill, most first)
+            var killers = new List<Core.Game.SummaryEntry>();
+            foreach (var e in summary) if (e != null && e.Kills > 0) killers.Add(e);
+            if (killers.Count > 0)
+            {
+                killers.Sort((a, b) => b.Kills.CompareTo(a.Kills));
+                var parts = new List<string>();
+                foreach (var k in killers) parts.Add((k.Name ?? ("#" + k.Id)) + "=" + k.Kills);
+                lines.Add(Lang.T("summary.kills", "キル数: ", "Kills: ", "击杀数: ") + string.Join(", ", parts));
+            }
+            lines.Add(compat
+                ? Lang.T("summary.legend.compat", "勝=勝者 ×=死亡", "W=winner ×=dead", "胜=胜者 ×=死亡")
+                : Lang.T("summary.legend", "☆=勝者 ×=死亡", "☆=winner ×=dead"));
             return string.Join("\n", lines);
         }
 
@@ -1131,6 +1147,7 @@ namespace PocketRoles.Chat
                 if (!Core.Game.IsHostActive) return true;
                 if (sourcePlayer == null || sourcePlayer.AmOwner) return true;
                 if (string.IsNullOrEmpty(chatText)) return true;
+                Lobby.AfkKick.Touch(sourcePlayer.PlayerId); // v0.4.6: chatting counts as lobby activity
                 string trimmed = chatText.Trim();
                 if (!trimmed.StartsWith("/")) return true;
                 return !Commands.Handle(sourcePlayer, trimmed);

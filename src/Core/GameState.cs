@@ -109,6 +109,17 @@ namespace PocketRoles.Core
             public RoleTypes Vanilla;
             public bool Dead;
             public bool Winner;
+            /// <summary>Kills credited to this player in that game (v0.4.6: MurderPlayer seen on the host, bites to the biter; compat games too).</summary>
+            public int Kills;
+        }
+
+        /// <summary>Kills per killer in the running game (Kills.OnMurder; a vampire bite counts for the biter). Cleared by Reset().</summary>
+        public static Dictionary<byte, int> KillCounts = new Dictionary<byte, int>();
+
+        public static void CountKill(byte killerId)
+        {
+            KillCounts.TryGetValue(killerId, out int n);
+            KillCounts[killerId] = n + 1;
         }
 
         /// <summary>Filled by WinConditions.EndGame; shown by /last and the lobby summary. Survives Reset().</summary>
@@ -124,6 +135,7 @@ namespace PocketRoles.Core
             VanillaRoles.Clear();
             OriginalNames.Clear();
             Bites.Clear();
+            KillCounts.Clear();
             ResetRoleState();
             ExtraWinners.Clear();
             SoloWinner = CustomRole.None;
@@ -243,7 +255,7 @@ namespace PocketRoles.Core
         /// <summary>Scheduler tags that belong to a running game (cancelled at lobby start).</summary>
         private static readonly string[] GameScopedTags =
         {
-            "win.end", "assign.roleinfo", "assign.introend", "haison.end", "antiblackout.restore", "names.meeting", "gm.apply", "meeting.defer"
+            "win.end", "assign.roleinfo", "assign.introend", "haison.end", "antiblackout.restore", "names.meeting", "gm.apply", "meeting.defer", "ghostlist.show"
         };
 
         public static CustomRole RoleOf(byte id)
