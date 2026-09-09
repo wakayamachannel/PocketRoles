@@ -164,6 +164,13 @@ namespace PocketRoles.Core
         private static ConfigEntry<float> _arsonistDouseCooldown, _witchSpellCooldown;
         private static ConfigEntry<int> _assassinGuessesPerMeeting;
 
+        // v0.5.0 [MadMayor] [MadStuntman] [MadHawk] [Worshipper] [JackalFriends] [EvilNekomata] [SerialKiller] [Samurai] [EvilHawk]
+        private static ConfigEntry<int> _madMayorVotes, _madStuntmanLives, _worshipperUses;
+        private static ConfigEntry<bool> _madMayorKnownToImpostors, _madStuntmanNotify, _jackalFriendsKnownToJackal, _jackalFriendsSheriffCanKill,
+            _nekomataVotersOnly, _nekomataExcludeImpostors, _nekomataAnnounce, _serialKillerResetAtMeeting, _samuraiHitTeammates;
+        private static ConfigEntry<float> _madHawkVision, _madHawkSpeed, _worshipperCooldown, _serialKillerKillCooldown, _serialKillerSuicideTime,
+            _samuraiKillCooldown, _samuraiRange, _samuraiStagger, _evilHawkVision;
+
         private static readonly List<OptionDescriptor> _descriptors = new List<OptionDescriptor>();
 
         /// <summary>Every editable option in display order (role rows first, then General / Lobby / Chat). Built by Init().</summary>
@@ -337,7 +344,7 @@ namespace PocketRoles.Core
             }
 
             _sheriffKillCooldown = cfg.Bind("Sheriff", "KillCooldown", 30f, new ConfigDescription("Sheriff kill cooldown (seconds)", new AcceptableValueRange<float>(2.5f, 180f)));
-            _sheriffCanKillMadmate = cfg.Bind("Sheriff", "CanKillMadmate", true, "Sheriff can shoot Madmates without dying");
+            _sheriffCanKillMadmate = cfg.Bind("Sheriff", "CanKillMadmate", true, "Sheriff can shoot Mad-type roles (Madmate, Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper) without dying");
             _jackalKillCooldown = cfg.Bind("Jackal", "KillCooldown", 30f, new ConfigDescription("Jackal kill cooldown (seconds)", new AcceptableValueRange<float>(2.5f, 180f)));
             _jackalCanVent = cfg.Bind("Jackal", "CanVent", true, "Jackal can use vents");
             _vampireKillDelay = cfg.Bind("Vampire", "KillDelay", 10f, new ConfigDescription("Seconds between a bite and the victim's death", new AcceptableValueRange<float>(1f, 60f)));
@@ -345,7 +352,7 @@ namespace PocketRoles.Core
             _snitchTasksLeftToWarn = cfg.Bind("Snitch", "TasksLeftToWarn", 1, new ConfigDescription("Killers see the Snitch marked when this many tasks (or fewer) are left", new AcceptableValueRange<int>(0, 10)));
             _lighterVision = cfg.Bind("Lighter", "VisionMultiplier", 2f, new ConfigDescription("Lighter vision multiplier", new AcceptableValueRange<float>(1f, 5f)));
             _speedBoosterSpeed = cfg.Bind("SpeedBooster", "SpeedMultiplier", 1.5f, new ConfigDescription("Speed Booster speed multiplier", new AcceptableValueRange<float>(1f, 3f)));
-            _madmateKnownToImpostors = cfg.Bind("Madmate", "KnownToImpostors", false, "Impostors see who the Madmate is");
+            _madmateKnownToImpostors = cfg.Bind("Madmate", "KnownToImpostors", false, "Impostors see who the Mad-type players are (red Ⓜ; Ⓦ for the Worshipper; the Mad Mayor has its own switch)");
 
             // ---- v0.4.1 roles
             _loversAllowImpostor = cfg.Bind("Lovers", "AllowImpostor", true, "The second lover may be a vanilla Impostor (keeps its kill button and counts as an Impostor for the win rules; wins only as a lover)");
@@ -356,6 +363,29 @@ namespace PocketRoles.Core
             _witchSpelledSeeMark = cfg.Bind("Witch", "SpelledSeeMark", false, "Spelled players see a mark on their own name (the Witch always sees it)");
             _assassinGuessesPerMeeting = cfg.Bind("Assassin", "GuessesPerMeeting", 1, new ConfigDescription("Guesses (/cmd guess) per meeting", new AcceptableValueRange<int>(1, 5)));
             _assassinFirstMeeting = cfg.Bind("Assassin", "CanGuessFirstMeeting", true, "The Assassin may guess in the first meeting of the game");
+
+            // ---- v0.5.0 roles
+            _madMayorVotes = cfg.Bind("MadMayor", "Votes", 2, new ConfigDescription("How many votes the Mad Mayor's vote counts as", new AcceptableValueRange<int>(1, 5)));
+            _madMayorKnownToImpostors = cfg.Bind("MadMayor", "KnownToImpostors", false, "Impostors see who the Mad Mayor is (red Ⓜ before the name)");
+            _madStuntmanLives = cfg.Bind("MadStuntman", "Lives", 1, new ConfigDescription("Kill attempts the Mad Stuntman survives before a kill goes through (votes are never blocked)", new AcceptableValueRange<int>(1, 10)));
+            _madStuntmanNotify = cfg.Bind("MadStuntman", "NotifyStuntman", false, "Tell the Mad Stuntman in private chat when it survived a kill attempt and how many are left (off = SNR behaviour: the role chat still shows the count at start and every meeting; also reveals absorbed Vampire bites / Witch spells; the killer is always told)");
+            _madHawkVision = cfg.Bind("MadHawk", "VisionMultiplier", 3f, new ConfigDescription("Mad Hawk vision multiplier (crew vision x N; a lights sabotage still shrinks it)", new AcceptableValueRange<float>(1f, 5f)));
+            _madHawkSpeed = cfg.Bind("MadHawk", "SpeedMultiplier", 1f, new ConfigDescription("Mad Hawk movement speed multiplier (1 = normal; below 1 pays for the wide vision; the result is kept inside the vanilla speed range 0.5-3)", new AcceptableValueRange<float>(0.5f, 1.5f)));
+            _worshipperUses = cfg.Bind("Worshipper", "Uses", 1, new ConfigDescription("How many players the Worshipper may turn into Madmates per game (successful worships only)", new AcceptableValueRange<int>(1, 5)));
+            _worshipperCooldown = cfg.Bind("Worshipper", "Cooldown", 30f, new ConfigDescription("Seconds between two worships (the Worshipper's kill button)", new AcceptableValueRange<float>(2.5f, 180f)));
+            _jackalFriendsKnownToJackal = cfg.Bind("JackalFriends", "KnownToJackal", false, "The Jackal sees who the Jackal Friends are (blue names)");
+            _jackalFriendsSheriffCanKill = cfg.Bind("JackalFriends", "SheriffCanKill", true, "The Sheriff can shoot Jackal Friends without dying");
+            _nekomataVotersOnly = cfg.Bind("EvilNekomata", "VotersOnly", true, "The dragged player is picked among the players who voted for the Evil Nekomata (false = among every living player)");
+            _nekomataExcludeImpostors = cfg.Bind("EvilNekomata", "ExcludeImpostors", true, "Impostor-team players (Impostors, Madmate family, an impostor lover) are never dragged");
+            _nekomataAnnounce = cfg.Bind("EvilNekomata", "Announce", true, "Everyone reads who was dragged along after the ejection screen (false = only the victim is told)");
+            _serialKillerKillCooldown = cfg.Bind("SerialKiller", "KillCooldown", 10f, new ConfigDescription("Serial Killer kill cooldown (seconds)", new AcceptableValueRange<float>(1f, 60f)));
+            _serialKillerSuicideTime = cfg.Bind("SerialKiller", "SuicideTime", 30f, new ConfigDescription("Seconds without a kill before the Serial Killer dies by itself (paused during meetings; never below KillCooldown + 5)", new AcceptableValueRange<float>(10f, 300f)));
+            _serialKillerResetAtMeeting = cfg.Bind("SerialKiller", "ResetAtMeeting", true, "The suicide timer restarts after every meeting (off: the remaining time carries over)");
+            _samuraiKillCooldown = cfg.Bind("Samurai", "KillCooldown", 45f, new ConfigDescription("Seconds between two slashes (0 = the lobby's kill cooldown; 2.5 or more recommended)", new AcceptableValueRange<float>(0f, 180f)));
+            _samuraiRange = cfg.Bind("Samurai", "Range", 2f, new ConfigDescription("Slash radius around the Samurai in map units (vanilla kill distances are roughly short 1 / medium 1.8 / long 2.5)", new AcceptableValueRange<float>(0.5f, 5f)));
+            _samuraiStagger = cfg.Bind("Samurai", "Stagger", 0.3f, new ConfigDescription("Seconds between two bystander deaths of one slash (0.3 = the official server's packet spacing)", new AcceptableValueRange<float>(0.1f, 1f)));
+            _samuraiHitTeammates = cfg.Bind("Samurai", "HitTeammates", false, "The slash also kills Impostor-team players in range (Impostors, Madmate family, an Impostor lover)");
+            _evilHawkVision = cfg.Bind("EvilHawk", "VisionMultiplier", 2f, new ConfigDescription("Evil Hawk vision multiplier, applied to the impostor vision (always on)", new AcceptableValueRange<float>(1f, 5f)));
 
             BuildDescriptors();
         }
@@ -644,6 +674,33 @@ namespace PocketRoles.Core
         public static int AssassinGuessesPerMeeting => _assassinGuessesPerMeeting?.Value ?? 1;
         public static bool AssassinCanGuessFirstMeeting => _assassinFirstMeeting == null || _assassinFirstMeeting.Value;
 
+        // v0.5.0
+        public static int MadMayorVotes => _madMayorVotes?.Value ?? 2;
+        public static bool MadMayorKnownToImpostors => _madMayorKnownToImpostors != null && _madMayorKnownToImpostors.Value;
+        public static int MadStuntmanLives => _madStuntmanLives?.Value ?? 1;
+        public static bool MadStuntmanNotify => _madStuntmanNotify != null && _madStuntmanNotify.Value;   // default false
+        public static float MadHawkVision => _madHawkVision?.Value ?? 3f;
+        public static float MadHawkSpeed => _madHawkSpeed?.Value ?? 1f;
+        public static int WorshipperUses => _worshipperUses?.Value ?? 1;
+        public static float WorshipperCooldown => _worshipperCooldown?.Value ?? 30f;
+        public static bool JackalFriendsKnownToJackal => _jackalFriendsKnownToJackal != null && _jackalFriendsKnownToJackal.Value;
+        public static bool JackalFriendsSheriffCanKill => _jackalFriendsSheriffCanKill == null || _jackalFriendsSheriffCanKill.Value;
+        public static bool EvilNekomataVotersOnly => _nekomataVotersOnly == null || _nekomataVotersOnly.Value;
+        public static bool EvilNekomataExcludeImpostors => _nekomataExcludeImpostors == null || _nekomataExcludeImpostors.Value;
+        public static bool EvilNekomataAnnounce => _nekomataAnnounce == null || _nekomataAnnounce.Value;
+        public static float SerialKillerKillCooldown => _serialKillerKillCooldown?.Value ?? 10f;
+        /// <summary>Raw option; SerialKiller.Limit() raises it to KillCooldown + 5 when set lower.</summary>
+        public static float SerialKillerSuicideTime => _serialKillerSuicideTime?.Value ?? 30f;
+        public static bool SerialKillerResetAtMeeting => _serialKillerResetAtMeeting == null || _serialKillerResetAtMeeting.Value;
+        /// <summary>0 = the lobby kill cooldown (Samurai.KillCooldown()).</summary>
+        public static float SamuraiKillCooldown => _samuraiKillCooldown?.Value ?? 45f;
+        /// <summary>Slash radius in map units.</summary>
+        public static float SamuraiRange => _samuraiRange?.Value ?? 2f;
+        /// <summary>Seconds between two bystander deaths (never 0: one MurderPlayer RPC per HudManager tick). Options.cs has no UnityEngine import: System.Math.</summary>
+        public static float SamuraiStagger => Math.Max(0.1f, Math.Min(1f, _samuraiStagger?.Value ?? 0.3f));
+        public static bool SamuraiHitTeammates => _samuraiHitTeammates != null && _samuraiHitTeammates.Value;
+        public static float EvilHawkVision => _evilHawkVision?.Value ?? 2f;
+
         /// <summary>Total number of custom-role slots that are enabled (for quick sanity messages).</summary>
         public static int EnabledSlots()
         {
@@ -753,8 +810,8 @@ namespace PocketRoles.Core
                     case CustomRole.Sheriff:
                         _descriptors.Add(Float("sheriff.cooldown", sJa, sEn, "キルクールダウン", "Kill cooldown", _sheriffKillCooldown, 2.5f, 180f, 2.5f, color)
                             .Tip("シェリフがキルボタンを再び使えるまでの秒数。", "Seconds before the Sheriff can shoot again.", "警长再次开枪所需的冷却秒数。"));
-                        _descriptors.Add(Bool("sheriff.killmadmate", sJa, sEn, "マッドメイトを撃てる", "Can kill Madmate", _sheriffCanKillMadmate, color)
-                            .Tip("オンならマッドメイトを撃っても自分は死にません。", "On: shooting a Madmate does not kill the Sheriff.", "开启后射杀疯子船员不会让警长死亡。"));
+                        _descriptors.Add(Bool("sheriff.killmadmate", sJa, sEn, "マッド系を撃てる", "Can kill Mad roles", _sheriffCanKillMadmate, color)
+                            .Tip("オンならマッド系役職（マッドメイト・マッドメイヤー・マッドスタントマン・マッドホーク・崇拝者）を撃っても自分は死にません。", "On: shooting a Mad-type role (Madmate, Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper) does not kill the Sheriff.", "开启后射杀狂粉系职业（内鬼狂粉、狂粉市长、疯狂特技演员、鹰眼狂粉、崇拜者）不会让警长死亡。"));
                         break;
                     case CustomRole.Jackal:
                         _descriptors.Add(Float("jackal.cooldown", sJa, sEn, "キルクールダウン", "Kill cooldown", _jackalKillCooldown, 2.5f, 180f, 2.5f, color)
@@ -784,7 +841,7 @@ namespace PocketRoles.Core
                         break;
                     case CustomRole.Madmate:
                         _descriptors.Add(Bool("madmate.known", sJa, sEn, "インポスターに公開", "Known to impostors", _madmateKnownToImpostors, color)
-                            .Tip("オンならインポスターに誰がマッドメイトか表示されます。", "On: Impostors see who the Madmate is.", "开启后内鬼可以看到谁是疯子船员。"));
+                            .Tip("オンならインポスターにマッド系役職（マッドメイト・マッドスタントマン・マッドホーク・崇拝者）が誰か表示されます（マッドメイヤーは別設定）。", "On: Impostors see who the Mad-type players are (Madmate, Mad Stuntman, Mad Hawk; Ⓦ for the Worshipper; the Mad Mayor has its own switch).", "开启后内鬼可以看到谁是狂粉系职业（内鬼狂粉、疯狂特技演员、鹰眼狂粉；崇拜者为 Ⓦ；狂粉市长另有设置）。"));
                         break;
                     // v0.4.1
                     case CustomRole.Lovers:
@@ -810,6 +867,67 @@ namespace PocketRoles.Core
                             .Tip("1回の会議で /cmd guess を使える回数。", "How many /cmd guess an Assassin may use per meeting.", "每次会议可使用 /cmd guess 的次数。"));
                         _descriptors.Add(Bool("assassin.firstmeeting", sJa, sEn, "初回会議でも推理可", "Can guess in 1st meeting", _assassinFirstMeeting, color)
                             .Tip("オフなら試合の最初の会議では推理できません。", "Off: no guessing in the first meeting of the game.", "关闭后本局第一次会议不能猜测。"));
+                        break;
+                    // ---- v0.5.0
+                    case CustomRole.MadMayor:
+                        _descriptors.Add(Int("madmayor.votes", sJa, sEn, "票数", "Votes", _madMayorVotes, 1, 5, 1, color)
+                            .Tip("マッドメイヤーの1票を何票として数えるか。", "How many votes the Mad Mayor's single vote counts as.", "狂粉市长的一票算作几票。"));
+                        _descriptors.Add(Bool("madmayor.known", sJa, sEn, "インポスターに公開", "Known to impostors", _madMayorKnownToImpostors, color)
+                            .Tip("オンならインポスターに誰がマッドメイヤーか表示されます。", "On: Impostors see who the Mad Mayor is.", "开启后内鬼可以看到谁是狂粉市长。"));
+                        break;
+                    case CustomRole.MadStuntman:
+                        _descriptors.Add(Int("madstuntman.lives", sJa, sEn, "耐えられるキル回数", "Kills survived", _madStuntmanLives, 1, 10, 1, color)
+                            .Tip("この回数まではキルされても死にません（投票による追放は防げません）。", "Kill attempts the Mad Stuntman survives before one goes through (votes are never blocked).", "在此次数内被击杀也不会死（无法阻止投票放逐）。"));
+                        _descriptors.Add(Bool("madstuntman.notify", sJa, sEn, "本人に通知", "Notify stuntman", _madStuntmanNotify, color)
+                            .Tip("オンならキルを耐えたことと残り回数を本人にチャットで知らせます（ヴァンパイアの噛みつきや魔女の呪いを耐えた時も知らせます。キルした側にはいつも知らせます）。", "On: the stuntman is told in chat that it survived and how many attempts are left (also for an absorbed Vampire bite or Witch spell; the killer is always told).", "开启后会用聊天告诉本人挡下了击杀以及剩余次数（挡下吸血鬼的咬或女巫的诅咒时也会告知；击杀者始终会被告知）。"));
+                        break;
+                    case CustomRole.MadHawk:
+                        _descriptors.Add(Float("madhawk.vision", sJa, sEn, "視界倍率", "Vision multiplier", _madHawkVision, 1f, 5f, 0.25f, color)
+                            .Tip("マッドホークの視界の倍率（停電中は、狭くなった視界にこの倍率がかかります）。", "Vision multiplier of the Mad Hawk (during a blackout the shrunken vision is multiplied).", "鹰眼狂粉的视野倍率（停电时是缩小后视野的倍数）。"));
+                        _descriptors.Add(Float("madhawk.speed", sJa, sEn, "速度倍率", "Speed multiplier", _madHawkSpeed, 0.5f, 1.5f, 0.25f, color)
+                            .Tip("マッドホークの移動速度の倍率（1 = 通常。広い視界の代償に遅くするなら 1 未満）。", "Movement speed multiplier of the Mad Hawk (1 = normal; below 1 to pay for the wide vision).", "鹰眼狂粉的移动速度倍率（1 = 普通；小于 1 可作为大视野的代价）。"));
+                        break;
+                    case CustomRole.Worshipper:
+                        _descriptors.Add(Int("worshipper.uses", sJa, sEn, "崇拝回数", "Worships", _worshipperUses, 1, 5, 1, color)
+                            .Tip("1 試合に崇拝できる回数（成功した分だけ数えます）。", "How many players the Worshipper may convert per game (only successes count).", "每局可以崇拜的次数（只计成功的次数）。"));
+                        _descriptors.Add(Float("worshipper.cooldown", sJa, sEn, "崇拝のクールダウン", "Worship cooldown", _worshipperCooldown, 2.5f, 180f, 2.5f, color)
+                            .Tip("崇拝してから次に崇拝できるまでの秒数（キルボタンのクールダウン）。", "Seconds between two worships (the kill button's cooldown).", "两次崇拜之间的秒数（击杀键冷却）。"));
+                        break;
+                    case CustomRole.JackalFriends:
+                        _descriptors.Add(Bool("jackalfriends.known", sJa, sEn, "ジャッカルに公開", "Known to Jackal", _jackalFriendsKnownToJackal, color)
+                            .Tip("オンならジャッカルにジャッカルフレンズの名前が青く見えます。", "On: the Jackal sees the Jackal Friends' names in blue.", "开启后豺狼能看到豺狼之友的名字（蓝色）。"));
+                        _descriptors.Add(Bool("jackalfriends.sheriff", sJa, sEn, "シェリフに撃たれる", "Sheriff can shoot", _jackalFriendsSheriffCanKill, color)
+                            .Tip("オンならシェリフはジャッカルフレンズを撃っても死にません。オフなら誤射扱いでシェリフが死にます。", "On: the Sheriff may shoot Jackal Friends without dying. Off: shooting one is a misfire (the Sheriff dies).", "开启后警长射杀豺狼之友不会死亡；关闭则视为误杀，警长死亡。"));
+                        break;
+                    case CustomRole.EvilHawk:
+                        _descriptors.Add(Float("evilhawk.vision", sJa, sEn, "視界倍率", "Vision multiplier", _evilHawkVision, 1f, 5f, 0.25f, color)
+                            .Tip("イビルホークの視界の倍率（インポスターの視界に掛けます。常時有効）。", "Vision multiplier of the Evil Hawk (applied to the impostor vision, always on).", "邪恶鹰眼的视野倍率（乘以内鬼视野，始终有效）。"));
+                        break;
+                    case CustomRole.EvilNekomata:
+                        _descriptors.Add(Bool("evilnekomata.voters", sJa, sEn, "道連れは投票者から", "Drag a voter only", _nekomataVotersOnly, color)
+                            .Tip("オンなら自分に投票した人の中から、オフなら生存者全員の中から道連れを選びます。", "On: the victim is one of the players who voted for you. Off: any living player.", "开启：从投票给你的人中选择；关闭：从所有存活玩家中选择。"));
+                        _descriptors.Add(Bool("evilnekomata.excludeimp", sJa, sEn, "インポスター陣営を除外", "Exclude impostor team", _nekomataExcludeImpostors, color)
+                            .Tip("オンならインポスター陣営（マッド系役職含む）は道連れになりません。", "On: Impostor-team players (Madmate family included) are never dragged.", "开启后内鬼阵营（含狂粉系职业）不会被拖走。"));
+                        _descriptors.Add(Bool("evilnekomata.announce", sJa, sEn, "道連れを全員に通知", "Announce the drag", _nekomataAnnounce, color)
+                            .Tip("オンなら追放画面の後に「○○ は △△ の道連れになりました」と全員に届きます。オフなら本人にだけ届きます。", "On: after the ejection screen everyone reads who was dragged along. Off: only the victim is told.", "开启后放逐画面结束时所有人都会看到谁被拖走；关闭则只通知本人。"));
+                        break;
+                    case CustomRole.SerialKiller:
+                        _descriptors.Add(Float("serialkiller.cooldown", sJa, sEn, "キルクールダウン", "Kill cooldown", _serialKillerKillCooldown, 1f, 60f, 1f, color)
+                            .Tip("シリアルキラーがキルボタンを再び使えるまでの秒数。", "Seconds before the Serial Killer can kill again.", "连环杀手再次击杀所需的秒数。"));
+                        _descriptors.Add(Float("serialkiller.time", sJa, sEn, "自殺までの時間", "Time until suicide", _serialKillerSuicideTime, 10f, 300f, 5f, color)
+                            .Tip("前のキルからこの秒数キルしないと自滅します（会議中は止まります。キルCD+5 秒未満には下がりません）。", "Seconds without a kill before the Serial Killer dies by itself (paused during meetings; never below kill cooldown + 5).", "距上次击杀超过此秒数未击杀则自灭（会议中暂停；不会低于击杀冷却+5 秒）。"));
+                        _descriptors.Add(Bool("serialkiller.meetingreset", sJa, sEn, "会議でタイマーをリセット", "Timer resets at meetings", _serialKillerResetAtMeeting, color)
+                            .Tip("オンなら会議が終わるたびにタイマーが最初から始まります。オフなら残り時間を引き継ぎます。", "On: the timer restarts after every meeting. Off: the remaining time carries over.", "开启后每次会议结束计时重新开始；关闭则沿用剩余时间。"));
+                        break;
+                    case CustomRole.Samurai:
+                        _descriptors.Add(Float("samurai.cooldown", sJa, sEn, "斬撃のクールダウン", "Slash cooldown", _samuraiKillCooldown, 0f, 180f, 2.5f, color)
+                            .Tip("斬撃から次の斬撃までの秒数（0 = キルクールダウンと同じ）。", "Seconds between two slashes (0 = same as the kill cooldown).", "两次斩击之间的秒数（0 = 与击杀冷却相同）。"));
+                        _descriptors.Add(Float("samurai.range", sJa, sEn, "斬撃の範囲", "Slash range", _samuraiRange, 0.5f, 5f, 0.25f, color)
+                            .Tip("侍を中心にした半径。バニラのキル距離はおよそ 短1 / 中1.8 / 長2.5。", "Radius around the Samurai. Vanilla kill distances are roughly short 1 / medium 1.8 / long 2.5.", "以武士为中心的半径。原版击杀距离约为 短1 / 中1.8 / 长2.5。"));
+                        _descriptors.Add(Float("samurai.stagger", sJa, sEn, "倒れる間隔", "Death interval", _samuraiStagger, 0.1f, 1f, 0.1f, color)
+                            .Tip("巻き込まれた人が順に倒れる間隔の秒数（0.3 = 公式サーバーの送信間隔）。", "Seconds between two bystander deaths (0.3 = the official server's packet spacing).", "被波及者依次倒下的间隔秒数（0.3 = 官方服务器的发送间隔）。"));
+                        _descriptors.Add(Bool("samurai.teammates", sJa, sEn, "味方も斬る", "Hits allies", _samuraiHitTeammates, color)
+                            .Tip("オンなら範囲内のインポスター陣営（インポスター・マッド系役職など）も死にます。", "On: Impostor-team players in range (Impostors, Madmate family …) die too.", "开启后范围内的内鬼阵营（内鬼、狂粉系职业等）也会死亡。"));
                         break;
                 }
             }
@@ -1040,7 +1158,10 @@ namespace PocketRoles.Core
         /// Sets one option from a chat command. Keys: "&lt;role&gt;.count", "&lt;role&gt;.chance", "sheriff.cooldown", "sheriff.killmadmate",
         /// "jackal.cooldown", "jackal.vent", "vampire.delay", "mayor.votes", "snitch.tasks", "lighter.vision", "speedbooster.speed",
         /// "madmate.known", "lovers.impostor", "lovers.lastthree", "arsonist.cooldown", "arsonist.vent", "witch.cooldown", "witch.mark",
-        /// "assassin.guesses", "assassin.firstmeeting" (v0.4.1), "lang", "enabled", "welcome", "roleinfo", "register", "kick", "general.ignoreversion",
+        /// "assassin.guesses", "assassin.firstmeeting" (v0.4.1), "madmayor.votes", "madmayor.known", "madstuntman.lives", "madstuntman.notify",
+        /// "madhawk.vision", "madhawk.speed", "worshipper.uses", "worshipper.cooldown", "jackalfriends.known", "jackalfriends.sheriff", "evilhawk.vision",
+        /// "evilnekomata.voters", "evilnekomata.excludeimp", "evilnekomata.announce", "serialkiller.cooldown", "serialkiller.time", "serialkiller.meetingreset",
+        /// "samurai.cooldown", "samurai.range", "samurai.stagger", "samurai.teammates" (v0.5.0), "lang", "enabled", "welcome", "roleinfo", "register", "kick", "general.ignoreversion",
         /// "lobby.autorehost", "lobby.autopublic", "lobby.autopublicdelay", "lobby.rehostmax", "lobby.maxping" (alias "maxping"), "compat.risky",
         /// "lobby.autostart", "lobby.autostartplayers", "lobby.autostartcountdown", "lobby.timermode", "lobby.timerwarnat",
         /// "lobby.extenddelay", "lobby.autoregion", "lobby.dleks", "gm", "hotkeys", "hotkeys.haison", "hotkeys.endmeeting",
@@ -1170,6 +1291,28 @@ namespace PocketRoles.Core
                 case "witch.mark": case "witch.spelledseemark": return SetBool(_witchSpelledSeeMark, value, "witch.mark", out message);
                 case "assassin.guesses": case "assassin.guessespermeeting": return SetInt(_assassinGuessesPerMeeting, value, 1, 5, "assassin.guesses", out message);
                 case "assassin.firstmeeting": case "assassin.first": case "assassin.canguessfirstmeeting": return SetBool(_assassinFirstMeeting, value, "assassin.firstmeeting", out message);
+                // v0.5.0 roles
+                case "madmayor.votes": case "madmayor.vote": return SetInt(_madMayorVotes, value, 1, 5, "madmayor.votes", out message);
+                case "madmayor.known": case "madmayor.knowntoimpostors": return SetBool(_madMayorKnownToImpostors, value, "madmayor.known", out message);
+                case "madstuntman.lives": case "madstuntman.guard": case "madstuntman.guards": case "stunt.lives": return SetInt(_madStuntmanLives, value, 1, 10, "madstuntman.lives", out message);
+                case "madstuntman.notify": case "madstuntman.notifystuntman": case "stunt.notify": return SetBool(_madStuntmanNotify, value, "madstuntman.notify", out message);
+                case "madhawk.vision": case "madhawk.visionmultiplier": return SetFloat(_madHawkVision, value, 1f, 5f, "madhawk.vision", out message);
+                case "madhawk.speed": case "madhawk.speedmultiplier": return SetFloat(_madHawkSpeed, value, 0.5f, 1.5f, "madhawk.speed", out message);
+                case "worshipper.uses": case "worshipper.times": case "worshipper.worships": return SetInt(_worshipperUses, value, 1, 5, "worshipper.uses", out message);
+                case "worshipper.cooldown": case "worshipper.cd": return SetFloat(_worshipperCooldown, value, 2.5f, 180f, "worshipper.cooldown", out message);
+                case "jackalfriends.known": case "jackalfriends.knowntojackal": case "jf.known": return SetBool(_jackalFriendsKnownToJackal, value, "jackalfriends.known", out message);
+                case "jackalfriends.sheriff": case "jackalfriends.sheriffcankill": case "jf.sheriff": return SetBool(_jackalFriendsSheriffCanKill, value, "jackalfriends.sheriff", out message);
+                case "evilhawk.vision": case "evilhawk.visionmultiplier": case "eh.vision": return SetFloat(_evilHawkVision, value, 1f, 5f, "evilhawk.vision", out message);
+                case "evilnekomata.voters": case "evilnekomata.votersonly": case "nekomata.voters": case "neko.voters": return SetBool(_nekomataVotersOnly, value, "evilnekomata.voters", out message);
+                case "evilnekomata.excludeimp": case "evilnekomata.excludeimpostors": case "nekomata.excludeimp": case "neko.excludeimp": return SetBool(_nekomataExcludeImpostors, value, "evilnekomata.excludeimp", out message);
+                case "evilnekomata.announce": case "nekomata.announce": case "neko.announce": return SetBool(_nekomataAnnounce, value, "evilnekomata.announce", out message);
+                case "serialkiller.cooldown": case "serialkiller.cd": case "serialkiller.killcooldown": case "sk.cooldown": case "sk.cd": return SetFloat(_serialKillerKillCooldown, value, 1f, 60f, "serialkiller.cooldown", out message);
+                case "serialkiller.time": case "serialkiller.suicide": case "serialkiller.suicidetime": case "serialkiller.limit": case "sk.time": return SetFloat(_serialKillerSuicideTime, value, 10f, 300f, "serialkiller.time", out message);
+                case "serialkiller.meetingreset": case "serialkiller.reset": case "serialkiller.resetatmeeting": case "sk.reset": return SetBool(_serialKillerResetAtMeeting, value, "serialkiller.meetingreset", out message);
+                case "samurai.cooldown": case "samurai.cd": case "samurai.killcooldown": return SetFloat(_samuraiKillCooldown, value, 0f, 180f, "samurai.cooldown", out message);
+                case "samurai.range": case "samurai.radius": return SetFloat(_samuraiRange, value, 0.5f, 5f, "samurai.range", out message);
+                case "samurai.stagger": case "samurai.interval": return SetFloat(_samuraiStagger, value, 0.1f, 1f, "samurai.stagger", out message);
+                case "samurai.teammates": case "samurai.allies": case "samurai.hitteammates": return SetBool(_samuraiHitTeammates, value, "samurai.teammates", out message);
                 case "sheriff.cooldown": case "sheriff.cd": case "sheriff.killcooldown": return SetFloat(_sheriffKillCooldown, value, 2.5f, 180f, "sheriff.cooldown", out message);
                 case "sheriff.killmadmate": case "sheriff.madmate": return SetBool(_sheriffCanKillMadmate, value, "sheriff.killmadmate", out message);
                 case "jackal.cooldown": case "jackal.cd": case "jackal.killcooldown": return SetFloat(_jackalKillCooldown, value, 2.5f, 180f, "jackal.cooldown", out message);
@@ -1255,6 +1398,42 @@ namespace PocketRoles.Core
                     case CustomRole.Assassin:
                         line += Lang.TF("opt.desc.assassin", " 推理{0}回/会議", " {0} guess/meeting", AssassinGuessesPerMeeting);
                         if (!AssassinCanGuessFirstMeeting) line += Lang.T("opt.desc.assassin.first", " 初回会議不可", ", not in 1st meeting");
+                        break;
+                    // ---- v0.5.0
+                    case CustomRole.MadMayor:
+                        line += Lang.TF("opt.desc.madmayor", " {0}票", " {0} votes", MadMayorVotes);
+                        if (MadMayorKnownToImpostors) line += Lang.T("opt.desc.madmayor.known", " インポスターに公開", ", known to impostors");
+                        break;
+                    case CustomRole.MadStuntman:
+                        line += Lang.TF("opt.desc.madstuntman", " 耐久{0}回", " survives {0}", MadStuntmanLives);
+                        if (MadStuntmanNotify) line += Lang.T("opt.desc.madstuntman.notify", " 本人に通知", ", notifies");
+                        break;
+                    case CustomRole.MadHawk:
+                        line += $" x{MadHawkVision:0.#}";   // same inline form as Lighter / SpeedBooster
+                        if (Math.Abs(MadHawkSpeed - 1f) > 0.001f) line += Lang.TF("opt.desc.madhawk.speed", " 速度x{0:0.##}", ", speed x{0:0.##}", MadHawkSpeed);
+                        break;
+                    case CustomRole.Worshipper:
+                        line += Lang.TF("opt.desc.worshipper", " 崇拝{0}回 CD{1:0.#}秒", " {0} worship(s), CD {1:0.#}s", WorshipperUses, WorshipperCooldown);
+                        break;
+                    case CustomRole.JackalFriends:
+                        if (JackalFriendsKnownToJackal) line += Lang.T("opt.desc.jackalfriends", " ジャッカルに公開", " known to Jackal");
+                        if (!JackalFriendsSheriffCanKill) line += Lang.T("opt.desc.jackalfriends.sheriff", " シェリフ不可", ", Sheriff cannot shoot");
+                        break;
+                    case CustomRole.EvilHawk: line += $" x{EvilHawkVision:0.#}"; break;
+                    case CustomRole.EvilNekomata:   // only deviations from the defaults are shown
+                        if (!EvilNekomataVotersOnly) line += Lang.T("opt.desc.evilnekomata.anyone", " 生存者全員から", ", any player");
+                        if (!EvilNekomataExcludeImpostors) line += Lang.T("opt.desc.evilnekomata.impok", " インポスターも対象", ", impostors too");
+                        if (!EvilNekomataAnnounce) line += Lang.T("opt.desc.evilnekomata.silent", " 非公開", ", silent");
+                        break;
+                    case CustomRole.SerialKiller:
+                        line += Lang.TF("opt.desc.serialkiller", " キルCD{0:0.#}秒 制限{1:0.#}秒", " KCD {0:0.#}s, limit {1:0.#}s", SerialKillerKillCooldown, SerialKillerSuicideTime);
+                        if (!SerialKillerResetAtMeeting) line += Lang.T("opt.desc.serialkiller.noreset", " 会議で継続", ", no reset at meetings");
+                        break;
+                    case CustomRole.Samurai:
+                        if (SamuraiKillCooldown > 0f) line += Lang.TF("opt.desc.samurai", " 斬撃CD{0:0.#}秒", " slash CD {0:0.#}s", SamuraiKillCooldown);
+                        line += Lang.TF("opt.desc.samurai.range", " 範囲{0:0.#}", ", range {0:0.#}", SamuraiRange);
+                        if (Math.Abs(SamuraiStagger - 0.3f) > 0.001f) line += Lang.TF("opt.desc.samurai.stagger", " 間隔{0:0.#}秒", ", stagger {0:0.#}s", SamuraiStagger);
+                        if (SamuraiHitTeammates) line += Lang.T("opt.desc.samurai.teammates", " 味方も斬る", ", hits allies");
                         break;
                 }
                 lines.Add(line);

@@ -12,7 +12,9 @@ namespace PocketRoles.Core
         Madmate, Vampire, Mafia,
         Jester, Opportunist, Terrorist, Jackal,
         // v0.4.1
-        Lovers, Arsonist, Witch, Assassin
+        Lovers, Arsonist, Witch, Assassin,
+        // v0.5.0 (values are never persisted; order = Roles.All order)
+        MadMayor, MadStuntman, MadHawk, Worshipper, JackalFriends, EvilHawk, EvilNekomata, SerialKiller, Samurai
     }
 
     public sealed class RoleInfo
@@ -78,9 +80,9 @@ namespace PocketRoles.Core
             new RoleInfo { Id = CustomRole.Sheriff, Key = "sheriff", NameJa = "シェリフ", NameEn = "Sheriff", Team = Team.Crew, Color = "#f8cd46",
                 // A Sheriff holds the Impostor role on its own client and cannot use task consoles: its tasks are fake.
                 IsKiller = true, ImpostorDesync = true, CanVent = false, CanSabotage = false, TasksCount = false,
-                DescJa = "キルボタンでインポスターやジャッカル、放火魔を撃てます。クルーを撃つと自分が死にます。ベントとサボタージュは使えず、タスクは偽物です。",
-                DescEn = "You have a kill button to shoot Impostors, the Jackal and the Arsonist. Shooting anyone else kills you instead. No venting or sabotage; your tasks are fake.",
-                NameZh = "警长", DescZh = "可用击杀键射杀内鬼、豺狼和纵火犯。误杀其他人会让自己死亡。不能跳管和破坏，任务是假的。",
+                DescJa = "キルボタンでインポスターやジャッカル、放火魔を撃てます（設定でマッド系役職・ジャッカルフレンズも）。クルーを撃つと自分が死にます。ベントとサボタージュは使えず、タスクは偽物です。",
+                DescEn = "You have a kill button to shoot Impostors, the Jackal and the Arsonist (Mad-type roles and Jackal Friends by option). Shooting anyone else kills you instead. No venting or sabotage; your tasks are fake.",
+                NameZh = "警长", DescZh = "可用击杀键射杀内鬼、豺狼和纵火犯（按设置也可射杀狂粉系职业、豺狼之友）。误杀其他人会让自己死亡。不能跳管和破坏，任务是假的。",
                 Aliases = new[] { "sh" } },
             new RoleInfo { Id = CustomRole.Mayor, Key = "mayor", NameJa = "メイヤー", NameEn = "Mayor", Team = Team.Crew, Color = "#204d42",
                 TasksCount = true,
@@ -118,6 +120,37 @@ namespace PocketRoles.Core
                 DescEn = "A crewmate on the Impostor team. You see Impostors in red but cannot kill. You win with the Impostors.",
                 NameZh = "内鬼狂粉", DescZh = "内鬼阵营的船员。内鬼的名字显示为红色，但你不能击杀。内鬼获胜时你也获胜。",
                 Aliases = new[] { "mad", "mm" } },
+            // ---- v0.5.0 Madmate family (crew pool, vanilla Crewmate on every client, see Roles.IsMadType).
+            // Ordering matters: Roles.TryParse resolves a ≥2-char ja prefix / ≥1-char zh prefix to the FIRST row, so `マッド` and
+            // `マッドメイ` stay Madmate (row above); the shortest unique prefixes are マッドメイヤ / マッドス / マッドホ / 崇拝 and 狂 / 疯 / 鹰 / 崇
+            // (README alias sentence quotes them). DescEn of the Mad Mayor is ≤ 100 chars on purpose: /cmd r <role> is capped at 3 messages.
+            new RoleInfo { Id = CustomRole.MadMayor, Key = "madmayor", NameJa = "マッドメイヤー", NameEn = "Mad Mayor", NameZh = "狂粉市长", Team = Team.Impostor, Color = ImpostorColor,
+                TasksCount = false,
+                DescJa = "インポスター陣営のクルーです。会議での投票が複数票として数えられます。インポスターの名前が赤く見えますがキルはできません。インポスターが勝つとあなたも勝ちです。タスクは偽物です。",
+                DescEn = "A Madmate whose vote counts as several votes. You see Impostors in red but cannot kill; fake tasks.",
+                DescZh = "内鬼阵营的船员，会议中的投票按多票计算。内鬼的名字显示为红色，但你不能击杀。内鬼获胜时你也获胜。任务是假的。",
+                Aliases = new[] { "mmy", "madmy", "mmayor" } },
+            new RoleInfo { Id = CustomRole.MadStuntman, Key = "madstuntman", NameJa = "マッドスタントマン", NameEn = "Mad Stuntman", NameZh = "疯狂特技演员", Team = Team.Impostor, Color = ImpostorColor,
+                // The first [MadStuntman] Lives kill attempts on it fail (Kills.TryStuntmanGuard) — votes, the Assassin's guess and disconnects still kill it.
+                TasksCount = false,
+                DescJa = "インポスター陣営のクルーです。インポスターの名前が赤く見えます。キルはできませんが、キルされても設定回数までは死にません（追放は防げません）。インポスターが勝つとあなたも勝ちです。",
+                DescEn = "A crewmate on the Impostor team. You see Impostors in red and cannot kill, but you survive the first few kill attempts (a vote still gets you). You win with the Impostors.",
+                DescZh = "内鬼阵营的船员。内鬼的名字显示为红色，你不能击杀，但前几次被击杀不会死（投票放逐无法避免）。内鬼获胜时你也获胜。",
+                Aliases = new[] { "stunt", "madstunt", "mst", "ms" } },
+            new RoleInfo { Id = CustomRole.MadHawk, Key = "madhawk", NameJa = "マッドホーク", NameEn = "Mad Hawk", NameZh = "鹰眼狂粉", Team = Team.Impostor, Color = ImpostorColor,
+                // Passive Lighter-style multiplier on a crewmate-basis client (SNR's active "hawk eye" needs a button a vanilla crewmate does not have).
+                TasksCount = false,
+                DescJa = "インポスター陣営のクルーです。視界が通常よりずっと広くなります。インポスターの名前が赤く見えます。キルはできません。インポスターが勝つとあなたも勝ちです。",
+                DescEn = "A crewmate on the Impostor team with much wider vision. You see Impostors in red but cannot kill. You win with the Impostors.",
+                DescZh = "内鬼阵营的船员，视野比普通船员大得多。内鬼的名字显示为红色，但你不能击杀。内鬼获胜时你也获胜。",
+                Aliases = new[] { "mh", "mhawk" } },
+            // Madmate with a button: its own client is an Impostor (kill button = worship), everyone else sees a Crewmate.
+            new RoleInfo { Id = CustomRole.Worshipper, Key = "worshipper", NameJa = "崇拝者", NameEn = "Worshipper", NameZh = "崇拜者", Team = Team.Impostor, Color = ImpostorColor,
+                IsKiller = true, ImpostorDesync = true, CanVent = false, CanSabotage = false, TasksCount = false,
+                DescJa = "インポスター陣営のクルー。インポスターは分かりません。キルボタンで相手を崇拝しマッドメイトにします（回数制限）。インポスターを崇拝すると自爆、回数切れ後は失敗だけ。ベント・サボ不可、タスクは偽物。",
+                DescEn = "A crewmate on the Impostor team; you do not know who the Impostors are. Your kill button worships: the target becomes a Madmate (limited uses). Worshipping an Impostor kills you; after the last use the button only fails. No venting or sabotage; your tasks are fake.",
+                DescZh = "内鬼阵营的船员（不知道谁是内鬼）。击杀键变为“崇拜”，对方成为内鬼狂粉（次数有限）。崇拜内鬼会自爆，次数用完后只会失败。不能跳管和破坏，任务是假的。",
+                Aliases = new[] { "ws", "worship" } },
             new RoleInfo { Id = CustomRole.Vampire, Key = "vampire", NameJa = "ヴァンパイア", NameEn = "Vampire", Team = Team.Impostor, Color = ImpostorColor,
                 IsKiller = true, CanVent = true, CanSabotage = true, FromImpostorPool = true,
                 DescJa = "インポスターです。キルは「噛みつき」になり、相手は数秒後に死にます。",
@@ -142,6 +175,34 @@ namespace PocketRoles.Core
                 DescEn = "An Impostor. In a meeting type /cmd guess <name> <role>: a correct guess kills the target, a wrong one kills you.",
                 DescZh = "内鬼。会议中输入 /cmd guess 名字 职业：猜对则对方死亡，猜错则你死亡。",
                 Aliases = new[] { "as", "asn" } },
+            // ---- v0.5.0 impostor-pool roles (real vanilla Impostor on the client; listed in Game.IsImpostorTeamKiller).
+            // Evil Hawk stays FIRST: TryParse's prefix passes take the first row, so イビ / イビル / 邪 / 邪恶 resolve here; イビルホ / イビル猫 and
+            // 邪恶鹰 / 邪恶猫 are the prefixes that are certain whatever the order (README alias sentence).
+            new RoleInfo { Id = CustomRole.EvilHawk, Key = "evilhawk", NameJa = "イビルホーク", NameEn = "Evil Hawk", NameZh = "邪恶鹰眼", Team = Team.Impostor, Color = ImpostorColor,
+                IsKiller = true, CanVent = true, CanSabotage = true, FromImpostorPool = true,
+                DescJa = "インポスターです。視界が通常のインポスターよりずっと広くなります。キル・ベント・サボタージュは通常どおりです。",
+                DescEn = "An Impostor who sees much further than a normal Impostor. Kills, vents and sabotages as usual.",
+                DescZh = "内鬼。视野比普通内鬼大得多。击杀、跳管、破坏与普通内鬼相同。",
+                Aliases = new[] { "eh" } },
+            new RoleInfo { Id = CustomRole.EvilNekomata, Key = "evilnekomata", NameJa = "イビル猫又", NameEn = "Evil Nekomata", NameZh = "邪恶猫又", Team = Team.Impostor, Color = ImpostorColor,
+                IsKiller = true, CanVent = true, CanSabotage = true, FromImpostorPool = true,
+                DescJa = "インポスターです。通常どおりキルできます。会議で追放されると、あなたに投票した人の中からランダムで 1 人を道連れにします。",
+                DescEn = "An Impostor who kills normally. When you are voted out, one random player who voted for you dies with you.",
+                DescZh = "内鬼，可以正常击杀。当你在会议中被投出时，会从投票给你的人中随机拖一人一起死。",
+                Aliases = new[] { "nekomata", "neko", "eneko" } },
+            // After SuperNewRoles: vanilla Impostor with a short kill cooldown that dies by itself when it has not killed for [SerialKiller] SuicideTime.
+            new RoleInfo { Id = CustomRole.SerialKiller, Key = "serialkiller", NameJa = "シリアルキラー", NameEn = "Serial Killer", NameZh = "连环杀手", Team = Team.Impostor, Color = ImpostorColor,
+                IsKiller = true, CanVent = true, CanSabotage = true, FromImpostorPool = true,
+                DescJa = "インポスターです。キルクールダウンが短い代わりに、前のキルから一定時間キルしないとその場で自滅します（キルするたびにリセット、会議中は停止）。ベント・サボタージュ可。",
+                DescEn = "An Impostor with a very short kill cooldown. If you do not kill within the time limit after your last kill you die on the spot (the timer restarts with every kill and pauses during meetings). Can vent and sabotage.",
+                DescZh = "内鬼。击杀冷却很短，但距上次击杀超过限定时间仍未击杀就会当场自灭（每次击杀后重置，会议中暂停）。可跳管、可破坏。",
+                Aliases = new[] { "sk", "serial" } },
+            new RoleInfo { Id = CustomRole.Samurai, Key = "samurai", NameJa = "侍", NameEn = "Samurai", NameZh = "武士", Team = Team.Impostor, Color = ImpostorColor,
+                IsKiller = true, CanVent = true, CanSabotage = true, FromImpostorPool = true,
+                DescJa = "インポスターです。キルが「斬撃」になり、キルした相手に続いて、その瞬間にあなたの周囲にいた人が次々に死にます。クールダウンは長めです。",
+                DescEn = "An Impostor whose kill is a slash: your target dies, then everyone who was near you at that moment falls one after another. Long cooldown.",
+                DescZh = "内鬼。你的击杀变成“斩击”：击杀目标之后，那一刻你周围的所有人也会接连死亡。冷却较长。",
+                Aliases = new[] { "sam", "sm" } },
             new RoleInfo { Id = CustomRole.Jester, Key = "jester", NameJa = "ジェスター", NameEn = "Jester", Team = Team.Neutral, Color = "#ec62a5",
                 TasksCount = false,
                 DescJa = "第三陣営です。会議で追放されると単独勝利します。タスクは偽物です。",
@@ -166,6 +227,14 @@ namespace PocketRoles.Core
                 DescEn = "A neutral killer. You can kill anyone. Win by eliminating the Impostors and outnumbering the remaining crew.",
                 NameZh = "豺狼", DescZh = "中立杀手。可以击杀任何人。消灭全部内鬼，且剩余船员人数不超过你时获胜。",
                 Aliases = new[] { "jk" } },
+            // v0.5.0: the Jackal's Madmate — vanilla Crewmate on its client (no kill button), Team.Neutral so its tasks never count on the
+            // host and it wins only through the Jackal (WinConditions.ComputeWinners). DescEn ≤ 100 chars (3-message /cmd r cap).
+            new RoleInfo { Id = CustomRole.JackalFriends, Key = "jackalfriends", NameJa = "ジャッカルフレンズ", NameEn = "Jackal Friends", NameZh = "豺狼之友", Team = Team.Neutral, Color = JackalColor,
+                TasksCount = false,
+                DescJa = "ジャッカル陣営のクルーです。ジャッカルの名前が青く見えます。キルはできません。ジャッカルが勝つとあなたも勝ちです。タスクは偽物です。",
+                DescEn = "Jackal-side crewmate: you see the Jackal in blue, cannot kill, and win with the Jackal. Fake tasks.",
+                DescZh = "豺狼阵营的船员。豺狼的名字显示为蓝色，但你不能击杀。豺狼获胜时你也获胜。任务是假的。",
+                Aliases = new[] { "jf", "friends", "friend" } },
             new RoleInfo { Id = CustomRole.Lovers, Key = "lovers", NameJa = "ラバーズ", NameEn = "Lovers", NameZh = "恋人", Team = Team.Neutral, Color = LoversColor,
                 TasksCount = false,
                 DescJa = "恋人です。相手の名前に♥が見えます。片方が死ぬともう片方も死にます。2人とも生きて試合が終わる（または残り3人になる）と2人だけの勝利です。タスクは偽物です。",
@@ -232,6 +301,16 @@ namespace PocketRoles.Core
         }
 
         public static string ColoredName(CustomRole r) => Info(r).ColoredName;
+
+        /// <summary>
+        /// The Madmate family (v0.5.0): Team.Impostor without a real kill — Madmate, Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper
+        /// (and every player the Worshipper converts, which becomes a literal Madmate). Drives exactly three rules: not crew for the
+        /// count thresholds (WinConditions.EvaluateBase), [Sheriff] CanKillMadmate (Kills.CanSheriffKill), the impostor-side Ⓜ/Ⓦ marker
+        /// (NameTags rule 3). The red-impostor-names rule (NameTags rule 2) is IsMadType minus the Worshipper. A converter must refuse
+        /// a target for which this is true (Game.ConvertRole doc).
+        /// </summary>
+        public static bool IsMadType(CustomRole r) =>
+            r == CustomRole.Madmate || r == CustomRole.MadMayor || r == CustomRole.MadStuntman || r == CustomRole.MadHawk || r == CustomRole.Worshipper;
 
         /// <summary>
         /// True when <paramref name="r"/> must not be assigned right now: the lobby runs in the unregistered compat

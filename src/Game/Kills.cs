@@ -29,6 +29,10 @@ namespace PocketRoles.Game
         private static readonly Dictionary<byte, float> LastSabotageNotice = new Dictionary<byte, float>();
         private static readonly Dictionary<byte, float> LastMafiaNotice = new Dictionary<byte, float>();
         private static readonly List<byte> Scratch = new List<byte>();
+        /// <summary>v0.5.0 (Samurai): a paced multi-victim slash is running until this Time.time; WinConditions.Check and the Bait auto-report wait for it (bounded: stagger window + 1 s, so a victim hiding in a vent cannot block the end).</summary>
+        private static float _slashUntil = -1f;
+        internal static void MarkSlash(float seconds) => _slashUntil = Time.time + seconds;
+        internal static bool SlashInProgress() => Game.Bites.Count > 0 && Time.time < _slashUntil;
 
         // ------------------------------------------------------------------ public API (contract)
 
@@ -46,7 +50,8 @@ namespace PocketRoles.Game
             {
                 if (kv.Value.DueAt <= now) Scratch.Add(kv.Key);
             }
-            for (int i = 0; i < Scratch.Count; i++) ExecuteBite(Scratch[i], true);
+            // v0.5.0: a Terrorist death inside the batch ends the game synchronously — no MurderPlayer after EndGame
+            for (int i = 0; i < Scratch.Count; i++) { if (Game.Ending || !Game.InProgress) break; ExecuteBite(Scratch[i], true); }
             Scratch.Clear();
         }
 
@@ -61,7 +66,8 @@ namespace PocketRoles.Game
             }
             Scratch.Clear();
             foreach (var kv in Game.Bites) Scratch.Add(kv.Key);
-            for (int i = 0; i < Scratch.Count; i++) ExecuteBite(Scratch[i], false);
+            // v0.5.0: a Terrorist death inside the batch ends the game synchronously — no MurderPlayer after EndGame
+            for (int i = 0; i < Scratch.Count; i++) { if (Game.Ending || !Game.InProgress) break; ExecuteBite(Scratch[i], false); }
             Scratch.Clear();
             Game.Bites.Clear();
         }
@@ -76,6 +82,10 @@ namespace PocketRoles.Game
             if (role == CustomRole.Jackal) return Options.JackalCanVent;
             if (role == CustomRole.Arsonist) return Options.ArsonistCanVent;
             if (role == CustomRole.Lovers) return true; // a lover keeps its vanilla side's abilities (vanilla already rejects a crew lover)
+            // v0.5.0: a Madmate is a vanilla crew client (vanilla rejects its vents itself); a vanilla Engineer converted by the Worshipper
+            // keeps its vents instead of being booted. Also covers a /assign-forced Engineer Madmate (previously booted). The Worshipper
+            // itself (Impostor client) stays on the RoleInfo path (CanVent = false → boot).
+            if (role == CustomRole.Madmate) return true;
             return Roles.Info(role).CanVent;
         }
 
@@ -87,7 +97,7 @@ namespace PocketRoles.Game
             return Roles.Info(role).CanSabotage;
         }
 
-        /// <summary>The lobby's kill cooldown (used for Vampire / Mafia / Witch, who keep the vanilla impostor cooldown).</summary>
+        /// <summary>The lobby's kill cooldown (used for Vampire / Mafia / Witch / Samurai (0 = lobby) / the Stuntman guard, who keep the vanilla impostor cooldown).</summary>
         internal static float LobbyKillCooldown()
         {
             try
@@ -112,8 +122,26 @@ namespace PocketRoles.Game
             if (Game.IsImpostorTeamKiller(targetId)) return true;
             var role = Game.RoleOf(targetId);
             if (role == CustomRole.Jackal || role == CustomRole.Arsonist) return true;
-            if (role == CustomRole.Madmate && Options.SheriffCanKillMadmate) return true;
+            if (Roles.IsMadType(role) && Options.SheriffCanKillMadmate) return true;         // Madmate family (v0.5.0: Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper, converts)
+            if (role == CustomRole.JackalFriends && Options.JackalFriendsSheriffCanKill) return true; // v0.5.0
             return false;
+        }
+
+        /// <summary>
+        /// Killers whose case returns true to vanilla CheckMurder (vanilla impostors, Mafia, Assassin, an impostor lover, v0.5.0 Evil Hawk /
+        /// Evil Nekomata): a host that is locally Impostor (desync role) as their target must be killed by Rpc.Kill here. Roles with their own
+        /// switch case (Witch, Serial Killer, Samurai …) call Rpc.Kill themselves and are NOT listed.
+        /// </summary>
+        private static bool VanillaKillsHost(CustomRole role)
+        {
+            switch (role)
+            {
+                case CustomRole.None: case CustomRole.Mafia: case CustomRole.Assassin: case CustomRole.Lovers:
+                case CustomRole.EvilHawk: case CustomRole.EvilNekomata:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static bool AnyOtherImpostorKillerAlive(byte selfId)
@@ -138,6 +166,63 @@ namespace PocketRoles.Game
             if (!Game.IsAlive(killer.PlayerId) || !Game.IsAlive(target.PlayerId)) return false;
             if (target.inVent) return false;
             if (target.protectedByGuardianThisRound) return false;
+            return true;
+        }
+
+        /// <summary>v0.5.0 shared gate: true while the target's Mad Stuntman shield absorbs kills. Consumed by the Samurai bystander filter and the Evil Nekomata candidate filter (no life spent there); presses go through TryStuntmanGuard.</summary>
+        internal static bool IsShielded(byte targetId) => MadStuntman.Remaining(targetId) > 0;
+
+        /// <summary>Killers whose kill goes through vanilla CheckMurder (HandleCheckMurder returns true): vanilla refuses moving-platform / ladder / vent-entering targets itself.</summary>
+        private static bool IsVanillaKillPath(CustomRole role) =>
+            role == CustomRole.None || role == CustomRole.Lovers || role == CustomRole.Assassin || role == CustomRole.EvilHawk || role == CustomRole.EvilNekomata;
+
+        /// <summary>
+        /// Mad Stuntman guard (v0.5.0): true when <paramref name="target"/> is a Mad Stuntman with lives left and the kill of
+        /// <paramref name="killer"/> (custom role <paramref name="role"/>) would otherwise have succeeded. Consumes one life, restarts the
+        /// killer's cooldown with its own cooldown (≥ 1 s) and notifies both. Anything that is not a plain kill (Mafia gate, Sheriff misfire,
+        /// Arsonist douse, Worshipper convert, invalid murder, a target vanilla itself refuses) returns false so the normal path answers it.
+        /// </summary>
+        private static bool TryStuntmanGuard(PlayerControl killer, PlayerControl target, CustomRole role)
+        {
+            byte killerId = killer.PlayerId, targetId = target.PlayerId;
+            if (Game.RoleOf(targetId) != CustomRole.MadStuntman) return false;
+            if (MadStuntman.Remaining(targetId) <= 0) return false;      // lives spent: the normal path decides (vanilla kill, shot, bite, spell, slash)
+            if (!IsValidMurder(killer, target)) return false;            // meeting / vent / GA shield / dead: no life spent, the normal path answers
+            // Vanilla CheckMurder refuses these targets itself (Airship moving platform / ladders, vent-enter animation) and the mod's
+            // custom-killer paths never checked them: let vanilla answer a vanilla-path press (no life, no reset).
+            if (IsVanillaKillPath(role) && (target.inMovingPlat || target.onLadder || target.walkingToVent)) return false;
+            bool wouldKill;
+            float cooldown;
+            switch (role)
+            {
+                case CustomRole.None:                                    // vanilla impostor
+                case CustomRole.Lovers:                                  // impostor lover (a crew lover has no button)
+                case CustomRole.EvilHawk:                                // v0.5.0 vanilla-path impostor-pool roles
+                case CustomRole.EvilNekomata:
+                    wouldKill = Game.IsImpostorTeamKiller(killerId); cooldown = LobbyKillCooldown(); break;
+                case CustomRole.Mafia:                                   // a blocked Mafia stays blocked (its own case: FailKill + notice)
+                    wouldKill = !AnyOtherImpostorKillerAlive(killerId); cooldown = LobbyKillCooldown(); break;
+                case CustomRole.Assassin:
+                case CustomRole.Vampire:                                 // the bite is absorbed at the press: no Bites entry
+                    wouldKill = true; cooldown = LobbyKillCooldown(); break;
+                case CustomRole.Witch:                                   // the spell is absorbed at the press: no Spelled entry
+                    wouldKill = true; cooldown = Witch.SpellCooldown(); break;
+                case CustomRole.Jackal:
+                    wouldKill = true; cooldown = Options.JackalKillCooldown; break;
+                case CustomRole.Sheriff:                                 // a misfire stays a misfire (the Sheriff dies, no life spent)
+                    wouldKill = CanSheriffKill(targetId); cooldown = Options.SheriffKillCooldown; break;
+                case CustomRole.SerialKiller:                            // v0.5.0: the guarded press restarts its countdown (MadStuntman.OnGuarded)
+                    wouldKill = true; cooldown = Options.SerialKillerKillCooldown; break;
+                case CustomRole.Samurai:                                 // v0.5.0: the whole slash is absorbed (guard returns before the Samurai case)
+                    wouldKill = true; cooldown = Samurai.KillCooldown(); break;
+                default:                                                 // Arsonist douse, Worshipper convert and anything else: not a kill
+                    wouldKill = false; cooldown = 0f; break;
+            }
+            if (!wouldKill) return false;
+            // ≥ 1 s: at a 0 s lobby cooldown (VanillaRanges) every press of a mashed button would otherwise cost a life and send an options
+            // pair + a MurderPlayer to that client (GameDataTo bursts kick the host, findings #49/#52).
+            Rpc.ResetKillCooldown(killer, Mathf.Max(1f, cooldown));   // host: SetKillTimer; client: options ×2 + FailedProtected + options back
+            MadStuntman.OnGuarded(killerId, targetId, role);
             return true;
         }
 
@@ -182,8 +267,8 @@ namespace PocketRoles.Game
 
             // A host that holds a desync role (Sheriff / Jackal / Arsonist) applied Impostor to its OWN PlayerControl, so
             // vanilla CheckMurder would reject it as an unkillable target (CanBeKilled). Decide those kills here with
-            // Rpc.Kill (vanilla impostors, Mafia, Assassin and an impostor lover; the Witch never needs a vanilla kill).
-            if (target != null && (role == CustomRole.None || role == CustomRole.Mafia || role == CustomRole.Assassin || role == CustomRole.Lovers)
+            // Rpc.Kill (vanilla impostors, Mafia, Assassin, an impostor lover, Evil Hawk, Evil Nekomata; the Witch never needs a vanilla kill).
+            if (target != null && VanillaKillsHost(role)
                 && Game.IsHost(target.PlayerId) && Game.IsDesyncImpostor(target.PlayerId))
             {
                 bool allowed = Game.IsImpostorTeamKiller(killerId) && IsValidMurder(killer, target)
@@ -201,6 +286,11 @@ namespace PocketRoles.Game
                 }
                 return false;
             }
+
+            // v0.5.0 Mad Stuntman: the first [MadStuntman] Lives kill attempts on it fail. Decided here, before the vanilla path, so a
+            // vanilla impostor's kill is caught too; the killer's button restarts as if it had killed (Rpc.ResetKillCooldown, the Vampire
+            // pattern) and no MurderPlayer reaches anyone. A pressed shielded target absorbs a Samurai's whole slash (no bystanders).
+            if (target != null && TryStuntmanGuard(killer, target, role)) return false;
 
             if (role == CustomRole.None) return true;
             var info = Roles.Info(role);
@@ -269,8 +359,24 @@ namespace PocketRoles.Game
                     Witch.Spell(killer, target);
                     return false;
 
+                // ---- v0.5.0
+                // worship (Vampire pattern on a crew target: it becomes a Madmate; an impostor target kills the worshipper)
+                case CustomRole.Worshipper:
+                    Worshipper.Worship(killer, target);
+                    return false;
+                // host-executed kill (Jackal pattern): the wire message equals vanilla's success path, but nothing depends on vanilla's
+                // CheckMurder body validating (or not) a killer whose timer is shorter than the lobby cooldown.
+                case CustomRole.SerialKiller:
+                    PocketRolesPlugin.Logger.LogInfo($"Kills: Serial Killer {Game.NameOf(killerId)} killed {Game.NameOf(targetId)}");
+                    Rpc.Kill(killer, target);
+                    return false;
+                // the kill is an area slash (pressed target + everyone in range, host-side positions, paced)
+                case CustomRole.Samurai:
+                    Samurai.Slash(killer, target);
+                    return false;
+
                 default:
-                    return true; // Assassin: vanilla kill (an impostor lover already left at the IsKiller check above)
+                    return true; // Assassin / Evil Hawk / Evil Nekomata: vanilla kill (an impostor lover already left at the IsKiller check above)
             }
         }
 
@@ -290,6 +396,9 @@ namespace PocketRoles.Game
                 if (killer == null || killer.PlayerId == targetId) reporterId = bite.Killer;
                 Game.Bites.Remove(targetId);
             }
+
+            // v0.5.0: a Serial Killer that killed someone else restarts its countdown (its own time-out death arrives here with killer == target and is ignored)
+            if (killer != null && killer.PlayerId != targetId) SerialKiller.OnKill(killer.PlayerId);
 
             // v0.4.1 role bookkeeping on any death
             Witch.OnPlayerDied(targetId);     // dead witch → curse fades; dead target → forgotten
@@ -322,6 +431,9 @@ namespace PocketRoles.Game
             {
                 if (!Game.IsHostActive || !Game.InProgress || Game.Ending) return;
                 if (MeetingHud.Instance != null || ExileController.Instance != null) return;
+                // v0.5.0: a Samurai's slash is still executing (paced bites): reporting now would make FlushBites fire every remaining victim
+                // in one frame. Wait for the batch (bounded by Kills.MarkSlash).
+                if (SlashInProgress()) { Scheduler.After(0.3f, () => ForceReport(reporterId, bodyId)); return; }
                 var reporter = Game.Player(reporterId);
                 if (reporter == null || !Game.IsAlive(reporterId)) return;
                 var body = Game.Info(bodyId);
@@ -346,7 +458,7 @@ namespace PocketRoles.Game
                 Game.Bites.Remove(victimId);
                 return;
             }
-            if (allowPostpone && victim.inVent)
+            if (allowPostpone && (victim.inVent || victim.onLadder || victim.inMovingPlat))
             {
                 bite.DueAt = Time.time + 1f;
                 Game.Bites[victimId] = bite;
@@ -416,6 +528,8 @@ namespace PocketRoles.Game
             LastSabotageNotice.Clear();
             LastMafiaNotice.Clear();
             Arsonist.ResetNotices();
+            Worshipper.ResetNotices();
+            _slashUntil = -1f;
         }
     }
 

@@ -36,7 +36,56 @@ namespace PocketRoles.Game
         }
 
         /// <summary>
-        /// Replacement tally used only when an alive Mayor has cast a counted vote. Returns false when the vote is not yet over.
+        /// Weight of one counted vote: [Mayor] Votes for a Mayor, [MadMayor] Votes for a Mad Mayor (v0.5.0), else 1.
+        /// Callers apply it only to living voters (a dead / disconnected voter counts once, as vanilla would).
+        /// </summary>
+        internal static int VoteWeightOf(byte voter)
+        {
+            switch (Core.Game.RoleOf(voter))
+            {
+                case CustomRole.Mayor: return Math.Max(1, Options.MayorVotes);
+                case CustomRole.MadMayor: return Math.Max(1, Options.MadMayorVotes);
+                default: return 1;
+            }
+        }
+
+        /// <summary>
+        /// v0.5.0 generic "who voted for whom" reader (Evil Nekomata): players whose counted vote was <paramref name="targetId"/>, one entry
+        /// per player — the Mayor / Mad Mayor tally repeats a VoterState per extra vote. <paramref name="states"/> is the tallied array bound
+        /// by Meetings_VotingCompletePatch (the guaranteed copy); <paramref name="hud"/>.playerStates is the fallback only (whether
+        /// PlayerVoteArea.VotedForId survives vanilla's ClearForResults is not verifiable from the interop).
+        /// </summary>
+        internal static List<byte> VotersFor(byte targetId, Il2CppStructArray<MeetingHud.VoterState> states, MeetingHud hud)
+        {
+            var seen = new HashSet<byte>();
+            var list = new List<byte>();
+            if (states != null && states.Length > 0)
+            {
+                for (int i = 0; i < states.Length; i++)
+                {
+                    var vs = states[i];
+                    byte voter = vs.VoterId;   // byte locals first: no operator ambiguity whichever way the interop typed the fields
+                    byte voted = vs.VotedForId;
+                    if (voted != targetId) continue;
+                    if (seen.Add(voter)) list.Add(voter);
+                }
+                return list;
+            }
+            var areas = hud != null ? hud.playerStates : null;
+            if (areas == null) return list;
+            foreach (var pva in areas)
+            {
+                if (pva == null || pva.AmDead || !pva.DidVote) continue;
+                byte voter = pva.PlayerId;
+                byte vote = pva.VotedForId;
+                if (vote != targetId) continue;
+                if (seen.Add(voter)) list.Add(voter);
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Replacement tally used only when an alive Mayor / Mad Mayor has cast a counted vote. Returns false when the vote is not yet over.
         /// </summary>
         internal static bool TryEndVotingWithMayor(MeetingHud hud)
         {
@@ -54,7 +103,6 @@ namespace PocketRoles.Game
             byte missedVote = PlayerVoteArea.MissedVote;
             byte skippedVote = PlayerVoteArea.SkippedVote;
             byte deadVote = PlayerVoteArea.DeadVote;
-            int mayorVotes = Math.Max(1, Options.MayorVotes);
 
             var tally = new Dictionary<byte, int>();
             var states = new List<MeetingHud.VoterState>();
@@ -67,14 +115,11 @@ namespace PocketRoles.Game
                 if (ps.AmDead) continue; // killed mid-meeting (Assassin): its vote is not tallied
                 if (!ps.DidVote || !IsCountedVote(vote, hasNotVoted, missedVote, deadVote)) continue;
 
-                int weight = 1;
-                if (Core.Game.RoleOf(voter) == CustomRole.Mayor && Core.Game.IsAlive(voter) && !ps.AmDead)
-                {
-                    weight = mayorVotes;
-                    // Duplicate entries make vanilla clients draw one extra vote icon per extra vote.
-                    for (int i = 1; i < mayorVotes; i++)
-                        states.Add(new MeetingHud.VoterState { VoterId = voter, VotedForId = vote });
-                }
+                // v0.5.0: Mayor and Mad Mayor share one weight helper (ps.AmDead voters left above; a disconnected voter is not IsAlive and counts once).
+                int weight = Core.Game.IsAlive(voter) ? VoteWeightOf(voter) : 1;
+                // Duplicate entries make vanilla clients draw one extra vote icon per extra vote.
+                for (int i = 1; i < weight; i++)
+                    states.Add(new MeetingHud.VoterState { VoterId = voter, VotedForId = vote });
                 tally.TryGetValue(vote, out int cur);
                 tally[vote] = cur + weight;
             }
@@ -135,10 +180,10 @@ namespace PocketRoles.Game
             return true;
         }
 
-        /// <summary>An alive Mayor has cast a vote that counts (skip included) and extra votes are enabled.</summary>
+        /// <summary>An alive Mayor / Mad Mayor has cast a vote that counts (skip included) and extra votes are enabled.</summary>
         internal static bool AliveMayorVoted(MeetingHud hud)
         {
-            if (Options.MayorVotes <= 1) return false;
+            if (Options.MayorVotes <= 1 && Options.MadMayorVotes <= 1) return false; // nobody can carry extra votes → vanilla tally
             var areas = hud.playerStates;
             if (areas == null) return false;
             byte hasNotVoted = PlayerVoteArea.HasNotVoted;
@@ -148,7 +193,7 @@ namespace PocketRoles.Game
             {
                 if (ps == null || ps.AmDead || !ps.DidVote) continue;
                 byte voter = ps.PlayerId;
-                if (Core.Game.RoleOf(voter) != CustomRole.Mayor || !Core.Game.IsAlive(voter)) continue;
+                if (VoteWeightOf(voter) <= 1 || !Core.Game.IsAlive(voter)) continue; // Mayor or Mad Mayor (v0.5.0)
                 byte vote = ps.VotedForId;
                 if (IsCountedVote(vote, hasNotVoted, missedVote, deadVote)) return true;
             }
@@ -253,7 +298,7 @@ namespace PocketRoles.Game
     [HarmonyPatch(typeof(MeetingHud), nameof(MeetingHud.VotingComplete))]
     internal static class Meetings_VotingCompletePatch
     {
-        private static void Postfix(MeetingHud __instance, NetworkedPlayerInfo exiled)
+        private static void Postfix(MeetingHud __instance, [HarmonyArgument(0)] Il2CppStructArray<MeetingHud.VoterState> states, NetworkedPlayerInfo exiled)
         {
             try
             {
@@ -267,6 +312,7 @@ namespace PocketRoles.Game
                     Witch.OnPlayerExiled(exiledId);
                     Arsonist.OnPlayerDied(exiledId);
                     Lovers.OnPlayerExiled(exiledId);
+                    EvilNekomata.OnPlayerExiled(exiledId, states, __instance);   // v0.5.0: an exiled Evil Nekomata drags one voter (bite; skipped when the exile ends the game)
                 }
                 if (!AntiBlackout.Prepared) AntiBlackout.Prepare(exiledId);
                 if (exiledId != 255 && Core.Game.RoleOf(exiledId) == CustomRole.Jester && Core.Game.SoloWinner == CustomRole.None)
@@ -306,6 +352,7 @@ namespace PocketRoles.Game
                         Core.Game.Bites[k] = b;
                     }
                 }
+                SerialKiller.OnExileWrapUp();   // v0.5.0: countdowns hold until the resume below (clients' kill timers are reset there)
                 byte exiledId = Core.Game.LastExiled;
                 // A suppressed end (test mode) falls through to the resync below like any other exile.
                 // Pending solo wins: an exiled Jester, or a Terrorist assassinated mid-meeting with all tasks done.
@@ -326,6 +373,7 @@ namespace PocketRoles.Game
                 // v0.4.1: the witch's curse strikes now (bites due 2 s after the exile screen, after AntiBlackout.Restore);
                 // after the end checks so the curse is not announced when the exile ended the game.
                 Witch.OnMeetingEnd(exiledId);
+                EvilNekomata.OnMeetingEnd(exiledId);   // v0.5.0: drag bite → +2.5 s (behind the +2 s curses), public line scheduled at +2 s
                 // Vanilla re-broadcasts the true options around the meeting and clients set their post-meeting kill
                 // timer from what they hold now: queue the private options right behind the exile (the 2 s resend below
                 // stays as the safety net).
@@ -334,6 +382,7 @@ namespace PocketRoles.Game
                 {
                     if (!Core.Game.IsHostActive || !Core.Game.InProgress) return;
                     OptionsDesync.ResyncAll();
+                    SerialKiller.OnMeetingEnd();   // v0.5.0: reset / carry over, authoritative kill-timer reset, private notice (before the forced tag refresh so the countdown tag rides along)
                     NameTags.RefreshAll(force: true);
                     WinConditions.Check();
                 });

@@ -20,7 +20,7 @@ namespace PocketRoles
     {
         public const string Id = "jp.pocketroles.mod";
         public const string Name = "PocketRoles";
-        public const string Version = "0.4.3";
+        public const string Version = "0.5.0";
         public const string SupportedGameVersion = "2026.8.18";
 
         public static ManualLogSource Logger;
@@ -330,7 +330,11 @@ namespace PocketRoles
                 // restore, lobby summary) still leave after /mod off or a game-mode switch.
                 var client = AmongUsClient.Instance;
                 if (client != null && client.AmHost) Rpc.Queue.Tick();
-                if (Core.Game.IsHostActive) Kills.Tick();
+                if (Core.Game.IsHostActive)
+                {
+                    SerialKiller.Tick(); // v0.5.0: counts down, queues a time-out death as a bite …
+                    Kills.Tick();        // … which executes in this same frame
+                }
             }
             catch (Exception e)
             {

@@ -66,7 +66,7 @@ namespace PocketRoles.Core
         public static Dictionary<byte, RoleTypes> VanillaRoles = new Dictionary<byte, RoleTypes>();
         public static Dictionary<byte, string> OriginalNames = new Dictionary<byte, string>();
 
-        /// <summary>Delayed, host-executed death (Kills.Tick). Reason: null = vampire bite, "lovers", "curse", "assassin" (log only).</summary>
+        /// <summary>Delayed, host-executed death (Kills.Tick). Reason: null = vampire bite, "lovers", "curse", "assassin", "nekomata" (Evil Nekomata drag), "serialkiller" (own time-out), "slash" (Samurai bystander) (log only; Kills.SlashInProgress keys on the batch window, not on the reason).</summary>
         public struct VampireBite { public byte Killer; public float DueAt; public string Reason; }
         public static Dictionary<byte, VampireBite> Bites = new Dictionary<byte, VampireBite>();
 
@@ -82,6 +82,23 @@ namespace PocketRoles.Core
         /// <summary>Meetings started in this game (MeetingHud.Start postfix; the first meeting is 1).</summary>
         public static int MeetingsHeld;
 
+        // ---- v0.5.0 role state (cleared in ResetRoleState)
+        /// <summary>Mad Stuntman playerId → kill attempts it has already survived (Kills.TryStuntmanGuard / MadStuntman.Remaining).</summary>
+        public static Dictionary<byte, int> StuntGuards = new Dictionary<byte, int>();
+        /// <summary>worshipper playerId → players it turned into Madmates, in conversion order (permanent; dead converts stay: Ⓜ mark, uses count, reminder line).</summary>
+        public static Dictionary<byte, List<byte>> Worshipped = new Dictionary<byte, List<byte>>();
+        /// <summary>Players an exiled Evil Nekomata drags along (bites registered at VotingComplete; re-armed to +2.5 s and announced from ExileController.WrapUp).</summary>
+        public static List<byte> NekomataDragged = new List<byte>();
+        /// <summary>
+        /// Serial Killer countdown: Remaining = seconds left (≤ 0 while the death is pending / retried); Warned = the "N s left" notice went
+        /// out in this cycle; TimedOut = the time-out was logged / announced; TagStep = countdown value last put into the own name tag (5 s steps, -1 = never).
+        /// </summary>
+        public struct SerialKillerTimer { public float Remaining; public bool Warned; public bool TimedOut; public int TagStep; }
+        /// <summary>serial killer playerId → countdown (SerialKiller.Tick; entries of dead / disconnected players are dropped there).</summary>
+        public static Dictionary<byte, SerialKillerTimer> SerialKillerTimers = new Dictionary<byte, SerialKillerTimer>();
+        /// <summary>Set at ExileController.WrapUp, cleared by SerialKiller.OnMeetingEnd (WrapUp + 2 s): the countdowns hold until the clients' kill timers were reset.</summary>
+        public static bool SerialKillerPaused;
+
         public static bool IsLover(byte id) => id != 255 && (id == LoverA || id == LoverB);
         public static byte PartnerOf(byte id) => id == 255 ? (byte)255 : (id == LoverA ? LoverB : (id == LoverB ? LoverA : (byte)255));
 
@@ -92,6 +109,13 @@ namespace PocketRoles.Core
             Spelled.Clear();
             GuessesThisMeeting.Clear();
             MeetingsHeld = 0;
+            // v0.5.0
+            StuntGuards.Clear();
+            Worshipped.Clear();
+            NekomataDragged.Clear();
+            SerialKillerTimers.Clear();
+            SerialKillerPaused = false;
+            SerialKiller.ResetState();   // one "limit raised" warning per game
         }
 
         public static HashSet<byte> ExtraWinners = new HashSet<byte>();
@@ -243,7 +267,7 @@ namespace PocketRoles.Core
         /// <summary>Scheduler tags that belong to a running game (cancelled at lobby start).</summary>
         private static readonly string[] GameScopedTags =
         {
-            "win.end", "assign.roleinfo", "assign.introend", "haison.end", "antiblackout.restore", "names.meeting", "gm.apply"
+            "win.end", "assign.roleinfo", "assign.introend", "haison.end", "antiblackout.restore", "names.meeting", "gm.apply", "serialkiller.arm"
         };
 
         public static CustomRole RoleOf(byte id)
@@ -275,19 +299,50 @@ namespace PocketRoles.Core
             return IsVanillaImpostorRole(VanillaRoleOf(id)) ? Team.Impostor : Team.Crew;
         }
 
-        /// <summary>Vanilla impostor-type role incl. Vampire/Mafia/Witch/Assassin (and an impostor lover) — NOT Madmate.</summary>
+        /// <summary>Vanilla impostor-type role incl. Vampire/Mafia/Witch/Assassin and the v0.5.0 Evil Hawk/Evil Nekomata/Serial Killer/Samurai (and an impostor lover) — NOT the Madmate family (Roles.IsMadType).</summary>
         public static bool IsImpostorTeamKiller(byte id)
         {
             var role = RoleOf(id);
-            if (role == CustomRole.Vampire || role == CustomRole.Mafia || role == CustomRole.Witch || role == CustomRole.Assassin) return true;
-            if (role == CustomRole.Lovers) return IsVanillaImpostorRole(VanillaRoleOf(id)); // an impostor lover keeps its kill button and counts as an impostor
-            if (role != CustomRole.None) return false;
-            return IsVanillaImpostorRole(VanillaRoleOf(id));
+            switch (role)
+            {
+                case CustomRole.Vampire: case CustomRole.Mafia: case CustomRole.Witch: case CustomRole.Assassin:
+                // v0.5.0 impostor-pool killers
+                case CustomRole.EvilHawk: case CustomRole.EvilNekomata: case CustomRole.SerialKiller: case CustomRole.Samurai:
+                    return true;
+                case CustomRole.Lovers:   // an impostor lover keeps its kill button and counts as an impostor
+                case CustomRole.None:
+                    return IsVanillaImpostorRole(VanillaRoleOf(id));
+                default:
+                    return false;         // every other custom role incl. the Madmate family and the Jackal Friends
+            }
         }
 
         public static bool IsDesyncImpostor(byte id) => InfoOf(id).ImpostorDesync;
 
         public static bool IsJackal(byte id) => RoleOf(id) == CustomRole.Jackal;
+
+        /// <summary>Madmate FAMILY (Roles.IsMadType: Madmate, Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper, converts). Not "is exactly a Madmate".</summary>
+        public static bool IsMadType(byte id) => Core.Roles.IsMadType(RoleOf(id));
+
+        /// <summary>
+        /// v0.5.0: the only sanctioned mid-game writer of <see cref="Roles"/> (the Worshipper's conversion). Writes the table, logs
+        /// before → after, and pushes what every consumer caches per client: task totals (Win_RecomputeTaskCountsPatch), the target's
+        /// per-client options (OptionsDesync.Resync: base options back for a Lighter / SpeedBooster convert, one paced packet), and the
+        /// name tags (paced, changed pairs only). The caller sends its notices and calls WinConditions.Check() afterwards.
+        /// Callers MUST refuse targets for which IsImpostorTeamKiller, IsMadType, IsDesyncImpostor or RoleOf == Lovers is true: the
+        /// client keeps its first SetRole (2026.8.18 rule), so only a vanilla-Crewmate → Crewmate-looking change is view-neutral.
+        /// </summary>
+        public static CustomRole ConvertRole(byte id, CustomRole to, string why)
+        {
+            CustomRole before = RoleOf(id);
+            Roles[id] = to;
+            PocketRolesPlugin.Logger.LogInfo($"Game: #{id} {NameOf(id)} {before} -> {to} ({why})");
+            try { GameData.Instance?.RecomputeTaskCounts(); }
+            catch (System.Exception e) { PocketRolesPlugin.Logger.LogWarning($"Game.ConvertRole: RecomputeTaskCounts: {e.Message}"); }
+            OptionsDesync.Resync(id);
+            NameTags.RefreshAll();
+            return before;
+        }
 
         /// <summary>Any player with a kill button that is not on the crew side (real impostors, Vampire, Mafia, Jackal, but not Sheriff).</summary>
         public static bool IsNonCrewKiller(byte id) => IsImpostorTeamKiller(id) || IsJackal(id);

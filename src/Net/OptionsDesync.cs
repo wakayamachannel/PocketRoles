@@ -85,6 +85,32 @@ namespace PocketRoles.Net
                     case CustomRole.Witch:
                         if (Options.WitchSpellCooldown > 0f) opts.SetFloat(FloatOptionNames.KillCooldown, Mathf.Max(0.02f, Options.WitchSpellCooldown));
                         break;
+                    // ---- v0.5.0
+                    // Mad Hawk = Lighter pattern (crewmate-basis client reads CrewLightMod) + optional SpeedBooster-style factor. The speed
+                    // product is clamped to the vanilla-legal PlayerSpeedMod range (NormalGameOptions.AreInvalid: 0 < speed <= 3; VanillaRanges
+                    // keeps the lobby value in 0.5..3): a client never receives 0.25 (lobby 0.5 x option 0.5). The vision product is not clamped (Lighter precedent).
+                    case CustomRole.MadHawk:
+                        opts.SetFloat(FloatOptionNames.CrewLightMod, opts.GetFloat(FloatOptionNames.CrewLightMod) * Options.MadHawkVision);
+                        if (Options.MadHawkSpeed != 1f)
+                            opts.SetFloat(FloatOptionNames.PlayerSpeedMod, Mathf.Clamp(opts.GetFloat(FloatOptionNames.PlayerSpeedMod) * Options.MadHawkSpeed, 0.5f, 3f));
+                        break;
+                    // the worship cooldown drives the client's kill button timer (impostor vision kept, like the Jackal).
+                    case CustomRole.Worshipper:
+                        opts.SetFloat(FloatOptionNames.KillCooldown, Mathf.Max(0.02f, Options.WorshipperCooldown));
+                        break;
+                    // the Serial Killer's short cooldown drives the client's kill button timer (the client resets its own timer from this value after every kill).
+                    case CustomRole.SerialKiller:
+                        opts.SetFloat(FloatOptionNames.KillCooldown, Mathf.Max(0.02f, Options.SerialKillerKillCooldown));
+                        break;
+                    // the slash cooldown drives the client's kill button timer (0 = lobby value, nothing to send).
+                    case CustomRole.Samurai:
+                        if (Options.SamuraiKillCooldown > 0f) opts.SetFloat(FloatOptionNames.KillCooldown, Mathf.Max(0.02f, Options.SamuraiKillCooldown));
+                        break;
+                    // the Evil Hawk is an Impostor-basis client, so its vision comes from ImpostorLightMod (TECH-NOTES §Per-client game options; the
+                    // Sheriff line above writes the same field — neither line has a live test record yet, §12 gate G3). Kill cooldown stays the base value.
+                    case CustomRole.EvilHawk:
+                        opts.SetFloat(FloatOptionNames.ImpostorLightMod, opts.GetFloat(FloatOptionNames.ImpostorLightMod) * Options.EvilHawkVision);
+                        break;
                     // Vampire / Mafia: vanilla impostor kill cooldown (base value) unless overridden below.
                 }
                 if (killCooldownOverride.HasValue)
@@ -106,9 +132,18 @@ namespace PocketRoles.Net
                 case CustomRole.Lighter:
                 case CustomRole.SpeedBooster:
                 case CustomRole.Arsonist:
+                // v0.5.0: always (the multiplier / cooldown is always in range; even ×1 keeps the Desynced bookkeeping honest for the Mad Hawk)
+                case CustomRole.MadHawk:
+                case CustomRole.Worshipper:
+                case CustomRole.SerialKiller:
                     return true;
                 case CustomRole.Witch:
                     return Options.WitchSpellCooldown > 0f;
+                // v0.5.0: Witch pattern — nothing to send at the neutral value
+                case CustomRole.Samurai:
+                    return Options.SamuraiKillCooldown > 0f;
+                case CustomRole.EvilHawk:
+                    return Options.EvilHawkVision > 1f;
                 default:
                     return false;
             }
@@ -235,6 +270,32 @@ namespace PocketRoles.Net
             }
         }
 
+        /// <summary>
+        /// One player's options after a mid-game role change (v0.5.0 Game.ConvertRole): custom options when the new role needs them, else
+        /// the base options back if the player was ever desynced (a Lighter / SpeedBooster convert); no-op for everyone else, the host and
+        /// disconnected players. One paced packet (Rpc.Queue), never the whole ResyncAll (which would queue one packet per custom-option
+        /// player in front of the name-tag batches and re-send the worshipper's own options a third time inside the ResetKillCooldown sequence).
+        /// </summary>
+        public static void Resync(byte playerId)
+        {
+            try
+            {
+                if (!Core.Game.IsHostActive) return;
+                var pc = Core.Game.Player(playerId);
+                if (pc == null || pc.AmOwner || pc.Data == null || pc.Data.Disconnected) return;
+                bool needs = NeedsCustomOptions(playerId);
+                if (!needs && !Desynced.Contains(playerId)) return;
+                var opts = BuildFor(playerId);
+                if (opts == null) return;
+                SendTo(pc, opts, false);
+                if (!needs) Desynced.Remove(playerId); // base options restored
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"OptionsDesync.Resync({playerId}): {e}");
+            }
+        }
+
         public static void Reset()
         {
             Desynced.Clear();
@@ -266,6 +327,10 @@ namespace PocketRoles.Net
                     case CustomRole.Jackal: __result = Mathf.Max(0.02f, Options.JackalKillCooldown); break;
                     case CustomRole.Arsonist: __result = Mathf.Max(0.02f, Options.ArsonistDouseCooldown); break;
                     case CustomRole.Witch: if (Options.WitchSpellCooldown > 0f) __result = Mathf.Max(0.02f, Options.WitchSpellCooldown); break;
+                    // v0.5.0
+                    case CustomRole.Worshipper: __result = Mathf.Max(0.02f, Options.WorshipperCooldown); break;
+                    case CustomRole.SerialKiller: __result = Mathf.Max(0.02f, Options.SerialKillerKillCooldown); break;
+                    case CustomRole.Samurai: if (Options.SamuraiKillCooldown > 0f) __result = Mathf.Max(0.02f, Options.SamuraiKillCooldown); break;
                 }
             }
             catch (Exception e)
@@ -285,8 +350,9 @@ namespace PocketRoles.Net
             {
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return;
                 if (pc == null || !pc.AmOwner) return;
-                if (Core.Game.RoleOf(pc.PlayerId) == CustomRole.SpeedBooster)
-                    __result *= Options.SpeedBoosterSpeed;
+                var role = Core.Game.RoleOf(pc.PlayerId);
+                if (role == CustomRole.SpeedBooster) __result *= Options.SpeedBoosterSpeed;
+                else if (role == CustomRole.MadHawk) __result = Mathf.Clamp(__result * Options.MadHawkSpeed, 0.5f, 3f);   // v0.5.0, same clamp as BuildFor
             }
             catch (Exception e)
             {
@@ -295,7 +361,7 @@ namespace PocketRoles.Net
         }
     }
 
-    /// <summary>Host's own vision: Lighter ×, Sheriff gets crew-equivalent vision (its local role is Impostor).</summary>
+    /// <summary>Host's own vision: Lighter ×, Mad Hawk × (crew basis), Evil Hawk × (impostor basis), Sheriff gets crew-equivalent vision (its local role is Impostor).</summary>
     [HarmonyPatch(typeof(ShipStatus), nameof(ShipStatus.CalculateLightRadius))]
     internal static class OptionsDesync_CalculateLightRadiusPatch
     {
@@ -307,6 +373,14 @@ namespace PocketRoles.Net
             if (role == CustomRole.Lighter)
             {
                 result *= Options.LighterVision;
+            }
+            else if (role == CustomRole.MadHawk)
+            {
+                result *= Options.MadHawkVision;   // v0.5.0: host is a local Crewmate → result already uses CrewLightMod
+            }
+            else if (role == CustomRole.EvilHawk)
+            {
+                result *= Options.EvilHawkVision;  // v0.5.0: the host's local role is Impostor, so `result` already carries ImpostorLightMod
             }
             else if (role == CustomRole.Sheriff)
             {

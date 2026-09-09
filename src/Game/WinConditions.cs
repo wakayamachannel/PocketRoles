@@ -22,6 +22,9 @@ namespace PocketRoles.Game
         /// <summary>Arsonist id found by the last Evaluate that returned Outcome.Arsonist.</summary>
         private static byte _evalSoloId = 255;
 
+        // v0.5.0 test-mode diagnostic (CheckNow): the last "WinConditions(test)" line, written only when it changes.
+        private static string _lastTestLine, _lastCounts = "";
+
         /// <summary>Solo win kinds (the winner is the player passed as soloId).</summary>
         private static bool IsSoloKind(WinKind kind) => kind == WinKind.Jester || kind == WinKind.Terrorist || kind == WinKind.Arsonist;
 
@@ -53,6 +56,7 @@ namespace PocketRoles.Game
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress || Core.Game.Ending) return;
                 if (Core.Game.HaisonActive) return; // 廃村: Lobby.Haison ends the game itself
                 if (MeetingHud.Instance != null || ExileController.Instance != null) return;
+                if (Kills.SlashInProgress()) return; // v0.5.0: a Samurai's paced slash finishes first (bounded, Kills.MarkSlash)
                 if (Core.Game.SoloWinner != CustomRole.None) return; // pending solo win, resolved at WrapUp
                 CheckNow();
             }
@@ -73,6 +77,7 @@ namespace PocketRoles.Game
                 {
                     // Test mode: no automatic end except the sabotage timer (and /end → EndGameOverridingTestMode).
                     if (CriticalSabotageExpired()) EndGameOverridingTestMode(WinKind.Impostor);
+                    LogTestOutcome();   // v0.5.0: the counting rules are otherwise invisible in test mode
                     return;
                 }
                 EndFromOutcome(Evaluate(255));
@@ -96,6 +101,16 @@ namespace PocketRoles.Game
                 PocketRolesPlugin.Logger.LogError($"WinConditions.WouldContinue: {e}");
                 return true;
             }
+        }
+
+        /// <summary>Test mode only: evaluates the true rules without ending anything and logs the counts when they change.</summary>
+        private static void LogTestOutcome()
+        {
+            Outcome o = Evaluate(255);   // EndFromOutcome is deliberately not called
+            string line = "WinConditions(test): outcome=" + o + " " + _lastCounts;
+            if (line == _lastTestLine) return;
+            _lastTestLine = line;
+            PocketRolesPlugin.Logger.LogInfo(line);
         }
 
         /// <summary>Set while an end is allowed despite test mode (/end, sabotage timer).</summary>
@@ -250,7 +265,7 @@ namespace PocketRoles.Game
                 if (gd.TotalTasks > 0 && gd.CompletedTasks >= gd.TotalTasks) return Outcome.Crew;
             }
 
-            int imp = 0, jackal = 0, others = 0, madmate = 0, alive = 0;
+            int imp = 0, jackal = 0, others = 0, madmate = 0, friends = 0, alive = 0;
             foreach (var id in Core.Game.AllPlayerIds())
             {
                 if (id == exiledId) continue;
@@ -261,10 +276,14 @@ namespace PocketRoles.Game
                 else
                 {
                     others++;
-                    if (Core.Game.RoleOf(id) == CustomRole.Madmate) madmate++;
+                    var r = Core.Game.RoleOf(id);
+                    if (Roles.IsMadType(r)) madmate++;                     // Madmate family (v0.5.0: Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper, converts): not crew for either threshold
+                    else if (r == CustomRole.JackalFriends) friends++;    // v0.5.0: the Jackal's Madmate — not crew for either threshold, never a killer
                 }
             }
-            int crewForCount = others - madmate;
+            int crewForCount = others - madmate - friends;
+            if (Core.Game.TestMode)
+                _lastCounts = $"alive={alive} imp={imp} jackal={jackal} others={others} madmate={madmate} friends={friends} crewForCount={crewForCount}";
 
             if (alive == 0) return Outcome.Crew;
             if (imp == 0 && jackal == 0) return Outcome.Crew;
@@ -287,8 +306,11 @@ namespace PocketRoles.Game
                 switch (kind)
                 {
                     case WinKind.Crew: win = Core.Game.TeamOf(id) == Team.Crew; break;
-                    case WinKind.Impostor: win = Core.Game.TeamOf(id) == Team.Impostor; break; // Madmate, Vampire, Mafia, vanilla impostors
-                    case WinKind.Jackal: win = role == CustomRole.Jackal && (Core.Game.IsAlive(id) || id == soloId); break;
+                    case WinKind.Impostor: win = Core.Game.TeamOf(id) == Team.Impostor; break; // Madmate family (Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper, converts), Vampire, Mafia, Witch, Assassin, Evil Hawk, Evil Nekomata, Serial Killer, Samurai, vanilla impostors
+                    case WinKind.Jackal:
+                        // v0.5.0: Jackal Friends win with the Jackal, dead or alive (Madmate parity); dead Jackals still lose
+                        win = (role == CustomRole.Jackal && (Core.Game.IsAlive(id) || id == soloId)) || role == CustomRole.JackalFriends;
+                        break;
                     case WinKind.Jester:
                     case WinKind.Terrorist:
                     case WinKind.Arsonist: win = id == soloId; break;
@@ -381,6 +403,7 @@ namespace PocketRoles.Game
         internal static void OnLobby()
         {
             _endedByMod = false;
+            _lastTestLine = null; _lastCounts = "";
         }
 
         internal static bool ThrottledCheck()

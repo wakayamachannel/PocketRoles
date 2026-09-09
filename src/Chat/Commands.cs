@@ -352,7 +352,10 @@ namespace PocketRoles.Chat
             if (k.StartsWith("vanilla.") || k.StartsWith("sheriff.") || k.StartsWith("jackal.") || k.StartsWith("vampire.")
                 || k.StartsWith("mayor.") || k.StartsWith("snitch.") || k.StartsWith("lighter.") || k.StartsWith("speedbooster.")
                 || k.StartsWith("speed.") || k.StartsWith("sb.") || k.StartsWith("madmate.")
-                || k.StartsWith("lovers.") || k.StartsWith("arsonist.") || k.StartsWith("witch.") || k.StartsWith("assassin."))
+                || k.StartsWith("lovers.") || k.StartsWith("arsonist.") || k.StartsWith("witch.") || k.StartsWith("assassin.")
+                || k.StartsWith("madmayor.") || k.StartsWith("madstuntman.") || k.StartsWith("stunt.") || k.StartsWith("madhawk.") || k.StartsWith("worshipper.")
+                || k.StartsWith("jackalfriends.") || k.StartsWith("jf.") || k.StartsWith("evilhawk.") || k.StartsWith("evilnekomata.") || k.StartsWith("nekomata.")
+                || k.StartsWith("neko.") || k.StartsWith("serialkiller.") || k.StartsWith("sk.") || k.StartsWith("samurai."))
                 return true;
             // <role>.count / <role>.chance
             int dot = k.LastIndexOf('.');
@@ -747,8 +750,8 @@ namespace PocketRoles.Chat
             {
                 case CustomRole.Sheriff:
                     return Options.SheriffCanKillMadmate
-                        ? Lang.TF("cmd.ro.sheriff.madmate", "キルCD {0:0.#}秒、マッドメイトを撃てる", "Kill cooldown {0:0.#}s, can shoot Madmate", Options.SheriffKillCooldown)
-                        : Lang.TF("cmd.ro.sheriff", "キルCD {0:0.#}秒、マッドメイトは撃てない", "Kill cooldown {0:0.#}s, cannot shoot Madmate", Options.SheriffKillCooldown);
+                        ? Lang.TF("cmd.ro.sheriff.madmate", "キルCD {0:0.#}秒、マッド系を撃てる", "Kill cooldown {0:0.#}s, can shoot Mad roles", Options.SheriffKillCooldown)
+                        : Lang.TF("cmd.ro.sheriff", "キルCD {0:0.#}秒、マッド系は撃てない", "Kill cooldown {0:0.#}s, cannot shoot Mad roles", Options.SheriffKillCooldown);
                 case CustomRole.Jackal:
                     return Options.JackalCanVent
                         ? Lang.TF("cmd.ro.jackal.vent", "キルCD {0:0.#}秒、ベント可", "Kill cooldown {0:0.#}s, vent on", Options.JackalKillCooldown)
@@ -758,7 +761,7 @@ namespace PocketRoles.Chat
                 case CustomRole.Snitch: return Lang.TF("cmd.ro.snitch", "残りタスク {0} でキラーに位置が知られる", "Killers see you when {0} tasks are left", Options.SnitchTasksLeftToWarn);
                 case CustomRole.Lighter: return Lang.TF("cmd.ro.lighter", "視界 x{0:0.#}", "Vision x{0:0.#}", Options.LighterVision);
                 case CustomRole.SpeedBooster: return Lang.TF("cmd.ro.speed", "速度 x{0:0.#}", "Speed x{0:0.#}", Options.SpeedBoosterSpeed);
-                case CustomRole.Madmate: return Options.MadmateKnownToImpostors ? Lang.T("cmd.ro.madmate", "インポスターはマッドメイトが誰か分かる", "Impostors know who the Madmate is") : null;
+                case CustomRole.Madmate: return Options.MadmateKnownToImpostors ? Lang.T("cmd.ro.madmate", "インポスターはマッド系役職が誰か分かる", "Impostors know who the Mad-type players are") : null;
                 // v0.4.1
                 case CustomRole.Lovers:
                     return Lang.TF("cmd.ro.lovers", "インポスターも恋人になる: {0}、残り3人で勝利: {1}", "Impostor may be a lover: {0}, win as last 3: {1}", OnOff(Options.LoversAllowImpostor), OnOff(Options.LoversWinAsLastThree));
@@ -771,6 +774,32 @@ namespace PocketRoles.Chat
                         Options.WitchSpellCooldown > 0f ? Options.WitchSpellCooldown.ToString("0.#") + "s" : Lang.T("cmd.ro.witch.samecd", "キルと同じ", "same as kill"), OnOff(Options.WitchSpelledSeeMark));
                 case CustomRole.Assassin:
                     return Lang.TF("cmd.ro.assassin", "会議ごとに {0} 回推理、初回会議: {1}", "{0} guess(es) per meeting, first meeting: {1}", Options.AssassinGuessesPerMeeting, OnOff(Options.AssassinCanGuessFirstMeeting));
+                // ---- v0.5.0
+                case CustomRole.MadMayor:
+                    return Lang.TF("cmd.ro.madmayor", "投票は {0}票分、インポスターに公開: {1}", "Vote counts as {0}, known to impostors: {1}", Options.MadMayorVotes, OnOff(Options.MadMayorKnownToImpostors));
+                case CustomRole.MadStuntman:
+                    return Lang.TF("cmd.ro.madstuntman", "キルを {0} 回まで耐える、本人に通知: {1}", "Survives {0} kill(s), notify stuntman: {1}", Options.MadStuntmanLives, OnOff(Options.MadStuntmanNotify));
+                case CustomRole.MadHawk:
+                    return Options.MadmateKnownToImpostors
+                        ? Lang.TF("cmd.ro.madhawk.known", "視界 x{0:0.#}、速度 x{1:0.##}、インポスターに公開", "Vision x{0:0.#}, speed x{1:0.##}, known to impostors", Options.MadHawkVision, Options.MadHawkSpeed)
+                        : Lang.TF("cmd.ro.madhawk", "視界 x{0:0.#}、速度 x{1:0.##}", "Vision x{0:0.#}, speed x{1:0.##}", Options.MadHawkVision, Options.MadHawkSpeed);
+                case CustomRole.Worshipper:
+                    return Lang.TF("cmd.ro.worshipper", "崇拝 {0} 回、崇拝CD {1:0.#}秒、シェリフが撃てる: {2}", "{0} worship(s), cooldown {1:0.#}s, Sheriff can shoot: {2}", Options.WorshipperUses, Options.WorshipperCooldown, OnOff(Options.SheriffCanKillMadmate));
+                case CustomRole.JackalFriends:
+                    return Lang.TF("cmd.ro.jackalfriends", "ジャッカルに公開: {0}、シェリフに撃たれる: {1}", "Known to Jackal: {0}, Sheriff can shoot: {1}", OnOff(Options.JackalFriendsKnownToJackal), OnOff(Options.JackalFriendsSheriffCanKill));
+                case CustomRole.EvilHawk:
+                    return Lang.TF("cmd.ro.evilhawk", "視界 x{0:0.#}（インポスターの視界に掛ける、常時）", "Vision x{0:0.#} (times the impostor vision, always on)", Options.EvilHawkVision);
+                case CustomRole.EvilNekomata:
+                    return Lang.TF("cmd.ro.evilnekomata", "道連れ: {0}、インポスター陣営を除外: {1}、全員に通知: {2}", "Drag: {0}, impostor team excluded: {1}, announce: {2}",
+                        Options.EvilNekomataVotersOnly ? Lang.T("cmd.ro.evilnekomata.voters", "投票者から 1 人", "one of your voters") : Lang.T("cmd.ro.evilnekomata.anyone", "生存者から 1 人", "any living player"),
+                        OnOff(Options.EvilNekomataExcludeImpostors), OnOff(Options.EvilNekomataAnnounce));
+                case CustomRole.SerialKiller:
+                    return Lang.TF("cmd.ro.serialkiller", "キルCD {0:0.#}秒、自殺まで {1:0.#}秒、会議でリセット: {2}", "Kill cooldown {0:0.#}s, suicide after {1:0.#}s, reset at meetings: {2}",
+                        Options.SerialKillerKillCooldown, Options.SerialKillerSuicideTime, OnOff(Options.SerialKillerResetAtMeeting));
+                case CustomRole.Samurai:
+                    return Lang.TF("cmd.ro.samurai", "斬撃CD {0}、範囲 {1:0.#}、間隔 {2:0.#}秒、味方も斬る: {3}", "Slash cooldown {0}, range {1:0.#}, stagger {2:0.#}s, hits allies: {3}",
+                        Options.SamuraiKillCooldown > 0f ? Options.SamuraiKillCooldown.ToString("0.#") + "s" : Lang.T("cmd.ro.samurai.samecd", "キルと同じ", "same as kill"),
+                        Options.SamuraiRange, Options.SamuraiStagger, OnOff(Options.SamuraiHitTeammates));
                 default: return null;
             }
         }

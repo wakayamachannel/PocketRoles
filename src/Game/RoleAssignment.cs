@@ -312,6 +312,21 @@ namespace PocketRoles.Game
                     }
                     continue;
                 }
+                // v0.5.0: Jackal Friends only in games that have a Jackal. Killers (Jackal) are drawn first (order = killers + rest), so the
+                // Jackal slots are already decided here. Forced Friends (/assign) are already in Game.Roles and unaffected.
+                if (role.Id == CustomRole.JackalFriends && !JackalFriends.AnyJackal())
+                {
+                    if (Options.Count(role.Id) > 0)
+                    {
+                        PocketRolesPlugin.Logger.LogInfo("RoleAssignment: Jackal Friends skipped (no Jackal this game)");
+                        if (Options.Count(CustomRole.Jackal) <= 0)
+                            Chat.Chat.Local(Chat.Chat.Title, Lang.T("assign.jackalfriends.nojackal",
+                                "ジャッカルフレンズはジャッカルが配られた試合だけ配られます（ジャッカルの人数が 0 です: /set jackal 1）。",
+                                "Jackal Friends are only assigned in games that have a Jackal (Jackal count is 0: /set jackal 1).",
+                                "只有本局分配了豺狼时才会分配豺狼之友（豺狼人数为 0：/set jackal 1）。"));
+                    }
+                    continue;
+                }
                 int count = Options.Count(role.Id);
                 int chance = Options.Chance(role.Id);
                 var pool = role.FromImpostorPool ? plainImp : plainCrew;
@@ -357,6 +372,8 @@ namespace PocketRoles.Game
             if (Core.Game.LoverA != 255)
                 sb.Append("\n  Lovers: #").Append(Core.Game.LoverA).Append(' ').Append(Core.Game.NameOf(Core.Game.LoverA))
                   .Append(" & #").Append(Core.Game.LoverB).Append(' ').Append(Core.Game.NameOf(Core.Game.LoverB));
+            if (JackalFriends.Any() && !JackalFriends.AnyJackal())
+                sb.Append("\n  Jackal Friends without a Jackal (forced by /assign)");
             PocketRolesPlugin.Logger.LogInfo(sb.ToString());
         }
 
@@ -701,6 +718,7 @@ namespace PocketRoles.Game
                     if (!Core.Game.InProgress) return;
                     NameTags.RefreshAll(force: true);
                     OptionsDesync.ResyncAll();
+                    SerialKiller.OnIntroEnd();   // v0.5.0: schedules the countdown start after the LAST client's intro (paced dispatch)
                 }, "assign.introend");
             }
             catch (Exception e)

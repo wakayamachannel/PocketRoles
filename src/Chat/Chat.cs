@@ -718,6 +718,35 @@ namespace PocketRoles.Chat
                 string spelled = Game.Witch.SpelledNamesFor(playerId);
                 if (!string.IsNullOrEmpty(spelled)) result += "\n" + Lang.TF("roleinfo.witch.spelled", "呪い中: {0}", "Cursed: {0}", spelled);
             }
+            // ---- v0.5.0 extras (skipped automatically in the SafeMode meeting branch above)
+            // the Stuntman always knows how many kills it can still survive (start + every meeting reminder + /cmd n); with NotifyStuntman off this is its only feedback
+            if (role == CustomRole.MadStuntman)
+                result += "\n" + Lang.TF("roleinfo.madstuntman.lives", "耐えられるキル: 残り {0} 回", "Kills you can still survive: {0}", Game.MadStuntman.Remaining(playerId));
+            // worships left (start + every meeting) and who was converted (dead converts stay listed: still Madmates)
+            if (role == CustomRole.Worshipper)
+            {
+                result += "\n" + Lang.TF("roleinfo.worshipper.uses", "崇拝の残り回数: {0}", "Worships left: {0}", Game.Worshipper.Remaining(playerId));
+                string converted = Game.Worshipper.ConvertedNamesFor(playerId);
+                if (!string.IsNullOrEmpty(converted)) result += "\n" + Lang.TF("roleinfo.worshipper.converted", "崇拝した相手: {0}", "Worshipped: {0}", converted);
+            }
+            // Jackal Friends learns its Jackal(s) by name (game start and every meeting reminder; alive ones only)
+            if (role == CustomRole.JackalFriends)
+            {
+                string jackals = Game.JackalFriends.JackalNames();
+                result += "\n" + (jackals.Length > 0
+                    ? Lang.TF("roleinfo.jackalfriends.jackal", "ジャッカル: {0}", "Jackal: {0}", jackals)
+                    : Lang.T("roleinfo.jackalfriends.nojackal", "生きているジャッカルがいません。", "No Jackal is alive.", "没有存活的豺狼。"));
+            }
+            // the Nekomata's description assumes the default voter rule; say so when the lobby drags anyone
+            if (role == CustomRole.EvilNekomata && !meeting && !Options.EvilNekomataVotersOnly)
+                result += "\n" + Lang.T("roleinfo.evilnekomata.anyone", "※この部屋の設定では、道連れは生存者全員からランダムに選ばれます。", "Note: in this lobby the drag picks any living player, not only your voters.");
+            // the Serial Killer's concrete limit (start and every meeting reminder)
+            if (role == CustomRole.SerialKiller)
+                result += "\n" + Lang.TF("roleinfo.serialkiller.limit", "制限時間: {0:0.#}秒（キルするたびにリセット。会議中は停止）", "Time limit: {0:0.#} s (restarts with every kill, paused during meetings)", Game.SerialKiller.Limit());
+            // the samurai cannot see its slash radius on screen → tell it the numbers once at game start
+            if (role == CustomRole.Samurai && !meeting)
+                result += "\n" + Lang.TF("roleinfo.samurai", "斬撃の範囲: 半径 {0:0.#}、味方のインポスターも斬る: {1}", "Slash radius {0:0.#}; hits fellow Impostors: {1}",
+                    Options.SamuraiRange, Options.SamuraiHitTeammates ? Lang.T("cmd.on", "オン", "on") : Lang.T("cmd.off", "オフ", "off"));
             return result;
         }
 

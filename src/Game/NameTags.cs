@@ -62,6 +62,8 @@ namespace PocketRoles.Game
                 if (viewerRole == CustomRole.Witch && Core.Game.Spelled.TryGetValue(targetId, out var witchId) && witchId == viewerId) mark += Witch.Mark;
                 if (viewerId == targetId && Options.WitchSpelledSeeMark && Core.Game.Spelled.ContainsKey(targetId)) mark += Witch.Mark;
                 if (viewerRole == CustomRole.Arsonist && Core.Game.Doused.TryGetValue(viewerId, out var doused) && doused.Contains(targetId)) mark += Arsonist.Mark;
+                // v0.5.0: the worshipper sees Ⓜ on the players it converted (they are literal Madmates; impostors get their own Ⓜ by rule 3)
+                if (viewerRole == CustomRole.Worshipper && Core.Game.Worshipped.TryGetValue(viewerId, out var worshipped) && worshipped.Contains(targetId)) mark += Worshipper.Mark;
                 baseName = mark + baseName;
 
                 // 1. own role tag
@@ -71,7 +73,9 @@ namespace PocketRoles.Game
                     RoleInfo info = Roles.Info(targetRole);
                     if (meeting)
                         return baseName + " <size=70%>" + info.ColoredName + "</size>";
-                    return info.ColoredName + "\r\n" + baseName;
+                    // v0.5.0: the Serial Killer sees its own countdown after the role name (5 s steps; SerialKiller.Tick refreshes when the step changes)
+                    string countdown = targetRole == CustomRole.SerialKiller ? SerialKiller.CountdownTag(targetId) : null;
+                    return info.ColoredName + (countdown != null ? " " + countdown : "") + "\r\n" + baseName;
                 }
 
                 bool viewerImpKiller = Core.Game.IsImpostorTeamKiller(viewerId);
@@ -79,13 +83,23 @@ namespace PocketRoles.Game
                 bool targetImpKiller = Core.Game.IsImpostorTeamKiller(targetId);
                 bool targetJackal = targetRole == CustomRole.Jackal;
 
-                // 2. Madmate sees the impostor-team killers in red
-                if (viewerRole == CustomRole.Madmate && targetImpKiller)
+                // 2. Madmate-family viewers (Madmate, Mad Mayor, Mad Stuntman, Mad Hawk, converts) see the impostor-team killers in red.
+                //    The Worshipper does NOT (SNR MadMaker rule: worshipping an impostor is its self-destruct risk).
+                if (Roles.IsMadType(viewerRole) && viewerRole != CustomRole.Worshipper && targetImpKiller)
                     return "<color=" + Roles.ImpostorColor + ">" + baseName + "</color>";
 
-                // 3. impostors see the Madmate marker (option)
-                if (viewerImpKiller && targetRole == CustomRole.Madmate && Options.MadmateKnownToImpostors)
-                    return "<color=" + Roles.ImpostorColor + ">Ⓜ</color>" + baseName;
+                // 3. impostors see the Ⓜ marker on a Madmate-family player (per-role KnownToImpostors option); Ⓦ for the Worshipper so the
+                //    Assassin can name the exact role (Assassin.Matches is exact)
+                if (viewerImpKiller && Roles.IsMadType(targetRole) && MadKnownToImpostors(targetRole))
+                    return (targetRole == CustomRole.Worshipper ? Worshipper.ImpostorViewMark : "<color=" + Roles.ImpostorColor + ">Ⓜ</color>") + baseName;
+
+                // 3a. v0.5.0: Jackal Friends sees every Jackal in blue (dead ones too, like the Madmate's red impostors)
+                if (viewerRole == CustomRole.JackalFriends && targetJackal)
+                    return "<color=" + Roles.JackalColor + ">" + baseName + "</color>";
+
+                // 3b. v0.5.0: the Jackal sees its Friends in blue (option)
+                if (viewerJackal && targetRole == CustomRole.JackalFriends && Options.JackalFriendsKnownToJackal)
+                    return "<color=" + Roles.JackalColor + ">" + baseName + "</color>";
 
                 // 4. Snitch nearly done → killers see a star on the Snitch
                 if (targetRole == CustomRole.Snitch && (viewerImpKiller || viewerJackal)
@@ -106,6 +120,10 @@ namespace PocketRoles.Game
             }
             return baseName;
         }
+
+        /// <summary>Per-role "known to impostors" switch of the Madmate family: [MadMayor] KnownToImpostors for the Mad Mayor, [Madmate] KnownToImpostors for everyone else (Madmate, Mad Stuntman, Mad Hawk, Worshipper, converts).</summary>
+        private static bool MadKnownToImpostors(CustomRole role) =>
+            role == CustomRole.MadMayor ? Options.MadMayorKnownToImpostors : Options.MadmateKnownToImpostors;
 
         // ------------------------------------------------------------------ RefreshAll / RestoreAll
 
