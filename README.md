@@ -4,6 +4,8 @@
 
 ▶ 動画: [導入編（YouTube・1 分半）](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [遊び方編（YouTube・3 分半）](https://www.youtube.com/watch?v=UyvmPzYSrRM)　中文: [安装篇（bilibili）](https://www.bilibili.com/video/BV17obV6CESH) / [玩法篇（bilibili）](https://www.bilibili.com/video/BV1qobV6kERQ)
 
+💬 **公式 Discord「PocketRoles 役職部屋」: <https://discord.gg/ahNvRMVeHP>** — 部屋コードの告知・募集・質問・バグ報告はここで。参加者は MOD なしで遊べます（役職部屋で遊びたい人も、ホストをしたい人も歓迎）。
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **部屋を作る人だけが入れる、Among Us（2026.8.18 / Steam）の役職 MOD です。** 友達は PC でもスマホでも Switch でも、いつもの Among Us のまま部屋コードを打つだけ。シェリフやジャッカル、ジェスターなど 26 の役職が、名前タグとチャットで本人にだけこっそり届きます。設定はロビーのパソコンから、案内は日本語・中文・English の 3 言語、外国語のチャットは自動で翻訳。ロビーの時間切れや会議の長引きもホストの手元で解決できます。無料・非営利、ソースは GitHub で公開しています（**v0.5.0**、旧名 HostRoles）。
@@ -38,7 +40,8 @@
 
 2026 年 7 月からの公式ルールで、MOD を使う部屋はサーバーに登録する必要があります（MOD 部屋登録。PocketRoles が自動で行います）。登録した部屋は **公開一覧に出ない** ので、ホストが部屋コードを伝えて入ってもらいます（[第 3 章](#3-innersloth-の-mod-ポリシーと公開部屋についての注意必読)）。コードの伝え方は自由です。いつも使っている場所に貼るだけで OK:
 
-- **Discord サーバー**: 部屋コードを貼るだけ（ホストの画面に出ているコードをコピーして貼ります。チャットに `/announce` と打つとクリップボードにコピーされます）
+- **公式 Discord「PocketRoles 役職部屋」** <https://discord.gg/ahNvRMVeHP>: `#部屋コード` にコードを貼ると、遊びたい人がそこから入ってきます（ホストをしたい人も歓迎。募集・質問・バグ報告のチャンネルもあります）
+- **自分の Discord サーバー**: 部屋コードを貼るだけ（ホストの画面に出ているコードをコピーして貼ります。チャットに `/announce` と打つとクリップボードにコピーされます）。**v0.4.5 からは自動投稿もできます**: チャンネルの「連携サービス → ウェブフック」で URL を作って設定ファイルの `[Discord] WebhookUrl` に貼ると、部屋を作るたびに「🔑 部屋コード ABCDEF — 3/15人 募集中」が投稿され、人数や「ゲーム中」が自動で書き換わります（[第 12 章](#12-設定ファイル)）
 - **LINE などのグループ**
 - **X のフォロワー**
 - **フレンドに直接**
@@ -835,6 +838,11 @@ AllCommands = true              # チャットコマンド全体を許可（fals
 RulesMode = none                # 挨拶のルール行: none（標準の「ルールなし」）| custom（RulesText）
 RulesText =                     # custom の時のルール文（\n で改行、/rules <文章>）
 WelcomeAllLanguages = true      # 短い挨拶（2 行）をその人の言語 → 残り 2 言語の順に送る（false = その人の言語だけ + 3 言語の /lang 案内 1 行）
+
+[Discord]                       # Discord に部屋コードを自動投稿（v0.4.5）。Bot 不要
+WebhookUrl =                    # チャンネル設定「連携サービス → ウェブフック → URL をコピー」の URL。空 = 投稿しない。他人に見せないこと（このファイルからだけ変更可）
+Announce = true                 # 部屋を作ると「🔑 部屋コード ABCDEF — 3/15人 募集中（役職あり）」を投稿し、入退室・開始・終了で同じ投稿を書き換える（5 秒に 1 回まで）
+Text =                          # 文面（空 = 標準）。{code} {count} {max} {state} {kind}、\n で改行、**太字** や @here も可
 
 [Translate]                     # チャット翻訳（v0.4b）。文章は Google / DeepL に送られます。DeepL のキーはこのファイルには書きません
 Enabled = true                  # 外国語のチャットを翻訳する（既定オン。文章は Google / DeepL に送られます。設定タブ「チャット翻訳」か /opt translate off でオフ）

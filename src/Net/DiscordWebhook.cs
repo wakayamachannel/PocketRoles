@@ -95,9 +95,9 @@ namespace PocketRoles.Net
 
         internal static void OnPlayersChanged() { try { Touch(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnPlayersChanged: {e}"); } }
 
-        internal static void OnGameStarted() { try { _inGame = true; Touch(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnGameStarted: {e}"); } }
+        internal static void OnGameStarted() { try { _inGame = true; PocketRolesPlugin.Logger.LogInfo("Discord: game started → update"); Touch(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnGameStarted: {e}"); } }
 
-        internal static void OnGameEnded() { try { _inGame = false; Touch(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnGameEnded: {e}"); } }
+        internal static void OnGameEnded() { try { _inGame = false; PocketRolesPlugin.Logger.LogInfo("Discord: game ended → update"); Touch(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnGameEnded: {e}"); } }
 
         /// <summary>The host leaves the lobby (disconnect / quit): the message is closed out (best effort, fire and forget).</summary>
         internal static void OnLobbyClosed()
@@ -107,7 +107,7 @@ namespace PocketRoles.Net
                 if (!Enabled || _messageId == null || _lobbyGameId == 0) return;
                 string code = GameCode.IntToGameName(_lobbyGameId);
                 string text = Lang.T("discord.closed", "部屋 {0} は閉じました。", "Lobby {0} has closed.", "房间 {0} 已关闭。").Replace("{0}", "`" + code + "`");
-                Scheduler.Cancel(Tag);
+                _pendingContent = null; _flushAt = -1f; _lobbyAt = -1f; _playersAt = -1f;
                 _lobbyGameId = 0;
                 Send(text, edit: true, closing: true);
             }
@@ -137,7 +137,11 @@ namespace PocketRoles.Net
                        .Replace("{code}", code).Replace("{count}", count.ToString()).Replace("{max}", max.ToString()).Replace("{state}", state).Replace("{kind}", kind);
         }
 
-        /// <summary>Something changed: rebuild the line and send it now, or after the throttle window.</summary>
+        /// <summary>
+        /// Something changed: rebuild the line and send it now, or when the throttle window ends (from Tick). All timing
+        /// lives in this class: the shared Scheduler is cleared on lobby join / game end, which silently dropped the
+        /// first post and pending edits (2026-09-09 live test).
+        /// </summary>
         private static void Touch()
         {
             if (!Enabled) return;
@@ -146,13 +150,19 @@ namespace PocketRoles.Net
             if (_lobbyGameId != client.GameId) { _lobbyGameId = client.GameId; _messageId = null; _posting = false; _lastContent = null; }
             string content = Build();
             if (content == null || content == _lastContent) return;
+            PocketRolesPlugin.Logger.LogInfo($"Discord: change queued (posting={_posting}, id={(_messageId ?? "none")})");
             _pendingContent = content;
-            float wait = _lastSentAt + MinInterval - UnityEngine.Time.realtimeSinceStartup;
-            Scheduler.Cancel(Tag);
+            _flushAt = Math.Max(UnityEngine.Time.realtimeSinceStartup, _lastSentAt + MinInterval);
             if (_posting) return;                    // the POST reply (message id) triggers the flush
-            if (wait > 0f) { Scheduler.After(wait, Flush, Tag); return; }
-            Flush();
+            if (_flushAt <= UnityEngine.Time.realtimeSinceStartup) Flush();
         }
+
+        private static float _flushAt = -1f;     // when the pending content may leave (throttle)
+        private static float _lobbyAt = -1f;     // OnLobby scheduled from the OnGameJoined patch
+        private static float _playersAt = -1f;   // OnPlayersChanged scheduled from the join / leave patches
+
+        internal static void ScheduleLobby(float delay) { _lobbyAt = UnityEngine.Time.realtimeSinceStartup + delay; }
+        internal static void SchedulePlayers(float delay) { _playersAt = UnityEngine.Time.realtimeSinceStartup + delay; }
 
         private static void Flush()
         {
@@ -164,6 +174,7 @@ namespace PocketRoles.Net
                 if (content == _lastContent) return;
                 _lastSentAt = UnityEngine.Time.realtimeSinceStartup;
                 _lastContent = content;
+                PocketRolesPlugin.Logger.LogInfo($"Discord: {(_messageId != null ? "edit" : "post")} → {content.Replace('\n', ' ')}");
                 Send(content, edit: _messageId != null, closing: false);
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.Flush: {e}"); }
@@ -202,8 +213,8 @@ namespace PocketRoles.Net
                     }
                 }
                 catch (Exception e) { error = e.GetType().Name + ": " + e.Message; }
-                // back to the main thread through the scheduler (Unity objects are not touched here anyway)
-                Scheduler.After(0f, () =>
+                // back to the main thread: the scheduler (a plain list + Time.time) must not be touched from this thread
+                Replies.Enqueue(() =>
                 {
                     try
                     {
@@ -219,8 +230,27 @@ namespace PocketRoles.Net
                         if (_pendingContent != null) Touch();
                     }
                     catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook reply: {e}"); }
-                }, Tag + ".reply");
+                });
             });
+        }
+
+        private static readonly System.Collections.Concurrent.ConcurrentQueue<Action> Replies = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+
+        /// <summary>Main thread (HudManager.Update): runs the HTTP replies queued by the thread pool and the timers.</summary>
+        internal static void Tick()
+        {
+            while (Replies.TryDequeue(out var a))
+            {
+                try { a(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.Tick: {e}"); }
+            }
+            try
+            {
+                float now = UnityEngine.Time.realtimeSinceStartup;
+                if (_lobbyAt >= 0f && now >= _lobbyAt) { _lobbyAt = -1f; OnLobby(); }
+                if (_playersAt >= 0f && now >= _playersAt) { _playersAt = -1f; OnPlayersChanged(); }
+                if (_pendingContent != null && !_posting && _flushAt >= 0f && now >= _flushAt) Flush();
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.Tick timers: {e}"); }
         }
 
         private static string Trim(string s) { s = (s ?? "").Replace("\n", " "); return s.Length > 160 ? s.Substring(0, 160) + "…" : s; }
@@ -249,19 +279,20 @@ namespace PocketRoles.Net
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnGameJoined))]
     internal static class DiscordWebhook_OnGameJoinedPatch
     {
-        private static void Postfix() { try { Scheduler.After(1.5f, DiscordWebhook.OnLobby, "discord.lobby"); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnGameJoinedPatch: {e}"); } }
+        // own timer, not the Scheduler: GameState clears the Scheduler in its OnGameJoined handling (patch order is undefined)
+        private static void Postfix() { try { DiscordWebhook.ScheduleLobby(1.5f); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnGameJoinedPatch: {e}"); } }
     }
 
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnPlayerJoined))]
     internal static class DiscordWebhook_OnPlayerJoinedPatch
     {
-        private static void Postfix(AmongUsClient __instance) { try { if (__instance != null && __instance.AmHost) Scheduler.After(1f, DiscordWebhook.OnPlayersChanged, "discord.players"); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnPlayerJoinedPatch: {e}"); } }
+        private static void Postfix(AmongUsClient __instance) { try { if (__instance != null && __instance.AmHost) DiscordWebhook.SchedulePlayers(1f); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnPlayerJoinedPatch: {e}"); } }
     }
 
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnPlayerLeft))]
     internal static class DiscordWebhook_OnPlayerLeftPatch
     {
-        private static void Postfix(AmongUsClient __instance) { try { if (__instance != null && __instance.AmHost) Scheduler.After(1f, DiscordWebhook.OnPlayersChanged, "discord.players"); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnPlayerLeftPatch: {e}"); } }
+        private static void Postfix(AmongUsClient __instance) { try { if (__instance != null && __instance.AmHost) DiscordWebhook.SchedulePlayers(1f); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnPlayerLeftPatch: {e}"); } }
     }
 
     [HarmonyPatch(typeof(GameManager), nameof(GameManager.StartGame))]

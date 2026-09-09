@@ -327,6 +327,7 @@ namespace PocketRoles
             try
             {
                 Scheduler.Tick();
+                Net.DiscordWebhook.Tick();
                 // The paced queue drains whenever we are host, so packets queued while the mod was active (name
                 // restore, lobby summary) still leave after /mod off or a game-mode switch.
                 var client = AmongUsClient.Instance;

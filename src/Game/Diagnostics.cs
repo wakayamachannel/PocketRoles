@@ -858,6 +858,7 @@ namespace PocketRoles.Game
             try
             {
                 if (__instance == null || AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost) return;
+                if (Scheduler.HasTag(Meetings.DeferTag)) return; // #55: the report is being held after a kill, not refused
                 byte id = __instance.PlayerId;
                 float at = Time.realtimeSinceStartup;
                 Diagnostics.LogVerbose($"PlayerControl.ReportDeadBody returned for #{id} (meetingHud={(MeetingHud.Instance != null)})");

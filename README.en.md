@@ -4,6 +4,8 @@
 
 ▶ Videos: [Install (YouTube, Japanese subtitles, 1.5 min)](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [How to play (YouTube, 3.5 min)](https://www.youtube.com/watch?v=UyvmPzYSrRM) · Chinese: [Install (bilibili)](https://www.bilibili.com/video/BV17obV6CESH) / [How to play (bilibili)](https://www.bilibili.com/video/BV1qobV6kERQ)
 
+💬 **Official Discord "PocketRoles 役職部屋": <https://discord.gg/ahNvRMVeHP>** — lobby codes, recruiting, questions and bug reports (mainly Japanese; English and Chinese are welcome). Players join lobbies without installing anything.
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **A role mod for Among Us (2026.8.18 / Steam) that only the person who creates the lobby installs.** Your friends keep their everyday Among Us on PC, phone or Switch and just type the room code. Twenty-six roles — Sheriff, Jackal, Jester and more — reach each player privately through their name tag and chat. Settings live in the lobby computer, every notice comes in Japanese / Chinese / English, foreign-language chat is translated automatically, and lobby time-outs or endless meetings are handled from the host's keyboard. Free, non-commercial, source on GitHub (**v0.5.0**, formerly HostRoles).
@@ -38,7 +40,8 @@ Details and manual installation: [chapter 5](#5-installation-steam). The launche
 
 Since July 2026 the official servers require lobbies that use mods to register (mod-lobby registration; PocketRoles does it automatically). Registered lobbies **do not appear in the public list**, so the host hands out the room code ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)). Share it any way you like, wherever your players already are:
 
-- **Discord server**: just paste the room code (copy the code shown on the host's screen; typing `/announce` in chat copies it to the clipboard)
+- **The official Discord "PocketRoles 役職部屋"** <https://discord.gg/ahNvRMVeHP>: paste your code in `#部屋コード` and players there will come (hosts are welcome too; there are channels for recruiting, questions and bug reports)
+- **Your own Discord server**: just paste the room code (copy the code shown on the host's screen; typing `/announce` in chat copies it to the clipboard). **Since v0.4.5 the mod can post it for you**: create a webhook in the channel ("Integrations → Webhooks"), paste its URL into `[Discord] WebhookUrl` in the config file, and every lobby you create posts "🔑 Lobby code ABCDEF — 3/15 players, open" and keeps the player count / "in game" up to date ([chapter 12](#12-config-file))
 - **Group chat** (LINE, WhatsApp and the like)
 - **Friends** directly
 
@@ -832,6 +835,11 @@ AllCommands = true              # allow chat commands at all (false = the host c
 RulesMode = none                # welcome rules line: none (built-in "no special rules") | custom (RulesText)
 RulesText =                     # the custom rules text (\n = line break; /rules <text>)
 WelcomeAllLanguages = true      # send the short welcome (2 lines) in the player's language, then the two others (false = the player's language plus one trilingual /lang line)
+
+[Discord]                       # post the lobby to Discord (v0.4.5). No bot needed
+WebhookUrl =                    # URL from the channel's "Integrations → Webhooks → Copy URL". Empty = off. Keep it private (config file only)
+Announce = true                 # post "🔑 Lobby code ABCDEF — 3/15 players, open (with roles)" when a lobby is created and edit it on join / leave / start / end (at most once per 5 s)
+Text =                          # your own line (empty = built-in). {code} {count} {max} {state} {kind}, \n = line break, **bold** and @here work
 
 [Translate]                     # chat translation (v0.4b). Chat text is sent to Google / DeepL. The DeepL key is never stored here
 Enabled = true                  # translate foreign-language chat (on by default; text is sent to Google / DeepL. "Chat translation" in the settings tab or /opt translate off turns it off)

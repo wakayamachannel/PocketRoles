@@ -4,6 +4,8 @@
 
 ▶ 视频: [安装篇（bilibili・1 分半）](https://www.bilibili.com/video/BV17obV6CESH) / [玩法篇（bilibili・3 分半）](https://www.bilibili.com/video/BV1qobV6kERQ)　日本語: [导入篇（YouTube）](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [玩法篇（YouTube）](https://www.youtube.com/watch?v=UyvmPzYSrRM)
 
+💬 **官方 Discord「PocketRoles 役職部屋」: <https://discord.gg/ahNvRMVeHP>** — 房间码公告、招人、提问和反馈 bug 都在这里（以日语为主，欢迎中文和英文）。玩家不用安装任何东西即可加入房间。
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **这是一个只需建房的人安装的 Among Us（2026.8.18 / Steam）职业模组。** 朋友们用 PC、手机或 Switch 上平时的 Among Us，输入房间代码就能加入。警长、豺狼、小丑等 26 种职业会通过名字标签和聊天悄悄地只告诉本人。设置在房间的电脑里完成，提示支持 日本語 / 中文 / English 三种语言，外语聊天自动翻译，房间超时和拖沓的会议也能由房主一键处理。免费、非营利，源代码在 GitHub 公开（**v0.5.0**，旧名 HostRoles）。
@@ -40,7 +42,8 @@
 
 根据 2026 年 7 月起的官方规则，使用 MOD 的房间必须向服务器注册（MOD 房间注册，PocketRoles 会自动完成）。已注册的房间 **不会出现在公开列表里**，需要房主把房间代码告诉玩家（[第 3 章](#3-innersloth-模组政策与公开房间须知必读)）。代码怎么分享都可以，贴到你平时用的地方即可：
 
-- **Discord 服务器**：贴上房间代码就行（复制房主画面上显示的代码再粘贴。在聊天里输入 `/announce` 会复制到剪贴板）
+- **官方 Discord「PocketRoles 役職部屋」** <https://discord.gg/ahNvRMVeHP>：把代码贴到 `#部屋コード`，想玩的人会从那里进来（也欢迎想当房主的人；还有招人、提问和反馈 bug 的频道）
+- **你自己的 Discord 服务器**：贴上房间代码就行（复制房主画面上显示的代码再粘贴。在聊天里输入 `/announce` 会复制到剪贴板）。**从 v0.4.5 起可以自动发布**：在频道设置「整合 → Webhook」里创建一个 Webhook，把 URL 填到配置文件的 `[Discord] WebhookUrl`，之后每次创建房间都会自动发布「🔑 房间码 ABCDEF — 3/15人 招人中」，并自动更新人数和「游戏中」（[第 12 章](#12-配置文件)）
 - **微信・QQ 群**
 - **朋友**（直接告诉）
 
@@ -836,6 +839,11 @@ AllCommands = true              # 允许所有聊天命令（false = 房主也�
 RulesMode = none                # 欢迎语规则行：none（默认的“无规则”）| custom（RulesText）
 RulesText =                     # custom 时的规则文字（\n 换行，/rules <文字>）
 WelcomeAllLanguages = true      # 把简短欢迎语（2 行）按 该玩家的语言 → 其余两种语言 的顺序发送（false = 只发该玩家的语言 + 一行三语 /lang 提示）
+
+[Discord]                       # 把房间自动发布到 Discord（v0.4.5）。不需要 Bot
+WebhookUrl =                    # 频道设置「整合 → Webhook → 复制 URL」得到的 URL。留空 = 不发布。请勿泄露（只能在配置文件里修改）
+Announce = true                 # 创建房间时发布「🔑 房间码 ABCDEF — 3/15人 招人中（有职业）」，进出房间・开始・结束时编辑同一条消息（每 5 秒最多 1 次）
+Text =                          # 自定义文案（留空 = 内置）。{code} {count} {max} {state} {kind}，\n 换行，可用 **粗体** 和 @here
 
 [Translate]                     # 聊天翻译（v0.4b）。文本会发送到 Google / DeepL。DeepL 密钥不写在这个文件里
 Enabled = true                  # 翻译外语聊天（默认开启。文本会发送到 Google / DeepL。在设置标签页“聊天翻译”或用 /opt translate off 关闭）
