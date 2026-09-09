@@ -16,6 +16,7 @@ v0.4.4 の修正版です。参加者側は今まで通りバニラのままで�
 
 - **Discord に部屋コードを自動投稿**（`[Discord] WebhookUrl`）。Discord のチャンネル設定「連携サービス → ウェブフック → 新しいウェブフック → URL をコピー」で作った URL を `BepInEx\config\jp.pocketroles.mod.cfg` の `[Discord]` → `WebhookUrl` に貼るだけ（Bot もトークンも不要）。
   - 部屋を作ると「🔑 部屋コード **ABCDEF** — 3/15人 募集中（役職あり）」を 1 回投稿し、入退室・ゲーム開始（「ゲーム中（終わったら入れます）」）・終了のたびに **同じ投稿を書き換え**ます（5 秒に 1 回まで、Discord の制限に当たりません）。部屋を閉じると「部屋 ABCDEF は閉じました。」に
+  - ゲームが落ちた・タスクマネージャーで閉じた場合も、次に部屋を作ったときに前の投稿を「閉じました」に直します（投稿の番号を `BepInEx\PocketRoles\discord-last.txt` に控えます）
   - `[Discord] Text` で文面を変えられます: `{code}` `{count}` `{max}` `{state}` `{kind}`、`\n` で改行、Discord の記法（`**太字**`、`@here`）も使えます。`[Discord] Announce = false` で一時停止
   - URL は他人に知られるとそのチャンネルへ投稿できてしまうので、設定ファイルからだけ変更できます（`/opt` では触れません）
 
