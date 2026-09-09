@@ -363,6 +363,8 @@ namespace PocketRoles.Chat
                 case "welcome": case "roleinfo":
                 case "chat.welcometext": case "welcometext": case "chat.welcomesettings": case "welcomesettings":
                 case "chat.compatwelcome": case "compatwelcome": case "chat.compatwelcometext":
+                case "chat.compatwelcomeinterval": case "compatwelcomeinterval": case "chat.welcomeinterval":
+                case "roles.reveal": case "reveal": case "revealdeath": case "roles.revealroleondeath":
                 case "chat.rulesmode": case "rulesmode": case "rules.mode":
                 case "chat.rulestext": case "rulestext": case "rules.text": case "rules":
                     return true;

@@ -608,6 +608,8 @@
   "rehost.prompt.note": "注意：短时间内反复重建房间会被视为故意断线，并暂时限制创建房间。",
   "rehost.prompt.yes": "是（重建）",
   "rehost.public": "房间已设为公开。",
+  "reveal.exiled": "被放逐的 {0} 是 {1}。",
+  "reveal.killed": "{0} 是 {1}。",
   "role.arsonist.desc": "中立阵营。击杀键变成“浇油”，不会杀人。给所有其他存活玩家浇油后立即单独获胜。不能破坏，任务是假的。",
   "role.arsonist.name": "纵火犯",
   "role.assassin.desc": "内鬼。会议中输入 /cmd guess 名字 职业：猜对则对方死亡，猜错则你死亡。",

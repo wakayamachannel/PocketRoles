@@ -270,6 +270,11 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>Mod notice + enabled roles + help hint, sent privately to a client that joined the lobby.</summary>
+        /// <summary>Time.time of the last public compat welcome (0 = none this lobby; reset with the welcome pacing).</summary>
+        private static float _lastCompatWelcomeAt;
+
+        internal static void ResetCompatWelcome() { _lastCompatWelcomeAt = 0f; }
+
         public static void Welcome(int clientId)
         {
             try
@@ -283,8 +288,20 @@ namespace PocketRoles.Chat
                 if (!present) return;
 
                 var chunks = BuildWelcomeChunks(clientId);
-                // Compat mode: the welcome is one public host broadcast (no client-addressed chat, findings #21/#28).
-                if (Registration.CompatMode) SendPublicChunks(Title, chunks);
+                // Compat mode: the welcome is one public host broadcast (no client-addressed chat, findings #21/#28),
+                // so a busy public lobby (a join every few seconds) would flood everyone: at most one welcome per
+                // [Chat] CompatWelcomeInterval seconds; joins in between are covered by the line already on screen.
+                if (Registration.CompatMode)
+                {
+                    float now = UnityEngine.Time.time, gap = Options.CompatWelcomeInterval;
+                    if (gap > 0f && _lastCompatWelcomeAt > 0f && now - _lastCompatWelcomeAt < gap)
+                    {
+                        PocketRolesPlugin.Logger.LogInfo($"Chat.Welcome: compat welcome skipped for client {clientId} ({now - _lastCompatWelcomeAt:0}s since the last one, interval {gap:0}s)");
+                        return;
+                    }
+                    _lastCompatWelcomeAt = now;
+                    SendPublicChunks(Title, chunks);
+                }
                 else SendChunksTo(clientId, Title, chunks, 0f);
             }
             catch (Exception e)
@@ -1146,6 +1163,7 @@ namespace PocketRoles.Chat
         internal static void ResetPacing()
         {
             _nextWelcomeAt = 0f;
+            Chat.ResetCompatWelcome();
         }
 
         private static void Postfix(AmongUsClient __instance, ClientData data)

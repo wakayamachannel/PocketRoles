@@ -291,6 +291,7 @@ namespace PocketRoles.Game
         {
             try
             {
+                RoleReveal.OnExiled(__instance); // [Roles] RevealRoleOnDeath (also in compat games, where InProgress stays false)
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return;
                 Scheduler.After(1.5f, AntiBlackout.Restore, "antiblackout.restore");
                 // A postponed bite (the reporter's) must not fire inside the WrapUp window: slower clients run their

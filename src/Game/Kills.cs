@@ -279,6 +279,7 @@ namespace PocketRoles.Game
         internal static void OnMurder(PlayerControl killer, PlayerControl target, MurderResultFlags resultFlags)
         {
             if ((resultFlags & MurderResultFlags.Succeeded) == 0) return;
+            if (target != null) RoleReveal.OnKilled(target.PlayerId); // [Roles] RevealRoleOnDeath (also in compat games, where InProgress stays false)
             if (!Game.InProgress || target == null) return;
 
             byte targetId = target.PlayerId;

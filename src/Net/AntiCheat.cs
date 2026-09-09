@@ -146,6 +146,16 @@ namespace PocketRoles.Net
                 if (!AntiCheat.IsHostOnlyPlayerRpc(callId)) return true;
                 var client = AmongUsClient.Instance;
                 if (client == null || !client.AmHost || !Options.ModEnabled) return true;
+                // v0.4.4: in an UNREGISTERED lobby (no host authority) the vanilla 2026.8.18 client sends its kills as
+                // a plain MurderPlayer(12) broadcast from its own PlayerControl (no CheckMurder to the host) — dropping it
+                // as "forged" desynced the host from every kill (ghosts walking through walls, "no body" on reports,
+                // 2026-09-09 15-player public lobby). The host-only list is a host-authority (+25) rule: skip it here.
+                if (Registration.CompatMode)
+                {
+                    if (AntiCheat.ShouldLogUnknownSender())
+                        PocketRolesPlugin.Logger.LogInfo($"AntiCheat: compat lobby, RPC {callId} on '{(__instance.Data != null ? __instance.Data.PlayerName : "?")}' passed through (no host authority)");
+                    return true;
+                }
                 // The host never receives its own RPCs through HandleRpc, so a host-only RPC arriving on the host's
                 // own PlayerControl was forged by some client on our net id: drop it (sender unknown, no strike).
                 int owner = __instance.OwnerId;
@@ -181,6 +191,7 @@ namespace PocketRoles.Net
                 if (!AntiCheat.IsHostOnlyMeetingRpc(callId)) return true;
                 var client = AmongUsClient.Instance;
                 if (client == null || !client.AmHost || !Options.ModEnabled) return true;
+                if (Registration.CompatMode) return true; // v0.4.4: no host authority in an unregistered lobby (see the PlayerControl patch)
                 // The sender is not identifiable here (MeetingHud is host-owned); just drop and log (rate-limited).
                 if (AntiCheat.ShouldLogUnknownSender())
                     PocketRolesPlugin.Logger.LogWarning($"AntiCheat: dropped forged MeetingHud RPC {callId} (sender unknown)");
