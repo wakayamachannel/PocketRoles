@@ -107,7 +107,7 @@ namespace PocketRoles.Game
         {
             float vMin = s.SeenMin ?? s.VanMin, vMax = s.SeenMax ?? s.VanMax, vStep = s.SeenStep ?? s.VanStep;
             min = vMin; max = vMax; step = vStep;
-            if (!Options.ExtendedRanges || Net.Rpc.CompatMode) return; // unregistered lobby: vanilla ranges only (server validation)
+            if (!Options.ExtendedRanges || (Net.Rpc.CompatMode && Options.ClampInUnregistered)) return; // unregistered lobby: vanilla ranges only unless [Vanilla] ClampInUnregistered=false
             try
             {
                 float m = s.Min(), x = s.Max(), st = s.Step();
@@ -149,7 +149,7 @@ namespace PocketRoles.Game
                 }
                 catch (Exception) { }
             }
-            if (!Options.ExtendedRanges || Net.Rpc.CompatMode) return false;
+            if (!Options.ExtendedRanges || (Net.Rpc.CompatMode && Options.ClampInUnregistered)) return false;
             Limits(s, out float min, out float max, out float step);
             n.ValidRange = new FloatRange(min, max);
             n.Increment = step;

@@ -128,6 +128,7 @@ namespace PocketRoles.Core
         private static ConfigEntry<int> _vanDiscussMax;
         private static ConfigEntry<int> _vanEmergencyMax;
         private static ConfigEntry<int> _vanTaskMax;
+        private static ConfigEntry<bool> _vanClampUnreg;
 
         // v0.4e [Guide] guide-room support (room-code overlay, /announce, /move)
         private static ConfigEntry<bool> _guideShowCodeOverlay;
@@ -325,6 +326,7 @@ namespace PocketRoles.Core
             _vanDiscussMax = cfg.Bind("Vanilla", "DiscussionTimeMax", 600, new ConfigDescription("Highest discussion time (seconds) offered by the settings screen (vanilla: 120)", new AcceptableValueRange<int>(0, 3600)));
             _vanEmergencyMax = cfg.Bind("Vanilla", "EmergencyCooldownMax", 120, new ConfigDescription("Highest emergency-meeting cooldown (seconds) offered by the settings screen (vanilla: 60)", new AcceptableValueRange<int>(0, 600)));
             _vanTaskMax = cfg.Bind("Vanilla", "TaskCountMax", 30, new ConfigDescription("Highest common / short / long task count offered by the settings screen (vanilla: 2 / 5 / 3)", new AcceptableValueRange<int>(1, 60)));
+            _vanClampUnreg = cfg.Bind("Vanilla", "ClampInUnregistered", true, "Unregistered (compat) lobby: pull every vanilla numeric setting back into its vanilla range when the lobby is created and offer only vanilla ranges in the settings screen / /vset (precaution against the official server's option validation). false = keep the extended values in unregistered lobbies too (AUR does this for task counts); the host takes the risk of a server disconnect");
 
             // ---- v0.4e guide room (a second, vanilla, PUBLIC lobby on a sub-phone whose host name / chat carry this room's code)
             _guideShowCodeOverlay = cfg.Bind("Guide", "ShowCodeOverlay", false, "Show the room code large on the host's screen while hosting a lobby (top-left; off by default because vanilla already shows the code at the bottom; /code on turns it on). Hidden in game");
@@ -623,6 +625,8 @@ namespace PocketRoles.Core
         public static int EmergencyCooldownMax { get => _vanEmergencyMax?.Value ?? 120; set { if (_vanEmergencyMax != null) _vanEmergencyMax.Value = Math.Max(0, Math.Min(600, value)); } }
         /// <summary>Per-category task count (1..60), vanilla 2 / 5 / 3.</summary>
         public static int TaskCountMax { get => _vanTaskMax?.Value ?? 30; set { if (_vanTaskMax != null) _vanTaskMax.Value = Math.Max(1, Math.Min(60, value)); } }
+        /// <summary>[Vanilla] ClampInUnregistered: clamp the vanilla numeric settings to their vanilla ranges in an unregistered lobby (default true).</summary>
+        public static bool ClampInUnregistered { get => _vanClampUnreg == null || _vanClampUnreg.Value; set { if (_vanClampUnreg != null) _vanClampUnreg.Value = value; } }
 
         // ------------------------------------------------------------------ v0.4e [Guide]
 
