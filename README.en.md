@@ -41,7 +41,7 @@ Details and manual installation: [chapter 5](#5-installation-steam). The launche
 Since July 2026 the official servers require lobbies that use mods to register (mod-lobby registration; PocketRoles does it automatically). Registered lobbies **do not appear in the public list**, so the host hands out the room code ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)). Share it any way you like, wherever your players already are:
 
 - **The official Discord "PocketRoles 役職部屋"** <https://discord.gg/ahNvRMVeHP>: paste your code in `#部屋コード` and players there will come (hosts are welcome too; there are channels for recruiting, questions and bug reports)
-- **Your own Discord server**: just paste the room code (copy the code shown on the host's screen; typing `/announce` in chat copies it to the clipboard)
+- **Your own Discord server**: just paste the room code (copy the code shown on the host's screen; typing `/announce` in chat copies it to the clipboard). **Since v0.4.5 the mod can post it for you**: create a webhook in the channel ("Integrations → Webhooks"), paste its URL into `[Discord] WebhookUrl` in the config file, and every lobby you create posts "🔑 Lobby code ABCDEF — 3/15 players, open" and keeps the player count / "in game" up to date ([chapter 12](#12-config-file))
 - **Group chat** (LINE, WhatsApp and the like)
 - **Friends** directly
 
@@ -805,6 +805,11 @@ AllCommands = true              # allow chat commands at all (false = the host c
 RulesMode = none                # welcome rules line: none (built-in "no special rules") | custom (RulesText)
 RulesText =                     # the custom rules text (\n = line break; /rules <text>)
 WelcomeAllLanguages = true      # send the short welcome (2 lines) in the player's language, then the two others (false = the player's language plus one trilingual /lang line)
+
+[Discord]                       # post the lobby to Discord (v0.4.5). No bot needed
+WebhookUrl =                    # URL from the channel's "Integrations → Webhooks → Copy URL". Empty = off. Keep it private (config file only)
+Announce = true                 # post "🔑 Lobby code ABCDEF — 3/15 players, open (with roles)" when a lobby is created and edit it on join / leave / start / end (at most once per 5 s)
+Text =                          # your own line (empty = built-in). {code} {count} {max} {state} {kind}, \n = line break, **bold** and @here work
 
 [Translate]                     # chat translation (v0.4b). Chat text is sent to Google / DeepL. The DeepL key is never stored here
 Enabled = true                  # translate foreign-language chat (on by default; text is sent to Google / DeepL. "Chat translation" in the settings tab or /opt translate off turns it off)
