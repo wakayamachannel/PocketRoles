@@ -131,7 +131,9 @@ namespace PocketRoles.Chat
                 else if (IsAsciiOnly(t)) targets.Remove(Lang.En);
                 if (targets.Count == 0) return;
                 // Ghost chat (vanilla: dead → dead only) must never reach alive players through the translation.
-                bool senderDead = Core.Game.InProgress && Core.Game.IsDead(playerId);
+                // Vanilla game state, not the mod's role-game flag: in a compat (unregistered) or haison game InProgress
+                // stays false, and a ghost's chat translated and broadcast to the living would reveal the killer.
+                bool senderDead = AmongUsClient.Instance != null && AmongUsClient.Instance.IsGameStarted && Core.Game.IsDead(playerId);
 
                 if (Volatile.Read(ref _pending) >= MaxPendingJobs)
                 {
@@ -294,7 +296,7 @@ namespace PocketRoles.Chat
 
             string hostTarget = Options.TranslateTargetLang;
             // A ghost's line (vanilla: dead → dead only) is never broadcast; alive recipients are skipped below.
-            bool ghost = job.SenderDead && Core.Game.InProgress;
+            bool ghost = job.SenderDead;
             // 併用 (BroadcastToAll + TranslateForPlayers, the default since 2026-09-08): the host-language line goes to
             // everyone, the foreign players get their own language privately — but never both for the same player (a
             // zh player is left out of the ja broadcast when a zh line is on its way to them). Private lines exist only

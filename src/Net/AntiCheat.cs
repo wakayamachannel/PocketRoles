@@ -150,10 +150,12 @@ namespace PocketRoles.Net
                 // a plain MurderPlayer(12) broadcast from its own PlayerControl (no CheckMurder to the host) — dropping it
                 // as "forged" desynced the host from every kill (ghosts walking through walls, "no body" on reports,
                 // 2026-09-09 15-player public lobby). The host-only list is a host-authority (+25) rule: skip it here.
-                if (Registration.CompatMode)
+                // Also every lobby the mod did not create as a registered host: a vanilla lobby we inherited by host
+                // migration, or a LAN game — no +25 was ever sent there, so clients kill with a plain MurderPlayer too.
+                if (Registration.CompatMode || !Registration.ShouldRegister)
                 {
                     if (AntiCheat.ShouldLogUnknownSender())
-                        PocketRolesPlugin.Logger.LogInfo($"AntiCheat: compat lobby, RPC {callId} on '{(__instance.Data != null ? __instance.Data.PlayerName : "?")}' passed through (no host authority)");
+                        PocketRolesPlugin.Logger.LogInfo($"AntiCheat: no host authority in this lobby, RPC {callId} on '{(__instance.Data != null ? __instance.Data.PlayerName : "?")}' passed through");
                     return true;
                 }
                 // The host never receives its own RPCs through HandleRpc, so a host-only RPC arriving on the host's
@@ -191,7 +193,7 @@ namespace PocketRoles.Net
                 if (!AntiCheat.IsHostOnlyMeetingRpc(callId)) return true;
                 var client = AmongUsClient.Instance;
                 if (client == null || !client.AmHost || !Options.ModEnabled) return true;
-                if (Registration.CompatMode) return true; // v0.4.4: no host authority in an unregistered lobby (see the PlayerControl patch)
+                if (Registration.CompatMode || !Registration.ShouldRegister) return true; // v0.4.4: no host authority in an unregistered lobby (see the PlayerControl patch)
                 // The sender is not identifiable here (MeetingHud is host-owned); just drop and log (rate-limited).
                 if (AntiCheat.ShouldLogUnknownSender())
                     PocketRolesPlugin.Logger.LogWarning($"AntiCheat: dropped forged MeetingHud RPC {callId} (sender unknown)");

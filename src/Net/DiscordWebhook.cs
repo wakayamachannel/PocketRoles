@@ -78,10 +78,11 @@ namespace PocketRoles.Net
             try
             {
                 var client = AmongUsClient.Instance;
-                if (client == null || !client.AmHost) return;
+                if (client == null || !client.AmHost || client.NetworkMode != NetworkModes.OnlineGame) return;
                 _inGame = false;
                 if (client.GameId != _lobbyGameId)
                 {
+                    if (_messageId != null) CloseCurrent("new lobby"); // a lobby lost without ExitGame (disconnect, re-host)
                     CloseStale(client.GameId);
                     _lobbyGameId = client.GameId;
                     _messageId = null;
@@ -155,10 +156,10 @@ namespace PocketRoles.Net
                 {
                     using (var payload = new StringContent(body, Encoding.UTF8, "application/json"))
                     {
-                        var req = new HttpRequestMessage(new HttpMethod("PATCH"), url.TrimEnd('/') + "/messages/" + id) { Content = payload };
+                        var req = new HttpRequestMessage(new HttpMethod("PATCH"), MessageUrl(url, id)) { Content = payload };
                         var resp = await Http.SendAsync(req).ConfigureAwait(false);
                         string text = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        if (!resp.IsSuccessStatusCode) Replies.Enqueue(() => PocketRolesPlugin.Logger.LogWarning($"Discord: stale message edit failed: {(int)resp.StatusCode} {Trim(text)}"));
+                        if (!resp.IsSuccessStatusCode) Replies.Enqueue(() => PocketRolesPlugin.Logger.LogWarning($"Discord: closing edit failed: {(int)resp.StatusCode} {Trim(text)}"));
                     }
                 }
                 catch (Exception e) { Replies.Enqueue(() => PocketRolesPlugin.Logger.LogWarning($"Discord: stale message edit failed: {e.Message}")); }
@@ -171,20 +172,33 @@ namespace PocketRoles.Net
 
         internal static void OnGameEnded() { try { _inGame = false; PocketRolesPlugin.Logger.LogInfo("Discord: game ended → update"); Touch(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnGameEnded: {e}"); } }
 
-        /// <summary>The host leaves the lobby (disconnect / quit): the message is closed out (best effort, fire and forget).</summary>
-        internal static void OnLobbyClosed()
+        /// <summary>The host leaves the lobby (ExitGame or a disconnect): the message is closed out (best effort, fire and forget).</summary>
+        internal static void OnLobbyClosed() { CloseCurrent("closed"); }
+
+        private static void CloseCurrent(string why)
         {
             try
             {
-                if (!Enabled || _messageId == null || _lobbyGameId == 0) return;
+                if (!Enabled || _lobbyGameId == 0) return;
                 string code = GameCode.IntToGameName(_lobbyGameId);
                 string text = Lang.T("discord.closed", "部屋 {0} は閉じました。", "Lobby {0} has closed.", "房间 {0} 已关闭。").Replace("{0}", "`" + code + "`");
                 _pendingContent = null; _flushAt = -1f; _lobbyAt = -1f; _playersAt = -1f;
+                if (_messageId == null)
+                {
+                    // the first POST is still in flight: its reply (Remember) is for a lobby that no longer exists —
+                    // the remembered id is closed by CloseStale at the next lobby / start of the game
+                    if (_posting) PocketRolesPlugin.Logger.LogInfo($"Discord: lobby {code} {why} before its message was posted; the message is closed later");
+                    _lobbyGameId = 0;
+                    return;
+                }
+                PocketRolesPlugin.Logger.LogInfo($"Discord: lobby {code} {why} → message closed");
+                string id = _messageId;
+                _messageId = null;
                 _lobbyGameId = 0;
                 Forget();
-                Send(text, edit: true, closing: true);
+                SendRaw(text, id);
             }
-            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnLobbyClosed: {e}"); }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.CloseCurrent: {e}"); }
         }
 
         // ------------------------------------------------------------------ content
@@ -219,8 +233,12 @@ namespace PocketRoles.Net
         {
             if (!Enabled) return;
             var client = AmongUsClient.Instance;
-            if (client == null || !client.AmHost || client.GameId == 0) return;
-            if (_lobbyGameId != client.GameId) { _lobbyGameId = client.GameId; _messageId = null; _posting = false; _lastContent = null; }
+            if (client == null || !client.AmHost || client.GameId == 0 || client.NetworkMode != NetworkModes.OnlineGame) return;
+            if (_lobbyGameId != client.GameId)
+            {
+                if (_messageId != null) CloseCurrent("new lobby");
+                _lobbyGameId = client.GameId; _messageId = null; _posting = false; _lastContent = null; _retries = 0;
+            }
             string content = Build();
             if (content == null || content == _lastContent) return;
             PocketRolesPlugin.Logger.LogInfo($"Discord: change queued (posting={_posting}, id={(_messageId ?? "none")})");
@@ -264,7 +282,7 @@ namespace PocketRoles.Net
             string body = "{\"content\":\"" + Escape(content) + "\",\"allowed_mentions\":{\"parse\":[\"everyone\"]}}";
             Task.Run(async () =>
             {
-                string newId = null; string error = null;
+                string newId = null; string error = null; float retryAfter = -1f;
                 try
                 {
                     HttpResponseMessage resp;
@@ -272,13 +290,14 @@ namespace PocketRoles.Net
                     {
                         if (edit && id != null)
                         {
-                            var req = new HttpRequestMessage(new HttpMethod("PATCH"), url.TrimEnd('/') + "/messages/" + id) { Content = payload };
+                            var req = new HttpRequestMessage(new HttpMethod("PATCH"), MessageUrl(url, id)) { Content = payload };
                             resp = await Http.SendAsync(req).ConfigureAwait(false);
                         }
                         else resp = await Http.PostAsync(url + (url.Contains("?") ? "&" : "?") + "wait=true", payload).ConfigureAwait(false);
                     }
                     string text = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
                     if (!resp.IsSuccessStatusCode) error = (int)resp.StatusCode + " " + Trim(text);
+                    if ((int)resp.StatusCode == 429) { var m = RetryAfter.Match(text); if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double ra)) retryAfter = (float)ra; }
                     else if (!edit)
                     {
                         var m = MessageId.Match(text); if (!m.Success) m = AnyId.Match(text);
@@ -291,15 +310,25 @@ namespace PocketRoles.Net
                 {
                     try
                     {
-                        if (!edit) _posting = false;
                         if (closing) return;
+                        // a reply for a lobby we already left: the remembered id (if any) is closed by CloseStale later
+                        if (gameId != _lobbyGameId) { PocketRolesPlugin.Logger.LogInfo("Discord: reply for a previous lobby ignored"); return; }
+                        if (!edit) _posting = false;
                         if (error != null)
                         {
                             PocketRolesPlugin.Logger.LogWarning($"Discord: {(edit ? "edit" : "post")} failed: {error}");
-                            if (!edit) _lastContent = null; // retry with the next change
+                            // retry the same line (bounded): otherwise the channel keeps a stale count / state for the whole game
+                            _lastContent = null;
+                            if (_retries < MaxRetries)
+                            {
+                                _retries++;
+                                if (_pendingContent == null) _pendingContent = content;
+                                _flushAt = UnityEngine.Time.realtimeSinceStartup + Math.Max(MinInterval, retryAfter > 0f ? retryAfter + 0.5f : MinInterval * _retries);
+                            }
                             return;
                         }
-                        if (newId != null && gameId == _lobbyGameId) { _messageId = newId; Remember(newId, gameId); PocketRolesPlugin.Logger.LogInfo($"Discord: lobby message posted (id {newId})"); }
+                        _retries = 0;
+                        if (newId != null) { _messageId = newId; Remember(newId, gameId); PocketRolesPlugin.Logger.LogInfo($"Discord: lobby message posted (id {newId})"); }
                         if (_pendingContent != null) Touch();
                     }
                     catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook reply: {e}"); }
@@ -327,6 +356,19 @@ namespace PocketRoles.Net
         }
 
         private static string Trim(string s) { s = (s ?? "").Replace("\n", " "); return s.Length > 160 ? s.Substring(0, 160) + "…" : s; }
+
+        private static int _retries;
+        private const int MaxRetries = 5;
+        private static readonly Regex RetryAfter = new Regex("\"retry_after\":\\s*([0-9.]+)", RegexOptions.Compiled);
+
+        /// <summary>…/webhooks/id/token[?thread_id=…] → …/webhooks/id/token/messages/{id}[?thread_id=…] (the query must follow the path).</summary>
+        private static string MessageUrl(string url, string id)
+        {
+            string path = url, query = "";
+            int q = url.IndexOf('?');
+            if (q >= 0) { path = url.Substring(0, q); query = url.Substring(q); }
+            return path.TrimEnd('/') + "/messages/" + id + query;
+        }
 
         private static string Escape(string s)
         {
@@ -380,10 +422,17 @@ namespace PocketRoles.Net
         private static void Postfix() { try { var c = AmongUsClient.Instance; if (c != null && c.AmHost) DiscordWebhook.OnGameEnded(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnGameEndPatch: {e}"); } }
     }
 
-    /// <summary>The host leaves (ExitGame / disconnect): close the Discord line out.</summary>
+    /// <summary>The host leaves (ExitGame): close the Discord line out.</summary>
     [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.ExitGame))]
     internal static class DiscordWebhook_ExitGamePatch
     {
         private static void Prefix() { try { var c = AmongUsClient.Instance; if (c != null && c.AmHost) DiscordWebhook.OnLobbyClosed(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_ExitGamePatch: {e}"); } }
+    }
+
+    /// <summary>The server dropped the host (Hacking / LobbyInactivity / network): the lobby is gone, close the line out.</summary>
+    [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnDisconnected))]
+    internal static class DiscordWebhook_OnDisconnectedPatch
+    {
+        private static void Prefix() { try { var c = AmongUsClient.Instance; if (c != null && c.AmHost) DiscordWebhook.OnLobbyClosed(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook_OnDisconnectedPatch: {e}"); } }
     }
 }

@@ -384,9 +384,12 @@ namespace PocketRoles.Chat
                 || k.StartsWith("speed.") || k.StartsWith("sb.") || k.StartsWith("madmate.")
                 || k.StartsWith("lovers.") || k.StartsWith("arsonist.") || k.StartsWith("witch.") || k.StartsWith("assassin."))
                 return true;
-            // <role>.count / <role>.chance
+            // <role>.count / <role>.chance — only those fields: a role alias that doubles as an option prefix
+            // (Terrorist "tr" vs the host-only tr.* translation keys) must not open the whole prefix to admins.
             int dot = k.LastIndexOf('.');
-            return dot > 0 && Roles.TryParse(k.Substring(0, dot), out _);
+            if (dot <= 0 || !Roles.TryParse(k.Substring(0, dot), out _)) return false;
+            string field = k.Substring(dot + 1);
+            return field == "count" || field == "num" || field == "n" || field == "c" || field == "chance" || field == "rate";
         }
 
         /// <summary>Commands a moderator (Moderator.txt + ModeratorsCanKick) may run.</summary>

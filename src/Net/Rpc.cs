@@ -266,7 +266,8 @@ namespace PocketRoles.Net
             var host = PlayerControl.LocalPlayer;
             if (client == null || host == null || text == null) return null;
             string line = string.IsNullOrEmpty(title) ? text : "[" + title + "] " + text;
-            line = SanitizeForVanillaChat(line);
+            // rich text (<color> …) cannot be shown to a vanilla client and the sanitizer would leave "color=#…/color"
+            line = SanitizeForVanillaChat(Core.Lang.StripTags(line));
             int max = PocketRoles.Chat.Chat.MaxChars;
             if (line.Length > max)
             {
@@ -314,6 +315,8 @@ namespace PocketRoles.Net
             foreach (char c0 in s)
             {
                 char c = c0;
+                if (c == '\r') continue;
+                if (c == '\n') { sb.Append(" / "); continue; }        // a packed multi-line chunk: keep the lines apart
                 if (c >= '！' && c <= '～') c = (char)(c - 0xFEE0);   // full-width ASCII (！（）：１２Ａ) → ASCII
                 else if (c == '　') c = ' ';
                 switch (c)
