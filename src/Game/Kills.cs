@@ -174,7 +174,8 @@ namespace PocketRoles.Game
 
         /// <summary>Killers whose kill goes through vanilla CheckMurder (HandleCheckMurder returns true): vanilla refuses moving-platform / ladder / vent-entering targets itself.</summary>
         private static bool IsVanillaKillPath(CustomRole role) =>
-            role == CustomRole.None || role == CustomRole.Lovers || role == CustomRole.Assassin || role == CustomRole.EvilHawk || role == CustomRole.EvilNekomata;
+            role == CustomRole.None || role == CustomRole.Lovers || role == CustomRole.Assassin || role == CustomRole.EvilHawk || role == CustomRole.EvilNekomata
+            || role == CustomRole.Mafia; // an unblocked Mafia press also returns to vanilla CheckMurder (review round 1)
 
         /// <summary>
         /// Mad Stuntman guard (v0.5.0): true when <paramref name="target"/> is a Mad Stuntman with lives left and the kill of

@@ -72,7 +72,7 @@ namespace PocketRoles.Game
         /// <summary>Own-name-tag suffix for a living Serial Killer ("20s" in the impostor colour), null while nothing counts or the death is pending.</summary>
         internal static string CountdownTag(byte id)
         {
-            if (!Game.SerialKillerTimers.TryGetValue(id, out var t) || t.Remaining <= 0f) return null;
+            if (!Game.SerialKillerTimers.TryGetValue(id, out var t) || t.Remaining <= 0f || t.TimedOut) return null;   // TimedOut: the death is pending / retried (review round 1)
             return "<color=" + Roles.ImpostorColor + ">" + StepOf(t.Remaining) + "s</color>";
         }
 
@@ -110,7 +110,7 @@ namespace PocketRoles.Game
                     }
                     if (t.Remaining > 0f)
                     {
-                        int step = StepOf(t.Remaining);
+                        int step = t.TimedOut ? 0 : StepOf(t.Remaining);   // a retried time-out keeps the tag hidden (no 0↔5 flicker)
                         if (step != t.TagStep) { t.TagStep = step; refreshTags = true; }
                         Game.SerialKillerTimers[id] = t;
                         continue;
