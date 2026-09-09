@@ -243,7 +243,7 @@ namespace PocketRoles.Core
         /// <summary>Scheduler tags that belong to a running game (cancelled at lobby start).</summary>
         private static readonly string[] GameScopedTags =
         {
-            "win.end", "assign.roleinfo", "assign.introend", "haison.end", "antiblackout.restore", "names.meeting", "gm.apply"
+            "win.end", "assign.roleinfo", "assign.introend", "haison.end", "antiblackout.restore", "names.meeting", "gm.apply", "meeting.defer"
         };
 
         public static CustomRole RoleOf(byte id)
