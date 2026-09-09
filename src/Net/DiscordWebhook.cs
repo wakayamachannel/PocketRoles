@@ -82,6 +82,7 @@ namespace PocketRoles.Net
                 _inGame = false;
                 if (client.GameId != _lobbyGameId)
                 {
+                    CloseStale(client.GameId);
                     _lobbyGameId = client.GameId;
                     _messageId = null;
                     _posting = false;
@@ -91,6 +92,77 @@ namespace PocketRoles.Net
                 Touch();
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnLobby: {e}"); }
+        }
+
+        // ------------------------------------------------------------------ stale message from a crashed / killed game
+
+        /// <summary>
+        /// The id of the live lobby message is kept in BepInEx\PocketRoles\discord-last.txt. When the game was closed
+        /// without ExitGame (crash, task manager, power loss) that message would say "募集中" forever; the next lobby
+        /// (or the next start of the game) edits it to "閉じました" first.
+        /// </summary>
+        private static string StatePath
+        {
+            get
+            {
+                try { return System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath, "PocketRoles", "discord-last.txt"); }
+                catch (Exception) { return null; }
+            }
+        }
+
+        private static void Remember(string messageId, int gameId)
+        {
+            try
+            {
+                string p = StatePath; if (p == null) return;
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(p));
+                System.IO.File.WriteAllText(p, messageId + " " + gameId + " " + GameCode.IntToGameName(gameId));
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Discord: could not remember the message id: {e.Message}"); }
+        }
+
+        private static void Forget()
+        {
+            try { string p = StatePath; if (p != null && System.IO.File.Exists(p)) System.IO.File.Delete(p); } catch (Exception) { }
+        }
+
+        /// <summary>A remembered message that is not the current lobby's: close it out (best effort) and forget it.</summary>
+        internal static void CloseStale(int currentGameId)
+        {
+            try
+            {
+                if (!Enabled) return;
+                string p = StatePath; if (p == null || !System.IO.File.Exists(p)) return;
+                string[] parts = System.IO.File.ReadAllText(p).Trim().Split(' ');
+                Forget();
+                if (parts.Length < 3) return;
+                if (int.TryParse(parts[1], out int gid) && gid == currentGameId) return; // same lobby (play again): still live
+                string text = Lang.T("discord.closed", "部屋 {0} は閉じました。", "Lobby {0} has closed.", "房间 {0} 已关闭。").Replace("{0}", "`" + parts[2] + "`");
+                PocketRolesPlugin.Logger.LogInfo($"Discord: closing the stale lobby message of {parts[2]} (id {parts[0]})");
+                SendRaw(text, parts[0]);
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Discord: stale message: {e.Message}"); }
+        }
+
+        /// <summary>Fire-and-forget PATCH of an arbitrary message id (stale message clean-up).</summary>
+        private static void SendRaw(string content, string id)
+        {
+            string url = Options.DiscordWebhookUrl;
+            string body = "{\"content\":\"" + Escape(content) + "\",\"allowed_mentions\":{\"parse\":[]}}";
+            Task.Run(async () =>
+            {
+                try
+                {
+                    using (var payload = new StringContent(body, Encoding.UTF8, "application/json"))
+                    {
+                        var req = new HttpRequestMessage(new HttpMethod("PATCH"), url.TrimEnd('/') + "/messages/" + id) { Content = payload };
+                        var resp = await Http.SendAsync(req).ConfigureAwait(false);
+                        string text = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        if (!resp.IsSuccessStatusCode) Replies.Enqueue(() => PocketRolesPlugin.Logger.LogWarning($"Discord: stale message edit failed: {(int)resp.StatusCode} {Trim(text)}"));
+                    }
+                }
+                catch (Exception e) { Replies.Enqueue(() => PocketRolesPlugin.Logger.LogWarning($"Discord: stale message edit failed: {e.Message}")); }
+            });
         }
 
         internal static void OnPlayersChanged() { try { Touch(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnPlayersChanged: {e}"); } }
@@ -109,6 +181,7 @@ namespace PocketRoles.Net
                 string text = Lang.T("discord.closed", "部屋 {0} は閉じました。", "Lobby {0} has closed.", "房间 {0} 已关闭。").Replace("{0}", "`" + code + "`");
                 _pendingContent = null; _flushAt = -1f; _lobbyAt = -1f; _playersAt = -1f;
                 _lobbyGameId = 0;
+                Forget();
                 Send(text, edit: true, closing: true);
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.OnLobbyClosed: {e}"); }
@@ -226,7 +299,7 @@ namespace PocketRoles.Net
                             if (!edit) _lastContent = null; // retry with the next change
                             return;
                         }
-                        if (newId != null && gameId == _lobbyGameId) { _messageId = newId; PocketRolesPlugin.Logger.LogInfo($"Discord: lobby message posted (id {newId})"); }
+                        if (newId != null && gameId == _lobbyGameId) { _messageId = newId; Remember(newId, gameId); PocketRolesPlugin.Logger.LogInfo($"Discord: lobby message posted (id {newId})"); }
                         if (_pendingContent != null) Touch();
                     }
                     catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook reply: {e}"); }
