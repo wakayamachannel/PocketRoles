@@ -806,6 +806,11 @@ RulesMode = none                # 挨拶のルール行: none（標準の「ル�
 RulesText =                     # custom の時のルール文（\n で改行、/rules <文章>）
 WelcomeAllLanguages = true      # 短い挨拶（2 行）をその人の言語 → 残り 2 言語の順に送る（false = その人の言語だけ + 3 言語の /lang 案内 1 行）
 
+[Discord]                       # Discord に部屋コードを自動投稿（v0.4.5）。Bot 不要
+WebhookUrl =                    # チャンネル設定「連携サービス → ウェブフック → URL をコピー」の URL。空 = 投稿しない。他人に見せないこと（このファイルからだけ変更可）
+Announce = true                 # 部屋を作ると「🔑 部屋コード ABCDEF — 3/15人 募集中（役職あり）」を投稿し、入退室・開始・終了で同じ投稿を書き換える（5 秒に 1 回まで）
+Text =                          # 文面（空 = 標準）。{code} {count} {max} {state} {kind}、\n で改行、**太字** や @here も可
+
 [Translate]                     # チャット翻訳（v0.4b）。文章は Google / DeepL に送られます。DeepL のキーはこのファイルには書きません
 Enabled = true                  # 外国語のチャットを翻訳する（既定オン。文章は Google / DeepL に送られます。設定タブ「チャット翻訳」か /opt translate off でオフ）
 Provider = auto                 # auto（BepInEx\PocketRoles\deepl-key.txt にキーがあれば DeepL、なければ Google）| google | deepl
