@@ -21,9 +21,11 @@ namespace PocketRoles.Game
         /// <summary>
         /// Minimum time between the last MurderPlayer and StartMeeting (finding #55, 2026-09-09): a vanilla 2026.8.18
         /// client that receives StartMeeting while its kill animation runs (a bite flushed by the report, a kill 20 ms
-        /// before the button) keeps a black screen. The vanilla kill animation is about 1.2 s.
+        /// before the button) keeps a black screen. Live test 2026-09-09 (PC host + MuMu victim): with a 1.7-s hold the
+        /// victim's meeting panel was still half-drawn 9 s in (it recovered only after about a minute); the mobile kill
+        /// overlay plus the camera hand-off take about 2.5 s, so the hold is 3 s.
         /// </summary>
-        internal const float KillMeetingGap = 1.6f;
+        internal const float KillMeetingGap = 3.0f;
         internal const string DeferTag = "meeting.defer";
         /// <summary>Set by the deferred call so the prefix lets the postponed report through untouched.</summary>
         internal static bool DeferredReport;
