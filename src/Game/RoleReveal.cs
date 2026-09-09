@@ -57,7 +57,10 @@ namespace PocketRoles.Game
                 NetworkedPlayerInfo info = null;
                 try { info = exile.initData != null ? exile.initData.networkedPlayer : null; } catch (Exception) { }
                 if (info == null) return;
-                Announce(info.PlayerId, "reveal.exiled", "追放された {0} は {1} でした。", "Ejected {0} was {1}.", "被放逐的 {0} 是 {1}。");
+                byte id = info.PlayerId;
+                // 2 s after the exile screen, not inside it: chat from a dead host opens Rpc.TempReviveHostForChat (an
+                // urgent Data(IsDead=false)) while clients still run their own exile end check → black screen.
+                Scheduler.After(2f, () => Announce(id, "reveal.exiled", "追放された {0} は {1} でした。", "Ejected {0} was {1}.", "被放逐的 {0} 是 {1}。"), "reveal.exiled");
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"RoleReveal.OnExiled: {e}"); }
         }
@@ -82,8 +85,11 @@ namespace PocketRoles.Game
             if (custom != CustomRole.None) return Roles.Info(custom).Name;
             var type = Core.Game.VanillaRoleOf(id);
             // After the death the live role is already the ghost role (seen at the exile screen): prefer the role
-            // recorded at assignment, then the vanilla RoleWhenAlive, then the live role.
-            if (AliveRoles.TryGetValue(id, out var recorded)) type = recorded;
+            // recorded at assignment, then the vanilla RoleWhenAlive, then the live role. In a role game the mod's own
+            // table is the truth: the recorder also sees the host's per-viewer applications (a Sheriff host holds a
+            // Crewmate view of every impostor), which must not become "X was Crewmate".
+            if (Core.Game.InProgress && Core.Game.VanillaRoles.ContainsKey(id)) { /* keep VanillaRoleOf */ }
+            else if (AliveRoles.TryGetValue(id, out var recorded)) type = recorded;
             else
             {
                 try

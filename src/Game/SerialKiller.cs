@@ -86,6 +86,7 @@ namespace PocketRoles.Game
                 if (!Game.IsHostActive || !Game.InProgress || Game.Ending) return;
                 if (Game.SerialKillerTimers.Count == 0 || Game.SerialKillerPaused) return;   // managed checks only while nobody counts
                 if (MeetingHud.Instance != null || ExileController.Instance != null || IntroCutscene.Instance != null) return;
+                if (Meetings.ReportHeld) return; // a report is being held (#55): no time-out death may land before StartMeeting
 
                 float dt = Time.deltaTime, now = Time.time;
                 bool refreshTags = false, queued = false;

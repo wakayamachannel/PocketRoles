@@ -384,12 +384,15 @@ namespace PocketRoles.Chat
                 || k.StartsWith("speed.") || k.StartsWith("sb.") || k.StartsWith("madmate.")
                 || k.StartsWith("lovers.") || k.StartsWith("arsonist.") || k.StartsWith("witch.") || k.StartsWith("assassin.")
                 || k.StartsWith("madmayor.") || k.StartsWith("madstuntman.") || k.StartsWith("stunt.") || k.StartsWith("madhawk.") || k.StartsWith("worshipper.")
-                || k.StartsWith("jackalfriends.") || k.StartsWith("jf.") || k.StartsWith("evilhawk.") || k.StartsWith("evilnekomata.") || k.StartsWith("nekomata.")
+                || k.StartsWith("jackalfriends.") || k.StartsWith("jf.") || k.StartsWith("evilhawk.") || k.StartsWith("eh.") || k.StartsWith("evilnekomata.") || k.StartsWith("nekomata.")
                 || k.StartsWith("neko.") || k.StartsWith("serialkiller.") || k.StartsWith("sk.") || k.StartsWith("samurai."))
                 return true;
-            // <role>.count / <role>.chance
+            // <role>.count / <role>.chance — only those fields: a role alias that doubles as an option prefix
+            // (Terrorist "tr" vs the host-only tr.* translation keys) must not open the whole prefix to admins.
             int dot = k.LastIndexOf('.');
-            return dot > 0 && Roles.TryParse(k.Substring(0, dot), out _);
+            if (dot <= 0 || !Roles.TryParse(k.Substring(0, dot), out _)) return false;
+            string field = k.Substring(dot + 1);
+            return field == "count" || field == "num" || field == "n" || field == "c" || field == "chance" || field == "rate";
         }
 
         /// <summary>Commands a moderator (Moderator.txt + ModeratorsCanKick) may run.</summary>
@@ -968,7 +971,7 @@ namespace PocketRoles.Chat
             if (a == "show" || a == "preview")
             {
                 // Exactly what a joining player receives (≤ Chat.MaxWelcomeMessages messages), on the caller's screen only.
-                LocalLines(sender, Lang.T("cmd.welcome.preview", "【挨拶文プレビュー】", "[Welcome preview]"), Chat.WelcomeChunks());
+                LocalLines(sender, Lang.T("cmd.welcome.preview", "【挨拶文プレビュー】", "[Welcome preview]"), Chat.PreviewWelcomeChunks());
                 return;
             }
             // Unregistered (compat) lobby: /welcome edits the ONE public compat line ([Chat] CompatWelcomeText) instead.
@@ -994,7 +997,7 @@ namespace PocketRoles.Chat
                     return;
                 }
                 PocketRolesPlugin.Logger.LogInfo($"Commands: compat welcome line set ({line.Length} chars)");
-                LocalLines(sender, Lang.T("cmd.welcome.set", "挨拶文を設定しました。プレビュー:", "Welcome text set. Preview:"), Chat.WelcomeChunks());
+                LocalLines(sender, Lang.T("cmd.welcome.set", "挨拶文を設定しました。プレビュー:", "Welcome text set. Preview:"), Chat.PreviewWelcomeChunks());
                 return;
             }
             if (a == "settings" || a == "setting")
@@ -1024,7 +1027,7 @@ namespace PocketRoles.Chat
                 return;
             }
             PocketRolesPlugin.Logger.LogInfo($"Commands: welcome text set ({text.Length} chars)");
-            LocalLines(sender, Lang.T("cmd.welcome.set", "挨拶文を設定しました。プレビュー:", "Welcome text set. Preview:"), Chat.WelcomeChunks());
+            LocalLines(sender, Lang.T("cmd.welcome.set", "挨拶文を設定しました。プレビュー:", "Welcome text set. Preview:"), Chat.PreviewWelcomeChunks());
         }
 
         /// <summary>
@@ -1590,8 +1593,12 @@ namespace PocketRoles.Chat
             if (auto)
             {
                 Scheduler.Cancel(MoveTag);
+                // Both callbacks check that the lobby is still a lobby: a game that starts inside the 30 s (auto-start, the
+                // Start button) would otherwise get the "5 s" line mid-game and a failed re-create with the register
+                // flag already flipped.
                 Scheduler.After(MoveDelay - 5f, () =>
                 {
+                    if (!InLobby()) { Scheduler.Cancel(MoveTag); PocketRolesPlugin.Logger.LogInfo("Commands: /move re-create cancelled (a game started)"); return; }
                     Chat.All(Chat.Title, Lang.T("guide.move.soon.ja", "5秒後に部屋を作り直します。新しいコードで入り直してください。", "5秒後に部屋を作り直します。新しいコードで入り直してください。", "5秒後に部屋を作り直します。新しいコードで入り直してください。")
                         + "\n" + Lang.T("guide.move.soon.zh", "5 秒后重建房间，请用新代码重新加入。", "5 秒后重建房间，请用新代码重新加入。", "5 秒后重建房间，请用新代码重新加入。")
                         + "\n" + Lang.T("guide.move.soon.en", "Re-creating the lobby in 5 s; rejoin with the new code.", "Re-creating the lobby in 5 s; rejoin with the new code.", "Re-creating the lobby in 5 s; rejoin with the new code."));
@@ -1600,12 +1607,15 @@ namespace PocketRoles.Chat
                 {
                     try
                     {
+                        if (!InLobby()) { PocketRolesPlugin.Logger.LogInfo("Commands: /move re-create cancelled (a game started)"); return; }
+                        bool wasRegistered = Options.HostAuthorityMode;
                         Options.HostAuthorityMode = true; // Registration_CoCreateOnlineGamePatch reads it when the new lobby is created
                         if (Rehost.RecreateNow("/move: re-create as a registered role lobby", true))
                         {
                             PocketRolesPlugin.Logger.LogInfo("Commands: /move re-creating the lobby as registered (+25)");
                             return;
                         }
+                        Options.HostAuthorityMode = wasRegistered; // nothing was re-created: keep the setting as it was
                         Chat.Local(Chat.Title, Lang.T("cmd.move.failed", "部屋を作り直せませんでした（開始処理中か、すでに再ホスト中）。/move でもう一度どうぞ。", "Could not re-create the lobby (a start is under way or a re-host is already running). Try /move again.", "无法重建房间（正在开始或已在重建中）。请再次 /move。"));
                     }
                     catch (Exception e)

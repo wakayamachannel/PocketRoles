@@ -266,7 +266,9 @@ namespace PocketRoles.Net
             var host = PlayerControl.LocalPlayer;
             if (client == null || host == null || text == null) return null;
             string line = string.IsNullOrEmpty(title) ? text : "[" + title + "] " + text;
-            line = SanitizeForVanillaChat(line);
+            // rich text (<color> …) cannot be shown to a vanilla client and the sanitizer would leave "color=#…/color"
+            // (a bounded pattern, not Lang.StripTags: a stray '<' in a player's text must not swallow the rest of the line)
+            line = SanitizeForVanillaChat(RichTextTag.Replace(line, ""));
             int max = PocketRoles.Chat.Chat.MaxChars;
             if (line.Length > max)
             {
@@ -314,6 +316,8 @@ namespace PocketRoles.Net
             foreach (char c0 in s)
             {
                 char c = c0;
+                if (c == '\r') continue;
+                if (c == '\n') { sb.Append(" / "); continue; }        // a packed multi-line chunk: keep the lines apart
                 if (c >= '！' && c <= '～') c = (char)(c - 0xFEE0);   // full-width ASCII (！（）：１２Ａ) → ASCII
                 else if (c == '　') c = ' ';
                 switch (c)
@@ -333,6 +337,8 @@ namespace PocketRoles.Net
             if (dropped > 0) PocketRolesPlugin.Logger.LogInfo($"Rpc.SanitizeForVanillaChat: dropped {dropped} character(s) the vanilla chat filter rejects ({(box != null ? "vanilla filter" : "fallback table")})");
             return sb.ToString();
         }
+
+        private static readonly System.Text.RegularExpressions.Regex RichTextTag = new System.Text.RegularExpressions.Regex("</?(color|size|b|i|u|s|font|sprite|alpha|mark|noparse|nobr)[^<>]{0,40}>", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         /// <summary>No chat field yet: letters, digits, space and the symbols seen to pass the vanilla filter (2026.8.18 probe).</summary>
         private static bool FallbackAllowed(char c)

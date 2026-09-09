@@ -27,8 +27,13 @@ namespace PocketRoles.Game
         /// </summary>
         internal const float KillMeetingGap = 3.0f;
         internal const string DeferTag = "meeting.defer";
-        /// <summary>Set by the deferred call so the prefix lets the postponed report through untouched.</summary>
+        /// <summary>Set by the deferred call so the prefix knows it is the postponed report coming back.</summary>
         internal static bool DeferredReport;
+        /// <summary>How many times the current report was held (a kill inside the hold extends it at most once more).</summary>
+        internal static int DeferCount;
+        internal const int MaxDefers = 2;
+        /// <summary>A report is being held: kills are refused and delayed deaths wait (see Kills).</summary>
+        internal static bool ReportHeld => Scheduler.HasTag(DeferTag);
 
         private static readonly RoleTypes[] ImpostorLikeViews =
         {
@@ -224,42 +229,51 @@ namespace PocketRoles.Game
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return true;
                 if (Meetings.SkipPrefixWork) return true;     // /diag skipmeeting: isolate this prefix
                 if (MeetingHud.Instance != null) return true; // already in a meeting
-                // The postponed report (see below) comes back through here: everything was done on the first pass.
-                if (Meetings.DeferredReport) { Meetings.DeferredReport = false; return true; }
+                // The postponed report (see below) comes back through here and repeats the checks: kills are refused
+                // and bites are paused while the hold runs (Kills.HandleCheckMurder / Kills.Tick), but a compat lobby's
+                // vanilla MurderPlayer or a disconnect can still land inside it.
+                bool deferredPass = Meetings.DeferredReport;
+                Meetings.DeferredReport = false;
                 // Vanilla rejects these reports: do not switch names to the meeting layout for nothing.
                 if (__instance == null || __instance.Data == null || __instance.Data.IsDead) return true;
-                if (target == null && ShipStatus.Instance != null && ShipStatus.Instance.EmergencyCooldown > 0f) return true;
+                if (!deferredPass && target == null && ShipStatus.Instance != null && ShipStatus.Instance.EmergencyCooldown > 0f) return true;
 
                 // A dead host that is temporarily "alive" for chat must not be built into the vote areas as a living voter.
                 Rpc.CancelTempRevive();
 
                 // Pending bites die now - except the reporter's own: killing it here would make vanilla drop the report.
-                // Its bite is postponed to the first Kills.Tick after the meeting / exile screen.
+                // Its bite stays parked (Kills.Tick pauses while the report is held and during the meeting) and executes
+                // after the exile screen (Meetings_ExileWrapUpPatch re-arms it).
                 byte reporterId = __instance.PlayerId;
-                bool reporterBitten = Core.Game.Bites.TryGetValue(reporterId, out var ownBite);
-                if (reporterBitten) Core.Game.Bites.Remove(reporterId);
-                Kills.FlushBites();
-                if (reporterBitten)
+                if (!deferredPass) Kills.FlushBites(reporterId); // the second pass flushes nothing: it would move LastMurderAt and chain holds
+                if (Core.Game.Bites.TryGetValue(reporterId, out var ownBite))
                 {
                     ownBite.DueAt = UnityEngine.Time.time;
                     Core.Game.Bites[reporterId] = ownBite;
                 }
 
                 // #55: a kill in the last KillMeetingGap seconds (a bite just flushed above, or an impostor kill right before
-                // the button) → hold StartMeeting until the victims' kill animations are over, then report again.
+                // the button) → hold StartMeeting until the victims' kill animations are over, then report again. A
+                // kill that lands inside the hold extends it once more (compat lobbies); after that the meeting starts.
                 float sinceKill = UnityEngine.Time.time - Kills.LastMurderAt;
-                if (sinceKill < Meetings.KillMeetingGap)
+                if (sinceKill < Meetings.KillMeetingGap && (!deferredPass || Meetings.DeferCount < Meetings.MaxDefers))
                 {
                     float wait = Meetings.KillMeetingGap - sinceKill + 0.1f;
                     var reporter = __instance;
                     var reported = target;
-                    PocketRolesPlugin.Logger.LogInfo($"Meetings: report by #{reporterId} {(reported == null ? "(emergency)" : "of #" + reported.PlayerId)} held {wait:0.00}s after a kill ({sinceKill:0.00}s ago)");
+                    Meetings.DeferCount = deferredPass ? Meetings.DeferCount + 1 : 1;
+                    PocketRolesPlugin.Logger.LogInfo($"Meetings: report by #{reporterId} {(reported == null ? "(emergency)" : "of #" + reported.PlayerId)} held {wait:0.00}s after a kill ({sinceKill:0.00}s ago, pass {Meetings.DeferCount})");
                     Scheduler.Cancel(Meetings.DeferTag);
                     Scheduler.After(wait, () =>
                     {
                         try
                         {
                             if (!Core.Game.IsHostActive || !Core.Game.InProgress || MeetingHud.Instance != null || reporter == null) return;
+                            if (reporter.Data == null || reporter.Data.IsDead)
+                            {
+                                PocketRolesPlugin.Logger.LogWarning($"Meetings: held report by #{reporterId} dropped (reporter died meanwhile)");
+                                return;
+                            }
                             Meetings.DeferredReport = true;
                             reporter.ReportDeadBody(reported);
                         }
@@ -268,6 +282,8 @@ namespace PocketRoles.Game
                     }, Meetings.DeferTag);
                     return false;
                 }
+                Meetings.DeferCount = 0;
+                if (deferredPass) return true; // names were switched on the first pass
 
                 // Vote areas are built from the names a client holds when MeetingHud spawns, which happens right after
                 // this prefix (StartMeeting is sent immediately): the meeting layout must leave before it.

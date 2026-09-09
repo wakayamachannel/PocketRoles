@@ -131,7 +131,9 @@ namespace PocketRoles.Game
                 if (cursed > 0)
                 {
                     PocketRolesPlugin.Logger.LogInfo($"Witch: curse strikes {cursed} player(s) {CurseDelay:0.#} s after the exile screen");
-                    HrChat.All(HrChat.Title, () => Lang.T("kill.curse.all", "魔女の呪いが発動しました。", "The witch's curse strikes."));
+                    // Not at WrapUp+0: chat from a dead host opens Rpc.TempReviveHostForChat (an urgent Data(IsDead=false))
+                    // inside the window where clients still run their own exile end check (EvilNekomata does the same).
+                    Scheduler.After(2f, () => HrChat.All(HrChat.Title, () => Lang.T("kill.curse.all", "魔女の呪いが発動しました。", "The witch's curse strikes.")), "witch.notice");
                 }
             }
             catch (Exception e)

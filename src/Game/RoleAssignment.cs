@@ -115,7 +115,9 @@ namespace PocketRoles.Game
                 }
                 var pick = candidates[new System.Random().Next(candidates.Count)];
                 Core.Game.VanillaRoles[pick.PlayerId] = RoleTypes.Impostor;
-                if (Core.Game.IsHost(pick.PlayerId)) Rpc.ApplyRoleLocal(pick, RoleTypes.Impostor);
+                // the host's own table too (as ApplyForcedRoles / DowngradeImpostorSpecials do), or vanilla on the host
+                // keeps treating the promoted player as a crewmate (exile text, CanBeKilled, ghost role pick)
+                Rpc.ApplyRoleLocal(pick, RoleTypes.Impostor);
                 PocketRolesPlugin.Logger.LogWarning($"RoleAssignment: vanilla assigned no impostor ({players.Count} players) — promoted #{pick.PlayerId} {Core.Game.NameOf(pick.PlayerId)} to Impostor so every role table has one");
             }
             catch (Exception e)

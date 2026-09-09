@@ -331,6 +331,16 @@ namespace PocketRoles.Chat
         /// (unregistered lobby: public host broadcasts only, 1 message / s): the single <see cref="CompatWelcomeLine"/>
         /// in the lobby's language, capped at <see cref="CompatMaxWelcomeMessages"/> (no roles list, no VIP line).
         /// </summary>
+        /// <summary>What a joiner actually receives, for /welcome show and the post-/welcome preview (the compat line in a compat lobby).</summary>
+        internal static List<string> PreviewWelcomeChunks()
+        {
+            if (!Registration.CompatMode) return WelcomeChunks();
+            var chunks = new List<string>();
+            using (Lang.Scope(Lang.Default)) chunks.AddRange(Split(CompatWelcomeLine()));
+            if (chunks.Count > CompatMaxWelcomeMessages) chunks.RemoveRange(CompatMaxWelcomeMessages, chunks.Count - CompatMaxWelcomeMessages);
+            return chunks;
+        }
+
         private static List<string> BuildWelcomeChunks(int clientId)
         {
             byte playerId = PlayerIdOfClient(clientId);

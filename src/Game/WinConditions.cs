@@ -147,6 +147,9 @@ namespace PocketRoles.Game
                 Core.Game.Ending = true;
                 Core.Game.InProgress = false;
                 Scheduler.Cancel("win.end");
+                // Paced packets still waiting (per-viewer ghost roles of the death that ends the game, name refreshes)
+                // would land after the Victory / Defeat roles below and turn a client's end screen around.
+                PocketRoles.Net.Rpc.Queue.Clear();
 
                 if (soloId == 255 && IsSoloKind(kind)) soloId = Core.Game.SoloWinnerId;
 

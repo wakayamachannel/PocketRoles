@@ -43,6 +43,9 @@ namespace PocketRoles.Game
             if (!Game.IsHostActive || !Game.InProgress || Game.Ending) return;
             // Not during the intro either: a lover disconnecting during the intro queues its partner's death.
             if (MeetingHud.Instance != null || ExileController.Instance != null || IntroCutscene.Instance != null) return;
+            // A report is being held (#55): nothing may die between the report and StartMeeting — the reporter's own
+            // parked bite included (it would void the report).
+            if (Meetings.ReportHeld) return;
 
             float now = Time.time;
             Scratch.Clear();
@@ -55,8 +58,13 @@ namespace PocketRoles.Game
             Scratch.Clear();
         }
 
-        /// <summary>Executes every pending bite immediately (called by Meetings from the ReportDeadBody prefix).</summary>
-        public static void FlushBites()
+        /// <summary>
+        /// Executes every pending bite immediately (called by Meetings from the ReportDeadBody prefix). Deaths chained
+        /// off a flushed one (a lover following its partner) are queued by OnMurder during the loop and execute in the
+        /// same flush, so they too land before the meeting; <paramref name="exceptId"/> (the reporter) is never touched —
+        /// its entry stays parked for after the exile screen.
+        /// </summary>
+        public static void FlushBites(byte exceptId = 255)
         {
             if (Game.Bites.Count == 0) return;
             if (!Game.IsHostActive || !Game.InProgress || Game.Ending)
@@ -64,12 +72,20 @@ namespace PocketRoles.Game
                 Game.Bites.Clear();
                 return;
             }
-            Scratch.Clear();
-            foreach (var kv in Game.Bites) Scratch.Add(kv.Key);
-            // v0.5.0: a Terrorist death inside the batch ends the game synchronously — no MurderPlayer after EndGame
-            for (int i = 0; i < Scratch.Count; i++) { if (Game.Ending || !Game.InProgress) break; ExecuteBite(Scratch[i], false); }
-            Scratch.Clear();
-            Game.Bites.Clear();
+            for (int round = 0; round < 6; round++)
+            {
+                Scratch.Clear();
+                foreach (var kv in Game.Bites) if (kv.Key != exceptId) Scratch.Add(kv.Key);
+                if (Scratch.Count == 0) break;
+                for (int i = 0; i < Scratch.Count; i++)
+                {
+                    // v0.5.0: a Terrorist death inside the batch ends the game synchronously — no MurderPlayer after EndGame
+                    if (Game.Ending || !Game.InProgress) break;
+                    ExecuteBite(Scratch[i], false);
+                }
+                for (int i = 0; i < Scratch.Count; i++) Game.Bites.Remove(Scratch[i]);
+                Scratch.Clear();
+            }
         }
 
         // ------------------------------------------------------------------ role capability helpers
@@ -264,6 +280,13 @@ namespace PocketRoles.Game
                 if (target != null) Rpc.FailKill(killer, target);
                 return false;
             }
+            // A report is being held for a few seconds (#55): a kill now would either void the report (reporter) or
+            // start the meeting inside somebody's kill animation. The button simply fails; the cooldown is untouched.
+            if (Meetings.ReportHeld)
+            {
+                if (target != null) Rpc.FailKill(killer, target);
+                return false;
+            }
             var role = Game.RoleOf(killerId);
 
             // A host that holds a desync role (Sheriff / Jackal / Arsonist) applied Impostor to its OWN PlayerControl, so
@@ -393,6 +416,13 @@ namespace PocketRoles.Game
         internal static void OnMurder(PlayerControl killer, PlayerControl target, MurderResultFlags resultFlags)
         {
             if ((resultFlags & MurderResultFlags.Succeeded) == 0) return;
+            // Rpc.Kill sends Succeeded without DecisionByHost: a target under a Guardian Angel's shield shows the protect
+            // flash and stays alive (SerialKiller relies on that) — nothing died, so none of the death hooks may run.
+            if (target != null && target.Data != null && !target.Data.IsDead)
+            {
+                PocketRolesPlugin.Logger.LogInfo($"Kills: kill on {Game.NameOf(target.PlayerId)} was blocked (protected) → no death bookkeeping");
+                return;
+            }
             LastMurderAt = Time.time;
             if (target != null) RoleReveal.OnKilled(target.PlayerId); // [Roles] RevealRoleOnDeath (also in compat games, where InProgress stays false)
             if (!Game.InProgress || target == null) return;

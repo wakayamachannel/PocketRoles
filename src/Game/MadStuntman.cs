@@ -53,10 +53,17 @@ namespace PocketRoles.Game
                     Kills.Notice(killerId, "kill.stuntman.guarded.anon", "{0} はキルを耐えました。", "{0} survived your kill.", name);
                 }
                 if (!Options.MadStuntmanNotify) return;   // default off (SNR: the stuntman is not told); the role chat always carries the count
-                if (left > 0)
-                    Kills.Notice(targetId, "kill.stuntman.survived", "キルを耐えました（残り {0} 回）。", "You survived a kill attempt ({0} left).", left);
-                else
-                    Kills.Notice(targetId, "kill.stuntman.survived.last", "キルを耐えました。次は耐えられません。", "You survived a kill attempt. The next one kills you.");
+                // Not in the same frame as the killer's cooldown reset + notice: one client's immediate packets per frame
+                // (Worshipper.Convert spaces the target's chat the same way).
+                int leftNow = left;
+                Scheduler.After(PocketRoles.Chat.Chat.ChunkSpacing + 0.05f, () =>
+                {
+                    if (!Game.IsHostActive || !Game.InProgress || !Game.IsAlive(targetId)) return;
+                    if (leftNow > 0)
+                        Kills.Notice(targetId, "kill.stuntman.survived", "キルを耐えました（残り {0} 回）。", "You survived a kill attempt ({0} left).", leftNow);
+                    else
+                        Kills.Notice(targetId, "kill.stuntman.survived.last", "キルを耐えました。次は耐えられません。", "You survived a kill attempt. The next one kills you.");
+                }, "stuntman.notice");
             }
             catch (Exception e)
             {
