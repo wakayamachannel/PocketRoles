@@ -4,6 +4,8 @@
 
 ▶ Videos: [Install (YouTube, Japanese subtitles, 1.5 min)](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [How to play (YouTube, 3.5 min)](https://www.youtube.com/watch?v=UyvmPzYSrRM) · Chinese: [Install (bilibili)](https://www.bilibili.com/video/BV17obV6CESH) / [How to play (bilibili)](https://www.bilibili.com/video/BV1qobV6kERQ)
 
+💬 **Official Discord "PocketRoles 役職部屋": <https://discord.gg/ahNvRMVeHP>** — lobby codes, recruiting, questions and bug reports (mainly Japanese; English and Chinese are welcome). Players join lobbies without installing anything.
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **A role mod for Among Us (2026.8.18 / Steam) that only the person who creates the lobby installs.** Your friends keep their everyday Among Us on PC, phone or Switch and just type the room code. Seventeen roles — Sheriff, Jackal, Jester and more — reach each player privately through their name tag and chat. Settings live in the lobby computer, every notice comes in Japanese / Chinese / English, foreign-language chat is translated automatically, and lobby time-outs or endless meetings are handled from the host's keyboard. Free, non-commercial, source on GitHub (**v0.4.1**, formerly HostRoles).
@@ -38,7 +40,8 @@ Details and manual installation: [chapter 5](#5-installation-steam). The launche
 
 Since July 2026 the official servers require lobbies that use mods to register (mod-lobby registration; PocketRoles does it automatically). Registered lobbies **do not appear in the public list**, so the host hands out the room code ([chapter 3](#3-innersloths-mod-policy-and-public-lobbies-read-this)). Share it any way you like, wherever your players already are:
 
-- **Discord server**: just paste the room code (copy the code shown on the host's screen; typing `/announce` in chat copies it to the clipboard)
+- **The official Discord "PocketRoles 役職部屋"** <https://discord.gg/ahNvRMVeHP>: paste your code in `#部屋コード` and players there will come (hosts are welcome too; there are channels for recruiting, questions and bug reports)
+- **Your own Discord server**: just paste the room code (copy the code shown on the host's screen; typing `/announce` in chat copies it to the clipboard)
 - **Group chat** (LINE, WhatsApp and the like)
 - **Friends** directly
 

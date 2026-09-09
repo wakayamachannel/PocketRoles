@@ -4,6 +4,8 @@
 
 ▶ 视频: [安装篇（bilibili・1 分半）](https://www.bilibili.com/video/BV17obV6CESH) / [玩法篇（bilibili・3 分半）](https://www.bilibili.com/video/BV1qobV6kERQ)　日本語: [导入篇（YouTube）](https://www.youtube.com/watch?v=Aogbzc_dUTU) / [玩法篇（YouTube）](https://www.youtube.com/watch?v=UyvmPzYSrRM)
 
+💬 **官方 Discord「PocketRoles 役職部屋」: <https://discord.gg/ahNvRMVeHP>** — 房间码公告、招人、提问和反馈 bug 都在这里（以日语为主，欢迎中文和英文）。玩家不用安装任何东西即可加入房间。
+
 <p align="center"><img src="assets/PocketRoles-256.png" width="128" alt="PocketRoles"></p>
 
 **这是一个只需建房的人安装的 Among Us（2026.8.18 / Steam）职业模组。** 朋友们用 PC、手机或 Switch 上平时的 Among Us，输入房间代码就能加入。警长、豺狼、小丑等 17 种职业会通过名字标签和聊天悄悄地只告诉本人。设置在房间的电脑里完成，提示支持 日本語 / 中文 / English 三种语言，外语聊天自动翻译，房间超时和拖沓的会议也能由房主一键处理。免费、非营利，源代码在 GitHub 公开（**v0.4.1**，旧名 HostRoles）。
@@ -40,7 +42,8 @@
 
 根据 2026 年 7 月起的官方规则，使用 MOD 的房间必须向服务器注册（MOD 房间注册，PocketRoles 会自动完成）。已注册的房间 **不会出现在公开列表里**，需要房主把房间代码告诉玩家（[第 3 章](#3-innersloth-模组政策与公开房间须知必读)）。代码怎么分享都可以，贴到你平时用的地方即可：
 
-- **Discord 服务器**：贴上房间代码就行（复制房主画面上显示的代码再粘贴。在聊天里输入 `/announce` 会复制到剪贴板）
+- **官方 Discord「PocketRoles 役職部屋」** <https://discord.gg/ahNvRMVeHP>：把代码贴到 `#部屋コード`，想玩的人会从那里进来（也欢迎想当房主的人；还有招人、提问和反馈 bug 的频道）
+- **你自己的 Discord 服务器**：贴上房间代码就行（复制房主画面上显示的代码再粘贴。在聊天里输入 `/announce` 会复制到剪贴板）
 - **微信・QQ 群**
 - **朋友**（直接告诉）
 
