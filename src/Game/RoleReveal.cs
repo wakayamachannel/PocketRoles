@@ -1,4 +1,5 @@
 using System;
+using AmongUs.GameOptions;
 using PocketRoles.Core;
 
 namespace PocketRoles.Game
@@ -49,23 +50,50 @@ namespace PocketRoles.Game
             string role = RoleNameOf(id);
             if (string.IsNullOrEmpty(role)) return;
             PocketRolesPlugin.Logger.LogInfo($"RoleReveal: {name} → {role} ({key})");
-            Chat.Chat.All(Chat.Chat.Title, Lang.TF(key, ja, en, zh, name, role));
+            // Lang.T (3 texts) + Format: Lang.TF has no zh overload (its 4th argument is the format args).
+            string text;
+            try { text = string.Format(Lang.T(key, ja, en, zh), name, role); } catch (FormatException) { text = name + ": " + role; }
+            Chat.Chat.All(Chat.Chat.Title, text);
         }
 
-        /// <summary>The PocketRoles role name, else the vanilla role's localized NiceName (Crewmate / Impostor / Judge …).</summary>
+        /// <summary>The PocketRoles role name, else the vanilla role's name in the lobby language (Crewmate / Impostor / Judge …).</summary>
         private static string RoleNameOf(byte id)
         {
             var custom = Core.Game.RoleOf(id);
             if (custom != CustomRole.None) return Roles.Info(custom).Name;
             var type = Core.Game.VanillaRoleOf(id);
+            string own = VanillaRoleName(type);
+            if (own != null) return own;
+            // Unknown role type: the game's own NiceName, unless it is the "STRMISS" placeholder (seen for Viper on 2026.8.18)
             try
             {
                 var rm = RoleManager.Instance;
                 var rb = rm != null ? rm.GetRole(type) : null;
-                if (rb != null && !string.IsNullOrEmpty(rb.NiceName)) return rb.NiceName;
+                if (rb != null && !string.IsNullOrEmpty(rb.NiceName) && !rb.NiceName.Contains("STRMISS")) return rb.NiceName;
             }
             catch (Exception) { }
             return type.ToString();
+        }
+
+        /// <summary>Vanilla 2026.8.18 role names (ja / en / zh-CN); null for a type not in the table.</summary>
+        private static string VanillaRoleName(RoleTypes type)
+        {
+            switch (type)
+            {
+                case RoleTypes.Crewmate: case RoleTypes.CrewmateGhost: return Lang.T("vanrole.crewmate", "クルーメイト", "Crewmate", "船员");
+                case RoleTypes.Impostor: case RoleTypes.ImpostorGhost: return Lang.T("vanrole.impostor", "インポスター", "Impostor", "内鬼");
+                case RoleTypes.Scientist: return Lang.T("vanrole.scientist", "サイエンティスト", "Scientist", "科学家");
+                case RoleTypes.Engineer: return Lang.T("vanrole.engineer", "エンジニア", "Engineer", "工程师");
+                case RoleTypes.GuardianAngel: return Lang.T("vanrole.guardianangel", "守護天使", "Guardian Angel", "守护天使");
+                case RoleTypes.Shapeshifter: return Lang.T("vanrole.shapeshifter", "シェイプシフター", "Shapeshifter", "变形者");
+                case RoleTypes.Noisemaker: return Lang.T("vanrole.noisemaker", "ノイズメーカー", "Noisemaker", "噪音制造者");
+                case RoleTypes.Phantom: return Lang.T("vanrole.phantom", "ファントム", "Phantom", "幻影");
+                case RoleTypes.Tracker: return Lang.T("vanrole.tracker", "トラッカー", "Tracker", "追踪者");
+                case RoleTypes.Detective: return Lang.T("vanrole.detective", "探偵", "Detective", "侦探");
+                case RoleTypes.Viper: return Lang.T("vanrole.viper", "ヴァイパー", "Viper", "毒蛇");
+                case RoleTypes.Judge: return Lang.T("vanrole.judge", "ジャッジ", "Judge", "审判官");
+                default: return null;
+            }
         }
     }
 }
