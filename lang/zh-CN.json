@@ -1,4 +1,6 @@
 {
+  "afk.kicked": "{0} {1} 分钟未移动，已被移出（挂机）。",
+  "afk.warn": "{0} 秒内不移动或发言将被移出（挂机）。",
   "anticheat.forged": "检测到来自 {0} 的非法通信（RPC {1}），已忽略。",
   "anticheat.forged.target": "已忽略发给 {0} 的非法通信（RPC {1}）（无法确定发送者）。",
   "anticheat.kick": "已因作弊行为踢出 {0}。",
@@ -206,8 +208,6 @@
   "compat.welcome": "欢迎! 本房间是普通的Among Us(无职业)，无需安装任何东西，直接玩即可。需要帮助请输入 /cmd h",
   "evilnekomata.drag.all": "{0} 被放逐的邪恶猫又 {1} 拖走了。",
   "evilnekomata.dragged": "你被放逐的 {0} 拖走了，放逐画面结束后你将死亡。",
-  "afk.kicked": "{0} {1} 分钟未移动，已被移出（挂机）。",
-  "afk.warn": "{0} 秒内不移动或发言将被移出（挂机）。",
   "ghostlist.alive": "存活时无法查看（死亡后会自动显示）。",
   "ghostlist.alive.head": "存活:",
   "ghostlist.dead.head": "死亡:",

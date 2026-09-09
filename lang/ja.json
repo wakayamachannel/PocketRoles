@@ -1,4 +1,6 @@
 {
+  "afk.kicked": "{0} は {1} 分間動かなかったため退出になりました（AFK）。",
+  "afk.warn": "{0}秒以内に動くか発言しないと退出になります（AFK）。",
   "anticheat.forged": "{0} から不正な通信(RPC {1})を検出し、無視しました。",
   "anticheat.forged.target": "{0} 宛ての不正な通信(RPC {1})を無視しました（送信元は特定できません）。",
   "anticheat.kick": "{0} を不正行為でキックしました。",
@@ -206,8 +208,6 @@
   "compat.welcome": "ようこそ! この部屋は普通のAmong Us(役職なし)です。何も入れなくてOK、そのまま遊べます。困ったら /cmd h",
   "evilnekomata.drag.all": "{0} は追放された {1}（イビル猫又）の道連れになりました。",
   "evilnekomata.dragged": "追放された {0} の道連れになりました。追放画面の後に死亡します。",
-  "afk.kicked": "{0} は {1} 分間動かなかったため退出になりました（AFK）。",
-  "afk.warn": "{0}秒以内に動くか発言しないと退出になります（AFK）。",
   "ghostlist.alive": "生存中は見られません（死亡すると自動で表示されます）。",
   "ghostlist.alive.head": "生存:",
   "ghostlist.dead.head": "死亡:",

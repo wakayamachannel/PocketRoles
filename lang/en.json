@@ -1,4 +1,6 @@
 {
+  "afk.kicked": "{0} was removed after {1} min without moving (AFK).",
+  "afk.warn": "Move or chat within {0} s or you will be removed (AFK).",
   "anticheat.forged": "Forged RPC {1} from {0} was dropped.",
   "anticheat.forged.target": "Forged RPC {1} addressed to {0} was dropped (sender unknown).",
   "anticheat.kick": "Kicked {0} for forged RPCs.",
@@ -206,8 +208,6 @@
   "compat.welcome": "Welcome! This is a normal Among Us lobby (no roles). Nothing to install, just play. Type /cmd h for help",
   "evilnekomata.drag.all": "{0} was dragged along by the ejected Evil Nekomata {1}.",
   "evilnekomata.dragged": "You were dragged along by the ejected {0}. You die after the ejection screen.",
-  "afk.kicked": "{0} was removed after {1} min without moving (AFK).",
-  "afk.warn": "Move or chat within {0} s or you will be removed (AFK).",
   "ghostlist.alive": "Not while you are alive (the list appears automatically once you die).",
   "ghostlist.alive.head": "Alive:",
   "ghostlist.dead.head": "Dead:",
