@@ -62,6 +62,16 @@ namespace PocketRoles.Game
             var custom = Core.Game.RoleOf(id);
             if (custom != CustomRole.None) return Roles.Info(custom).Name;
             var type = Core.Game.VanillaRoleOf(id);
+            // After the death the live role is already the ghost role (Guardian Angel / CrewmateGhost, seen at the exile
+            // screen): the vanilla NetworkedPlayerInfo keeps the role the player had while alive.
+            try
+            {
+                var pc = Core.Game.Player(id);
+                var info = pc != null ? pc.Data : null;
+                var alive = info != null ? info.RoleWhenAlive : null;
+                if (alive != null && alive.HasValue) type = alive.Value;
+            }
+            catch (Exception) { }
             string own = VanillaRoleName(type);
             if (own != null) return own;
             // Unknown role type: the game's own NiceName, unless it is the "STRMISS" placeholder (seen for Viper on 2026.8.18)
@@ -80,11 +90,11 @@ namespace PocketRoles.Game
         {
             switch (type)
             {
-                case RoleTypes.Crewmate: case RoleTypes.CrewmateGhost: return Lang.T("vanrole.crewmate", "クルーメイト", "Crewmate", "船员");
+                // ghost roles (CrewmateGhost / ImpostorGhost / Guardian Angel) are only ever assigned after a death: name the living side
+                case RoleTypes.Crewmate: case RoleTypes.CrewmateGhost: case RoleTypes.GuardianAngel: return Lang.T("vanrole.crewmate", "クルーメイト", "Crewmate", "船员");
                 case RoleTypes.Impostor: case RoleTypes.ImpostorGhost: return Lang.T("vanrole.impostor", "インポスター", "Impostor", "内鬼");
                 case RoleTypes.Scientist: return Lang.T("vanrole.scientist", "サイエンティスト", "Scientist", "科学家");
                 case RoleTypes.Engineer: return Lang.T("vanrole.engineer", "エンジニア", "Engineer", "工程师");
-                case RoleTypes.GuardianAngel: return Lang.T("vanrole.guardianangel", "守護天使", "Guardian Angel", "守护天使");
                 case RoleTypes.Shapeshifter: return Lang.T("vanrole.shapeshifter", "シェイプシフター", "Shapeshifter", "变形者");
                 case RoleTypes.Noisemaker: return Lang.T("vanrole.noisemaker", "ノイズメーカー", "Noisemaker", "噪音制造者");
                 case RoleTypes.Phantom: return Lang.T("vanrole.phantom", "ファントム", "Phantom", "幻影");
