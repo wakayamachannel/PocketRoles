@@ -18,6 +18,16 @@ namespace PocketRoles.Game
         /// <summary>Diagnostics (/diag skipmeeting): skip the ReportDeadBody prefix work to isolate it.</summary>
         internal static bool SkipPrefixWork;
 
+        /// <summary>
+        /// Minimum time between the last MurderPlayer and StartMeeting (finding #55, 2026-09-09): a vanilla 2026.8.18
+        /// client that receives StartMeeting while its kill animation runs (a bite flushed by the report, a kill 20 ms
+        /// before the button) keeps a black screen. The vanilla kill animation is about 1.2 s.
+        /// </summary>
+        internal const float KillMeetingGap = 1.6f;
+        internal const string DeferTag = "meeting.defer";
+        /// <summary>Set by the deferred call so the prefix lets the postponed report through untouched.</summary>
+        internal static bool DeferredReport;
+
         private static readonly RoleTypes[] ImpostorLikeViews =
         {
             RoleTypes.Impostor, RoleTypes.Shapeshifter, RoleTypes.Phantom, RoleTypes.Viper
@@ -212,6 +222,8 @@ namespace PocketRoles.Game
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return true;
                 if (Meetings.SkipPrefixWork) return true;     // /diag skipmeeting: isolate this prefix
                 if (MeetingHud.Instance != null) return true; // already in a meeting
+                // The postponed report (see below) comes back through here: everything was done on the first pass.
+                if (Meetings.DeferredReport) { Meetings.DeferredReport = false; return true; }
                 // Vanilla rejects these reports: do not switch names to the meeting layout for nothing.
                 if (__instance == null || __instance.Data == null || __instance.Data.IsDead) return true;
                 if (target == null && ShipStatus.Instance != null && ShipStatus.Instance.EmergencyCooldown > 0f) return true;
@@ -229,6 +241,30 @@ namespace PocketRoles.Game
                 {
                     ownBite.DueAt = UnityEngine.Time.time;
                     Core.Game.Bites[reporterId] = ownBite;
+                }
+
+                // #55: a kill in the last KillMeetingGap seconds (a bite just flushed above, or an impostor kill right before
+                // the button) → hold StartMeeting until the victims' kill animations are over, then report again.
+                float sinceKill = UnityEngine.Time.time - Kills.LastMurderAt;
+                if (sinceKill < Meetings.KillMeetingGap)
+                {
+                    float wait = Meetings.KillMeetingGap - sinceKill + 0.1f;
+                    var reporter = __instance;
+                    var reported = target;
+                    PocketRolesPlugin.Logger.LogInfo($"Meetings: report by #{reporterId} {(reported == null ? "(emergency)" : "of #" + reported.PlayerId)} held {wait:0.00}s after a kill ({sinceKill:0.00}s ago)");
+                    Scheduler.Cancel(Meetings.DeferTag);
+                    Scheduler.After(wait, () =>
+                    {
+                        try
+                        {
+                            if (!Core.Game.IsHostActive || !Core.Game.InProgress || MeetingHud.Instance != null || reporter == null) return;
+                            Meetings.DeferredReport = true;
+                            reporter.ReportDeadBody(reported);
+                        }
+                        catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Meetings: deferred report: {e}"); }
+                        finally { Meetings.DeferredReport = false; }
+                    }, Meetings.DeferTag);
+                    return false;
                 }
 
                 // Vote areas are built from the names a client holds when MeetingHud spawns, which happens right after
@@ -337,6 +373,7 @@ namespace PocketRoles.Game
         {
             try
             {
+                RoleReveal.OnExiled(__instance); // [Roles] RevealRoleOnDeath (also in compat games, where InProgress stays false)
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress) return;
                 Scheduler.After(1.5f, AntiBlackout.Restore, "antiblackout.restore");
                 // A postponed bite (the reporter's) must not fire inside the WrapUp window: slower clients run their

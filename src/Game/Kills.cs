@@ -383,9 +383,18 @@ namespace PocketRoles.Game
 
         // ------------------------------------------------------------------ MurderPlayer
 
+        /// <summary>
+        /// Time.time of the last successful MurderPlayer seen on the host (own kills, relayed vanilla kills, executed bites).
+        /// Meetings_ReportDeadBodyPatch keeps StartMeeting at least <see cref="Meetings.KillMeetingGap"/> away from it: a
+        /// 2026.8.18 client whose kill animation is cut by MeetingHud stays on a black screen (finding #55).
+        /// </summary>
+        internal static float LastMurderAt = -100f;
+
         internal static void OnMurder(PlayerControl killer, PlayerControl target, MurderResultFlags resultFlags)
         {
             if ((resultFlags & MurderResultFlags.Succeeded) == 0) return;
+            LastMurderAt = Time.time;
+            if (target != null) RoleReveal.OnKilled(target.PlayerId); // [Roles] RevealRoleOnDeath (also in compat games, where InProgress stays false)
             if (!Game.InProgress || target == null) return;
 
             byte targetId = target.PlayerId;

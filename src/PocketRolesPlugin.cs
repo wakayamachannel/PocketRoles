@@ -36,6 +36,7 @@ namespace PocketRoles
             try
             {
                 Options.Init(Config);
+                Options.Backup(".startup"); // /restore startup: the settings as they were when the game was launched
             }
             catch (Exception e)
             {

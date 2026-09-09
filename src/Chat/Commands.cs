@@ -220,6 +220,27 @@ namespace PocketRoles.Chat
                         Options.Reload();
                         Reply(sender, Lang.T("cmd.reload", "設定ファイルを再読み込みしました。", "Config file reloaded.") + "\n" + ShowText());
                         return true;
+                    case "backup":
+                    {
+                        // v0.4.4: snapshot of the whole config file, restored with /restore (host only)
+                        string b = Options.Backup();
+                        Reply(sender, b != null
+                            ? Lang.TF("cmd.backup.ok", "今の設定を保存しました（{0}）。壊れたら /restore で戻せます。", "Settings backed up ({0}). /restore brings them back.", System.IO.Path.GetFileName(b))
+                            : Lang.T("cmd.backup.fail", "設定を保存できませんでした。", "Could not back up the settings."));
+                        return true;
+                    }
+                    case "restore": case "復元":
+                    {
+                        if (InGame()) { Reply(sender, InGameText()); return true; }
+                        bool startup = arg1 == "startup" || arg1 == "起動時" || arg1 == "start";
+                        string suffix = startup ? ".startup" : ".backup";
+                        if (Options.Restore(suffix))
+                            Reply(sender, Lang.TF("cmd.restore.ok", "設定を{0}の状態に戻しました。", "Settings restored to the {0} state.",
+                                startup ? Lang.T("cmd.restore.startup", "ゲーム起動時", "game-launch") : Lang.T("cmd.restore.backup", "/backup 実行時", "/backup")) + "\n" + ShowText());
+                        else
+                            Reply(sender, Lang.T("cmd.restore.none", "戻せる保存がありません（/backup で保存できます。/restore startup でゲーム起動時の状態に戻せます）。", "Nothing to restore (/backup saves the settings; /restore startup returns to the game-launch state)."));
+                        return true;
+                    }
                     case "welcome": HandleWelcome(sender, arg1, RestOfLine(body, tokens[0])); return true;
                     case "test": Reply(sender, ToggleTest(arg1)); return true;
                     case "assign": Reply(sender, Assign(tokens)); return true;
@@ -279,6 +300,7 @@ namespace PocketRoles.Chat
                 case "admin": case "admins": case "moderator": case "moderators": case "vip": case "vips":
                 case "kick": case "ban": case "unban": case "vset":
                 case "code": case "コード": case "announce": case "guide": case "案内": case "move": case "migrate": case "移動":
+                case "backup": case "restore": case "復元":
                     return true;
                 default:
                     return false;
@@ -313,10 +335,12 @@ namespace PocketRoles.Chat
         {
             switch (cmd)
             {
-                case "set": case "opt": case "show": case "start": case "cancel": case "autostart":
-                case "welcome": case "rules": case "kick": case "ban": case "unban": case "vset":
+                case "set": case "opt": case "show":
+                case "welcome": case "rules": case "kick": case "ban": case "unban":
                 case "vip": case "vips": case "moderator": case "moderators":
                     return true;
+                case "start": case "cancel": case "autostart": case "vset":
+                    return Options.AdminLobbyControl; // v0.4.4: lobby control / vanilla settings only with [Permissions] AdminLobbyControl
                 case "mod":
                     return IsListVerb(arg1); // "/mod add|remove|list", never "/mod on|off"
                 default:
@@ -338,8 +362,13 @@ namespace PocketRoles.Chat
             {
                 case "welcome": case "roleinfo":
                 case "chat.welcometext": case "welcometext": case "chat.welcomesettings": case "welcomesettings":
+                case "chat.compatwelcome": case "compatwelcome": case "chat.compatwelcometext":
+                case "chat.compatwelcomeinterval": case "compatwelcomeinterval": case "chat.welcomeinterval":
+                case "roles.reveal": case "reveal": case "revealdeath": case "roles.revealroleondeath":
                 case "chat.rulesmode": case "rulesmode": case "rules.mode":
                 case "chat.rulestext": case "rulestext": case "rules.text": case "rules":
+                    return true;
+                // v0.4.4: lobby timer / auto-start / vanilla ranges only with [Permissions] AdminLobbyControl
                 case "lobby.autostart": case "autostart":
                 case "lobby.autostartplayers": case "autostartplayers": case "autostart.players":
                 case "lobby.autostartcountdown": case "autostartcountdown": case "autostart.countdown":
@@ -347,9 +376,10 @@ namespace PocketRoles.Chat
                 case "lobby.timerwarnat": case "timerwarnat": case "lobby.warnat":
                 case "lobby.extenddelay": case "lobby.extendnoticedelay": case "extenddelay":
                 case "vanilla.ranges": case "vanilla.extendedranges": case "vanilla.extended": case "ranges":
-                    return true;
+                    return Options.AdminLobbyControl;
             }
-            if (k.StartsWith("vanilla.") || k.StartsWith("sheriff.") || k.StartsWith("jackal.") || k.StartsWith("vampire.")
+            if (k.StartsWith("vanilla.")) return Options.AdminLobbyControl;
+            if (k.StartsWith("sheriff.") || k.StartsWith("jackal.") || k.StartsWith("vampire.")
                 || k.StartsWith("mayor.") || k.StartsWith("snitch.") || k.StartsWith("lighter.") || k.StartsWith("speedbooster.")
                 || k.StartsWith("speed.") || k.StartsWith("sb.") || k.StartsWith("madmate.")
                 || k.StartsWith("lovers.") || k.StartsWith("arsonist.") || k.StartsWith("witch.") || k.StartsWith("assassin.")
@@ -923,6 +953,8 @@ namespace PocketRoles.Chat
 
         /// <summary>Longest custom welcome text accepted (the message is capped at 4 chat messages anyway).</summary>
         private const int MaxWelcomeTextChars = 320;
+        /// <summary>Compat (unregistered) lobby: the welcome is ONE public message; 100 chars minus the "[PocketRoles] " prefix.</summary>
+        private const int CompatWelcomeMaxChars = 86;
 
         /// <summary>/welcome (state), /welcome show, /welcome reset, /welcome settings on|off, /welcome &lt;text…&gt;.</summary>
         private static void HandleWelcome(PlayerControl sender, string arg1, string rest)
@@ -939,11 +971,30 @@ namespace PocketRoles.Chat
                 LocalLines(sender, Lang.T("cmd.welcome.preview", "【挨拶文プレビュー】", "[Welcome preview]"), Chat.WelcomeChunks());
                 return;
             }
+            // Unregistered (compat) lobby: /welcome edits the ONE public compat line ([Chat] CompatWelcomeText) instead.
+            bool compat = Registration.CompatMode;
             if (a == "reset" || a == "default" || a == "clear")
             {
-                Options.TrySet("chat.welcometext", "", out _);
-                PocketRolesPlugin.Logger.LogInfo("Commands: welcome text reset");
+                Options.TrySet(compat ? "chat.compatwelcome" : "chat.welcometext", "", out _);
+                PocketRolesPlugin.Logger.LogInfo("Commands: welcome text reset" + (compat ? " (compat line)" : ""));
                 Reply(sender, Lang.T("cmd.welcome.reset", "挨拶文を標準に戻しました。", "Welcome text reset to the built-in one."));
+                return;
+            }
+            if (compat && a != "settings" && a != "setting")
+            {
+                string line = (rest ?? "").Replace("\\n", " ").Trim();
+                if (line.Length > CompatWelcomeMaxChars)
+                {
+                    Reply(sender, Lang.TF("cmd.welcome.toolong", "長すぎます（最大 {0} 文字）。", "Too long (max {0} characters).", CompatWelcomeMaxChars));
+                    return;
+                }
+                if (!Options.TrySet("chat.compatwelcome", line, out var cmsg))
+                {
+                    Reply(sender, Lang.T("cmd.opt.fail", "設定できません: ", "Failed: ") + cmsg);
+                    return;
+                }
+                PocketRolesPlugin.Logger.LogInfo($"Commands: compat welcome line set ({line.Length} chars)");
+                LocalLines(sender, Lang.T("cmd.welcome.set", "挨拶文を設定しました。プレビュー:", "Welcome text set. Preview:"), Chat.WelcomeChunks());
                 return;
             }
             if (a == "settings" || a == "setting")
@@ -997,7 +1048,8 @@ namespace PocketRoles.Chat
 
         private static string WelcomeStateText()
         {
-            string custom = Options.WelcomeText;
+            // Compat (unregistered) lobby: the state and /welcome <text> refer to the one-line public welcome.
+            string custom = Registration.CompatMode ? Options.CompatWelcomeText : Options.WelcomeText;
             string which = string.IsNullOrWhiteSpace(custom)
                 ? Lang.T("cmd.welcome.builtin", "標準", "built-in")
                 : Lang.TF("cmd.welcome.custom", "カスタム（{0}文字）", "custom ({0} chars)", custom.Length);

@@ -130,6 +130,9 @@ namespace PocketRoles.Core
         private static ConfigEntry<int> _vanEmergencyMax;
         private static ConfigEntry<int> _vanTaskMax;
         private static ConfigEntry<bool> _vanClampUnreg;
+        private static ConfigEntry<bool> _permAdminLobby;
+        private static ConfigEntry<bool> _revealOnDeath;
+        private static ConfigEntry<float> _compatWelcomeInterval;
 
         // v0.4e [Guide] guide-room support (room-code overlay, /announce, /move)
         private static ConfigEntry<bool> _guideShowCodeOverlay;
@@ -228,6 +231,8 @@ namespace PocketRoles.Core
             _welcomeText = cfg.Bind("Chat", "WelcomeText", "",
                 "Custom welcome text sent to joining players (empty = built-in text). \\n = line break; placeholders: {rules} {roles} {settings} {help} {version}. The mandatory mod notice line is always prepended");
             _welcomeIncludeSettings = cfg.Bind("Chat", "WelcomeIncludeSettings", false, "Append the current role settings to the welcome message (off by default: the welcome stays short, the settings summary is always available with /cmd s)");
+            _compatWelcomeInterval = cfg.Bind("Chat", "CompatWelcomeInterval", 60f, new ConfigDescription("Unregistered (compat) lobby: the welcome is ONE public message for everyone, so it is sent at most once per this many seconds no matter how many players join in between (a full public lobby gets a join every few seconds; 12 welcomes a minute drove players out on 2026-09-09). 0 = every join", new AcceptableValueRange<float>(0f, 600f)));
+            _revealOnDeath = cfg.Bind("Roles", "RevealRoleOnDeath", false, "Announce a player's role to everyone when they are killed or ejected ('X was Sheriff'; the vanilla role's name when there is no PocketRoles role, e.g. in an unregistered lobby)");
             _compatWelcomeText = cfg.Bind("Chat", "CompatWelcomeText", "", "Unregistered (compat) lobby only: your own one-line public welcome for every joiner (empty = built-in line 'ようこそ! この部屋は普通のAmong Us(役職なし)です…'). One chat message, at most 86 characters; characters a vanilla player cannot type ([ ] < > full-width ！（） etc.) are converted or dropped automatically");
             _wireLog = cfg.Bind("Diagnostics", "WireLog", false, "Investigation aid: log every packet this client sends (InnerNetClient.SendOrDisconnect) and receives (HandleMessage), decoded one level (GameData / GameDataTo -> Data / RPC / Spawn ...), plus every disconnect, to LogOutput.log. Off (default) = no effect");
             _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
@@ -316,6 +321,7 @@ namespace PocketRoles.Core
             // ---- v0.4b permissions (Admin.txt / Moderator.txt / VIP.txt under BepInEx/PocketRoles)
             _permAdminSettings = cfg.Bind("Permissions", "AdminsCanChangeSettings", true, "Players listed in Admin.txt may use the host commands (/set /opt /show /start /cancel /autostart /welcome /rules /kick)");
             _permModKick = cfg.Bind("Permissions", "ModeratorsCanKick", true, "Players listed in Moderator.txt may use /kick and /ban");
+            _permAdminLobby = cfg.Bind("Permissions", "AdminLobbyControl", false, "Admins may also run /start, /cancel, /autostart and /vset and change the lobby timer / auto-start / vanilla-range keys with /opt (off = admins only change roles, welcome / rules text and the moderator / VIP / ban lists; the host keeps everything that can break the lobby)");
             _permVipMarker = cfg.Bind("Permissions", "VipMarker", true, "Show a star marker next to the name of players listed in VIP.txt and greet them personally");
 
             // ---- v0.4b vanilla extended ranges (settings screen + /vset); the values reach vanilla clients through the normal settings sync
@@ -608,6 +614,12 @@ namespace PocketRoles.Core
 
         public static bool AdminsCanChangeSettings { get => _permAdminSettings == null || _permAdminSettings.Value; set { if (_permAdminSettings != null) _permAdminSettings.Value = value; } }
         public static bool ModeratorsCanKick { get => _permModKick == null || _permModKick.Value; set { if (_permModKick != null) _permModKick.Value = value; } }
+        /// <summary>[Permissions] AdminLobbyControl: admins may /start /cancel /autostart /vset and change lobby.* / vanilla.* keys (default false).</summary>
+        public static bool AdminLobbyControl { get => _permAdminLobby != null && _permAdminLobby.Value; set { if (_permAdminLobby != null) _permAdminLobby.Value = value; } }
+        /// <summary>[Roles] RevealRoleOnDeath: "X was ROLE" to everyone on every kill / eject (default false).</summary>
+        public static bool RevealRoleOnDeath { get => _revealOnDeath != null && _revealOnDeath.Value; set { if (_revealOnDeath != null) _revealOnDeath.Value = value; } }
+        /// <summary>[Chat] CompatWelcomeInterval: seconds between two public welcomes in an unregistered lobby (default 60, 0 = every join).</summary>
+        public static float CompatWelcomeInterval { get => _compatWelcomeInterval?.Value ?? 60f; set { if (_compatWelcomeInterval != null) _compatWelcomeInterval.Value = Math.Max(0f, Math.Min(600f, value)); } }
         public static bool VipMarker { get => _permVipMarker == null || _permVipMarker.Value; set { if (_permVipMarker != null) _permVipMarker.Value = value; } }
 
         // ------------------------------------------------------------------ v0.4b [Vanilla] extended ranges
@@ -1209,11 +1221,19 @@ namespace PocketRoles.Core
                 case "lobby.maxping": case "lobby.maxhostping": case "maxping": case "maxhostping": return SetInt(_maxHostPing, value, 0, 300, "lobby.maxping", out message);
                 case "compat.risky": case "compat.allowrisky": case "compat.allowriskyroles": case "risky": return SetBool(_compatAllowRisky, value, "compat.risky", out message);
                 case "chat.welcometext": case "welcometext": return SetString(_welcomeText, value, "chat.welcometext", out message);
+                case "chat.compatwelcome": case "compatwelcome": case "chat.compatwelcometext": return SetString(_compatWelcomeText, value, "chat.compatwelcome", out message);
                 case "chat.welcomesettings": case "welcomesettings": return SetBool(_welcomeIncludeSettings, value, "chat.welcomesettings", out message);
                 case "credits.author": return SetString(_creditAuthor, value, "credits.author", out message);
                 case "credits.url": case "credits.repourl": return SetString(_creditRepoUrl, value, "credits.url", out message);
                 case "credits.show": return SetBool(_showCredits, value, "credits.show", out message);
                 case "roles.vanilla": case "vanillaroles": case "vanilla.roles": return SetBool(_vanillaRoles, value, "roles.vanilla", out message);
+                case "roles.reveal": case "reveal": case "revealdeath": case "roles.revealroleondeath": return SetBool(_revealOnDeath, value, "roles.reveal", out message);
+                case "chat.compatwelcomeinterval": case "compatwelcomeinterval": case "chat.welcomeinterval":
+                {
+                    if (!float.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float sec) || sec < 0f || sec > 600f)
+                    { message = "chat.compatwelcomeinterval: 0-600"; return false; }
+                    CompatWelcomeInterval = sec; message = $"chat.compatwelcomeinterval = {CompatWelcomeInterval:0.#}"; return true;
+                }
                 // v0.4 lobby
                 case "lobby.autostart": case "autostart": return SetBool(_autoStart, value, "lobby.autostart", out message);
                 case "lobby.autostartplayers": case "autostartplayers": case "autostart.players": return SetInt(_autoStartPlayers, value, 4, 15, "lobby.autostartplayers", out message);
@@ -1256,6 +1276,7 @@ namespace PocketRoles.Core
                 // v0.4b permissions
                 case "perm.adminsettings": case "perm.admin": case "adminsettings": case "permissions.adminscanchangesettings": return SetBool(_permAdminSettings, value, "perm.adminsettings", out message);
                 case "perm.modkick": case "perm.mod": case "modkick": case "permissions.moderatorscankick": return SetBool(_permModKick, value, "perm.modkick", out message);
+                case "perm.adminlobby": case "perm.lobby": case "adminlobby": case "permissions.adminlobbycontrol": return SetBool(_permAdminLobby, value, "perm.adminlobby", out message);
                 case "perm.vipmarker": case "perm.vip": case "vipmarker": case "permissions.vipmarker": return SetBool(_permVipMarker, value, "perm.vipmarker", out message);
                 // v0.4b vanilla extended ranges
                 case "vanilla.ranges": case "vanilla.extendedranges": case "vanilla.extended": case "ranges": return SetBool(_vanExtendedRanges, value, "vanilla.ranges", out message);
@@ -1476,6 +1497,52 @@ namespace PocketRoles.Core
         public static void Save()
         {
             _cfg?.Save();
+        }
+
+        // ------------------------------------------------------------------ backup / restore (v0.4.4)
+
+        /// <summary>
+        /// Copies the config file to "&lt;config&gt;&lt;suffix&gt;" (".backup" = /backup, ".startup" = the state at game launch,
+        /// written by PocketRolesPlugin.Load). Returns the copy's path, null on failure.
+        /// </summary>
+        public static string Backup(string suffix = ".backup")
+        {
+            try
+            {
+                string p = _cfg?.ConfigFilePath;
+                if (string.IsNullOrEmpty(p)) return null;
+                try { _cfg.Save(); } catch (Exception) { }
+                if (!File.Exists(p)) return null;
+                string b = p + suffix;
+                File.Copy(p, b, true);
+                return b;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Options.Backup({suffix}): {e}");
+                return null;
+            }
+        }
+
+        /// <summary>Restores the config file from "&lt;config&gt;&lt;suffix&gt;" and re-reads it. False when there is no such copy.</summary>
+        public static bool Restore(string suffix = ".backup")
+        {
+            try
+            {
+                string p = _cfg?.ConfigFilePath;
+                if (string.IsNullOrEmpty(p)) return false;
+                string b = p + suffix;
+                if (!File.Exists(b)) return false;
+                File.Copy(b, p, true);
+                _cfg.Reload();
+                PocketRolesPlugin.Logger.LogInfo($"Options: config restored from {Path.GetFileName(b)}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Options.Restore({suffix}): {e}");
+                return false;
+            }
         }
     }
 }
