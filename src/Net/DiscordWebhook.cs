@@ -202,8 +202,8 @@ namespace PocketRoles.Net
                     }
                 }
                 catch (Exception e) { error = e.GetType().Name + ": " + e.Message; }
-                // back to the main thread through the scheduler (Unity objects are not touched here anyway)
-                Scheduler.After(0f, () =>
+                // back to the main thread: the scheduler (a plain list + Time.time) must not be touched from this thread
+                Replies.Enqueue(() =>
                 {
                     try
                     {
@@ -219,8 +219,19 @@ namespace PocketRoles.Net
                         if (_pendingContent != null) Touch();
                     }
                     catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook reply: {e}"); }
-                }, Tag + ".reply");
+                });
             });
+        }
+
+        private static readonly System.Collections.Concurrent.ConcurrentQueue<Action> Replies = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+
+        /// <summary>Main thread (HudManager.Update): runs the HTTP replies queued by the thread pool.</summary>
+        internal static void Tick()
+        {
+            while (Replies.TryDequeue(out var a))
+            {
+                try { a(); } catch (Exception e) { PocketRolesPlugin.Logger.LogError($"DiscordWebhook.Tick: {e}"); }
+            }
         }
 
         private static string Trim(string s) { s = (s ?? "").Replace("\n", " "); return s.Length > 160 ? s.Substring(0, 160) + "…" : s; }
