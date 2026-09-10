@@ -766,6 +766,8 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `chat.playercommands` | on / off | `[Chat] PlayerCommands` |
 | `chat.allcommands` | on / off | `[Chat] AllCommands` |
 | `chat.welcomeall` | on / off | `[Chat] WelcomeAllLanguages`（按 该玩家的语言 → 其余两种语言 的顺序用三种语言发送欢迎语。默认 on） |
+| `chat.compatwelcome`（`compatwelcome`） | 文字（最多 86 字） | `[Chat] CompatWelcomeText`（仅未注册房间。发给每位加入者的一行公开欢迎语。留空则用内置文字。v0.4.4） |
+| `chat.compatwelcomeinterval`（`compatwelcomeinterval`） | 0〜600（0 = 每次加入） | `[Chat] CompatWelcomeInterval`（未注册房间的欢迎语最多每隔这么多秒发送一次。默认 60。v0.4.4） |
 | `translate.enabled`（`translate`, `tr`） | on / off | `[Translate] Enabled`（聊天翻译） |
 | `translate.provider` | auto / google / deepl | `[Translate] Provider` |
 | `translate.target` | ja / zh / en | `[Translate] TargetLang`（房主阅读的语言） |
@@ -776,9 +778,11 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `translate.minchars` | 1〜50 | `[Translate] MinChars` |
 | `translate.maxperminute` | 1〜120 | `[Translate] MaxPerMinute` |
 | `perm.adminsettings` | on / off | `[Permissions] AdminsCanChangeSettings` |
+| `perm.adminlobby`（`adminlobby`） | on / off | `[Permissions] AdminLobbyControl`（允许管理员也使用 `/start`・`/cancel`・`/autostart`・`/vset` 及大厅相关的 `/opt` 项。默认 off。v0.4.4） |
 | `perm.modkick` | on / off | `[Permissions] ModeratorsCanKick` |
 | `perm.vipmarker` | on / off | `[Permissions] VipMarker` |
 | `vanilla.ranges` | on / off | `[Vanilla] ExtendedRanges` |
+| `vanilla.clampunreg`（`clampunreg`） | on / off | `[Vanilla] ClampInUnregistered`（创建未注册房间时收回到原版范围。默认 on） |
 | `vanilla.killmin` / `vanilla.killmax` / `vanilla.killstep` | 0〜60 / 10〜600 / 0.5〜10 | `[Vanilla] KillCooldownMin` / `KillCooldownMax` / `KillCooldownStep` |
 | `vanilla.votemin` / `vanilla.votemax` | 0〜300 / 15〜3600 | `[Vanilla] VotingTimeMin` / `VotingTimeMax` |
 | `vanilla.discussmax` | 0〜3600 | `[Vanilla] DiscussionTimeMax` |
@@ -797,6 +801,9 @@ PocketRoles 免费、非营利。请不要利用本模组或模组房间盈利�
 | `lobby.autostartplayers` | 4〜15 | `[Lobby] AutoStartPlayers` |
 | `lobby.afkkick`（`afkkick`） | 0〜30（0 = 关闭） | `[Lobby] AfkKickMinutes`（大厅中这么多分钟既不移动也不发言的玩家，提前 30 秒警告后移出；VIP・版主・管理员除外。v0.4.6） |
 | `roles.ghostlist`（`ghostlist`） | on / off | `[Roles] HostGhostRoleList`（死亡后的职业一览，仅房主屏幕。默认 on。v0.4.6） |
+| `roles.reveal`（`reveal`） | on / off | `[Roles] RevealRoleOnDeath`（向所有人公布被击杀/放逐玩家的职业。无职业房间显示原版职业名。默认 off。v0.4.4） |
+| `roles.vanilla`（`vanillaroles`） | on / off | `[Roles] VanillaRoles`（同时按原版设置分配原版特殊职业。默认 off） |
+| `compat.risky`（`risky`） | on / off | `[Compat] AllowRiskyRoles`（未注册房间也分配警长和豺狼。服务器可能拒绝其击杀。默认 off） |
 | `lobby.autostartcountdown` | 1〜30 | `[Lobby] AutoStartCountdown` |
 | `lobby.timermode` | extend / haison / notify | `[Lobby] TimerMode` |
 | `lobby.timerwarnat` | 30〜300 | `[Lobby] TimerWarnAt` |

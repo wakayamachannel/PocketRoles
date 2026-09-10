@@ -762,6 +762,8 @@ A way to run the lobby together with friends, managed through four text files in
 | `chat.playercommands` | on / off | `[Chat] PlayerCommands` |
 | `chat.allcommands` | on / off | `[Chat] AllCommands` |
 | `chat.welcomeall` | on / off | `[Chat] WelcomeAllLanguages` (send the welcome in the player's language, then the two others; default on) |
+| `chat.compatwelcome` (`compatwelcome`) | text (up to 86 chars) | `[Chat] CompatWelcomeText` (unregistered lobby only: your own one-line public welcome for every joiner; empty = built-in line; v0.4.4) |
+| `chat.compatwelcomeinterval` (`compatwelcomeinterval`) | 0–600 (0 = every join) | `[Chat] CompatWelcomeInterval` (unregistered lobby: the welcome is sent at most once per this many seconds; default 60; v0.4.4) |
 | `translate.enabled` (`translate`, `tr`) | on / off | `[Translate] Enabled` (chat translation) |
 | `translate.provider` | auto / google / deepl | `[Translate] Provider` |
 | `translate.target` | ja / zh / en | `[Translate] TargetLang` (the language the host reads) |
@@ -772,9 +774,11 @@ A way to run the lobby together with friends, managed through four text files in
 | `translate.minchars` | 1–50 | `[Translate] MinChars` |
 | `translate.maxperminute` | 1–120 | `[Translate] MaxPerMinute` |
 | `perm.adminsettings` | on / off | `[Permissions] AdminsCanChangeSettings` |
+| `perm.adminlobby` (`adminlobby`) | on / off | `[Permissions] AdminLobbyControl` (admins may also run `/start`, `/cancel`, `/autostart`, `/vset` and the lobby `/opt` keys; default off; v0.4.4) |
 | `perm.modkick` | on / off | `[Permissions] ModeratorsCanKick` |
 | `perm.vipmarker` | on / off | `[Permissions] VipMarker` |
 | `vanilla.ranges` | on / off | `[Vanilla] ExtendedRanges` |
+| `vanilla.clampunreg` (`clampunreg`) | on / off | `[Vanilla] ClampInUnregistered` (clamp to the vanilla ranges when an unregistered lobby is created; default on) |
 | `vanilla.killmin` / `vanilla.killmax` / `vanilla.killstep` | 0–60 / 10–600 / 0.5–10 | `[Vanilla] KillCooldownMin` / `KillCooldownMax` / `KillCooldownStep` |
 | `vanilla.votemin` / `vanilla.votemax` | 0–300 / 15–3600 | `[Vanilla] VotingTimeMin` / `VotingTimeMax` |
 | `vanilla.discussmax` | 0–3600 | `[Vanilla] DiscussionTimeMax` |
@@ -793,6 +797,9 @@ A way to run the lobby together with friends, managed through four text files in
 | `lobby.autostartplayers` | 4–15 | `[Lobby] AutoStartPlayers` |
 | `lobby.afkkick` (`afkkick`) | 0–30 (0 = off) | `[Lobby] AfkKickMinutes` (a lobby player who neither moves nor chats for this many minutes is warned 30 s ahead, then kicked; VIPs / moderators / admins exempt; v0.4.6) |
 | `roles.ghostlist` (`ghostlist`) | on / off | `[Roles] HostGhostRoleList` (role list on the dead host's own screen; default on; v0.4.6) |
+| `roles.reveal` (`reveal`) | on / off | `[Roles] RevealRoleOnDeath` (announce a killed / ejected player's role to everyone; the vanilla role name in a lobby without roles; default off; v0.4.4) |
+| `roles.vanilla` (`vanillaroles`) | on / off | `[Roles] VanillaRoles` (also hand out the vanilla special roles as set in the vanilla role settings; default off) |
+| `compat.risky` (`risky`) | on / off | `[Compat] AllowRiskyRoles` (also assign Sheriff and Jackal in an unregistered lobby; the server may reject their kills; default off) |
 | `lobby.autostartcountdown` | 1–30 | `[Lobby] AutoStartCountdown` |
 | `lobby.timermode` | extend / haison / notify | `[Lobby] TimerMode` |
 | `lobby.timerwarnat` | 30–300 | `[Lobby] TimerWarnAt` |

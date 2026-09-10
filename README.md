@@ -765,6 +765,8 @@ MOD が読み込まれた後、ゲームのバージョンが対応版と違う�
 | `chat.playercommands` | on / off | `[Chat] PlayerCommands` |
 | `chat.allcommands` | on / off | `[Chat] AllCommands` |
 | `chat.welcomeall` | on / off | `[Chat] WelcomeAllLanguages`（挨拶をその人の言語 → 残り 2 言語の順に 3 言語で送る。既定 on） |
+| `chat.compatwelcome`（`compatwelcome`） | 文章（86 文字まで） | `[Chat] CompatWelcomeText`（登録オフの部屋だけ。入室者全員に送る公開の挨拶 1 行。空で内蔵の文。v0.4.4） |
+| `chat.compatwelcomeinterval`（`compatwelcomeinterval`） | 0〜600（0 = 入室ごと） | `[Chat] CompatWelcomeInterval`（登録オフの部屋の挨拶を何秒に 1 回までにするか。既定 60。v0.4.4） |
 | `translate.enabled`（`translate`, `tr`） | on / off | `[Translate] Enabled`（チャット翻訳） |
 | `translate.provider` | auto / google / deepl | `[Translate] Provider` |
 | `translate.target` | ja / zh / en | `[Translate] TargetLang`（ホストが読む言語） |
@@ -775,9 +777,11 @@ MOD が読み込まれた後、ゲームのバージョンが対応版と違う�
 | `translate.minchars` | 1〜50 | `[Translate] MinChars` |
 | `translate.maxperminute` | 1〜120 | `[Translate] MaxPerMinute` |
 | `perm.adminsettings` | on / off | `[Permissions] AdminsCanChangeSettings` |
+| `perm.adminlobby`（`adminlobby`） | on / off | `[Permissions] AdminLobbyControl`（アドミンにも `/start`・`/cancel`・`/autostart`・`/vset` とロビー系の `/opt` を許可。既定 off。v0.4.4） |
 | `perm.modkick` | on / off | `[Permissions] ModeratorsCanKick` |
 | `perm.vipmarker` | on / off | `[Permissions] VipMarker` |
 | `vanilla.ranges` | on / off | `[Vanilla] ExtendedRanges` |
+| `vanilla.clampunreg`（`clampunreg`） | on / off | `[Vanilla] ClampInUnregistered`（登録オフの部屋を作るときバニラ範囲に丸める。既定 on） |
 | `vanilla.killmin` / `vanilla.killmax` / `vanilla.killstep` | 0〜60 / 10〜600 / 0.5〜10 | `[Vanilla] KillCooldownMin` / `KillCooldownMax` / `KillCooldownStep` |
 | `vanilla.votemin` / `vanilla.votemax` | 0〜300 / 15〜3600 | `[Vanilla] VotingTimeMin` / `VotingTimeMax` |
 | `vanilla.discussmax` | 0〜3600 | `[Vanilla] DiscussionTimeMax` |
@@ -796,6 +800,9 @@ MOD が読み込まれた後、ゲームのバージョンが対応版と違う�
 | `lobby.autostartplayers` | 4〜15 | `[Lobby] AutoStartPlayers` |
 | `lobby.afkkick`（`afkkick`） | 0〜30（0 = しない） | `[Lobby] AfkKickMinutes`（ロビーでその分数だけ動きも発言もない人を 30 秒前に警告してから退出。VIP・モデレーター・アドミンは対象外。v0.4.6） |
 | `roles.ghostlist`（`ghostlist`） | on / off | `[Roles] HostGhostRoleList`（死亡後の役職一覧をホストの画面だけに出す。既定 on。v0.4.6） |
+| `roles.reveal`（`reveal`） | on / off | `[Roles] RevealRoleOnDeath`（キル・追放された人の役職を全員に知らせる。役職なしの部屋では本体の役職名。既定 off。v0.4.4） |
+| `roles.vanilla`（`vanillaroles`） | on / off | `[Roles] VanillaRoles`（本体の特殊役職も本体の設定どおりに配る。既定 off） |
+| `compat.risky`（`risky`） | on / off | `[Compat] AllowRiskyRoles`（登録オフの部屋でもシェリフ・ジャッカルを配る。サーバーにキルを拒否されることあり。既定 off） |
 | `lobby.autostartcountdown` | 1〜30 | `[Lobby] AutoStartCountdown` |
 | `lobby.timermode` | extend / haison / notify | `[Lobby] TimerMode` |
 | `lobby.timerwarnat` | 30〜300 | `[Lobby] TimerWarnAt` |
