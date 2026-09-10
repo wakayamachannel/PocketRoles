@@ -2796,3 +2796,22 @@ SheriffCanKill = true           # シェリフはジャッカルフレンズを�
 * Remote `/cmd r` for en descriptions above 100 chars (Mad Stuntman, Mad Hawk, Worshipper, Evil Nekomata, Serial Killer, Samurai) drops the option line — pre-existing for Lovers / Witch / Sheriff; the README `/cmd r` sentence does not promise the option line for remote players.
 * The README alias sentence must be re-checked if any later role changes `Roles.All` order (the prefix rule is order-dependent).
 * README "current version" strings were stale for two releases; the docs pass replaces them all (§13.1) — grep `0.4.1` afterwards and keep only the history mentions.
+
+### 12.x 実機結果（2026-09-10、PC ホスト＋MuMu 2 台、登録部屋、`/test on`）
+
+| Gate | 結果 | メモ |
+|---|---|---|
+| G0 | PASS | PatchAll OK、lang 968 キー |
+| G2 マッドホーク視界 | PASS | 画面端の明るさ E1 417 vs E2 97（同位置比較）、会議後も維持 |
+| G2b マッドホーク速度 | 未 | — |
+| G3 イビルホーク視界 ×5 | PASS | ヴァンパイア（通常視界）より明らかに広い |
+| G4 崇拝者ホストの自爆 | PASS | インポスターを崇拝→自爆、全画面に死体、幽霊役職 |
+| G4b 崇拝者ホストがシェリフに撃たれる | PASS | `Kills: Sheriff … shot もみじちゃ` |
+| G5 Ⓦ | PASS | エミュ（インポスター視点）で「Ⓦもみじちゃ」 |
+| G6 侍クライアントのタイマー | PASS（00:xx） | 45 で再開 |
+| G7 侍が desync ホストを斬る | PASS | `Kills: Samurai … slashed もみじちゃ`、通常の死亡 |
+| G8 シリアルキラー | PASS（00:xx） | — |
+| G9 3 人斬り | 未（4 人必要） | — |
+| W1 崇拝 | PASS | 相手が即マッドメイト、崇拝者の画面に赤 Ⓜ（順序修正 5ad9f5c）、madmate=2 |
+| J ジャッカルフレンズ | PASS | friends=1 crewForCount=1、ジャッカルのキル後 outcome=Jackal |
+| 追加: ホスト侍のクールダウン | PASS（修正後） | 本体はホストのタイマーをロビー値で毎フレーム上限クランプ → 毎フレーム上書き（Rpc.EnforceHostCooldownOverride） |
