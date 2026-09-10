@@ -86,6 +86,10 @@ namespace PocketRoles.Game
                 //    `Rpc.ResetKillCooldown(samurai, KillCooldown());` right after Rpc.Kill below (owned file, Implementer D).
                 PocketRolesPlugin.Logger.LogInfo($"Kills: Samurai {Game.NameOf(s)} slashed {Game.NameOf(t)} (range {range:0.##}, lobby kill distance {LobbyKillDistance()}, cooldown {KillCooldown():0.#}s)");
                 Rpc.Kill(samurai, target);
+                // Host Samurai: the vanilla owner-side reset after MurderPlayer uses the LOBBY kill cooldown (live: the host button counted
+                // down from 25 instead of 45; the GetKillCooldown postfix is not consulted on that path). SetKillTimer only, no wire traffic;
+                // a client Samurai restarts from its private options (§12 G6 passed) and is left alone.
+                if (samurai.AmOwner) Rpc.ResetKillCooldown(samurai, KillCooldown());
 
                 // 3. The target's death may have ended the game synchronously (Terrorist with all tasks done → EndGame in
                 //    OnMurder): nothing more may go out, and no stale entries stay behind.

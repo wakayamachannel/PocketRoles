@@ -178,9 +178,11 @@ namespace PocketRoles.Game
         /// </summary>
         private static void Convert(byte w, byte t)
         {
-            CustomRole before = Game.ConvertRole(t, CustomRole.Madmate, "worshipped by " + Game.NameOf(w));
+            // The list first: ConvertRole refreshes the name tags, and the Worshipper's own Ⓜ on the convert (NameTags.NameFor) reads it
+            // (static review 2026-09-10: added afterwards, the mark only showed up at the next unrelated refresh).
             if (!Game.Worshipped.TryGetValue(w, out var list)) Game.Worshipped[w] = list = new List<byte>();
             if (!list.Contains(t)) list.Add(t);
+            CustomRole before = Game.ConvertRole(t, CustomRole.Madmate, "worshipped by " + Game.NameOf(w));
             int left = Remaining(w);
             PocketRolesPlugin.Logger.LogInfo($"Kills: Worshipper {Game.NameOf(w)} worshipped {Game.NameOf(t)} ({before} -> Madmate, {left} left)");
 

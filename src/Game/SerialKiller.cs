@@ -139,7 +139,14 @@ namespace PocketRoles.Game
                         Game.SerialKillerTimers[id] = t;
                         continue;
                     }
-                    if (queued) { Game.SerialKillerTimers[id] = t; continue; }   // one broadcast MurderPlayer per frame (unverified on the official server otherwise)
+                    if (queued)
+                    {
+                        // One broadcast MurderPlayer per frame (unverified on the official server otherwise): the second time-out of the
+                        // same frame retries NEXT frame (Remaining 0 skips the countdown branch), not RetrySeconds later with a 0↔5 s tag flicker.
+                        t.Remaining = 0f;
+                        Game.SerialKillerTimers[id] = t;
+                        continue;
+                    }
                     queued = true;
                     // Credited to itself: self-kill animation + body, reporter == victim (no Bait report); Kills.Tick executes it this frame.
                     Game.Bites[id] = new Game.VampireBite { Killer = id, DueAt = now, Reason = BiteReason };
@@ -279,7 +286,11 @@ namespace PocketRoles.Game
                     float remaining = reset || !Game.SerialKillerTimers.TryGetValue(id, out var t) ? limit : Mathf.Max(t.Remaining, floor);
                     Arm(id, remaining, reset ? "meeting end, reset" : "meeting end, carried over");
                     ScheduleCooldownReset(id, index++, "meeting end");
-                    Kills.Notice(id, "serialkiller.resume", "残り {0:0.#} 秒以内にキルしてください。", "{0:0.#} s left to kill.", remaining);
+                    // The "N s left" line rides with that Serial Killer's own staggered reset: two clients' immediate packets never share a frame
+                    // (static review 2026-09-10; index 0 keeps the reset + chat pair to the same client in one frame, as before).
+                    byte sid = id; float rem = remaining; int slot = index - 1;
+                    void Notice() { if (Game.IsHostActive && Game.InProgress && !Game.Ending && Game.IsAlive(sid)) Kills.Notice(sid, "serialkiller.resume", "残り {0:0.#} 秒以内にキルしてください。", "{0:0.#} s left to kill.", rem); }
+                    if (slot <= 0) Notice(); else Scheduler.After(ResetStagger * slot, Notice);
                 }
             }
             catch (Exception e)
