@@ -336,6 +336,7 @@ namespace PocketRoles
                 {
                     SerialKiller.Tick(); // v0.5.0: counts down, queues a time-out death as a bite …
                     Kills.Tick();        // … which executes in this same frame
+                    Rpc.EnforceHostCooldownOverride(); // host custom cooldown above the lobby value (Samurai 45 s): re-applied after vanilla's own reset
                     GhostRoleList.Tick(); // dead host → role list on the host screen (4 Hz poll, compat games too)
                     Lobby.AfkKick.Tick();  // [Lobby] AfkKickMinutes (0.5 Hz, lobby only)
                 }

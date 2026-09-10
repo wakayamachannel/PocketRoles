@@ -617,6 +617,38 @@ namespace PocketRoles.Net
         /// Vanilla client: options with KillCooldown×2 → MurderPlayer(FailedProtected, target = killer) only to that client
         /// (the client resets its timer to half of its KillCooldown) → normal options 0.5 s later. Host: SetKillTimer.
         /// </summary>
+        /// <summary>Time.time until which the host's own kill timer must show a custom cooldown above the lobby value (-1 = none).</summary>
+        internal static float HostCooldownOverrideEndsAt = -1f;
+
+        /// <summary>
+        /// Per frame (Plugin_TickPatch, host only): 2026.8.18 resets the host's kill timer to the LOBBY cooldown once more when the kill
+        /// animation ends (live 2026-09-10: 45 → 25 about a second after the slash), so a custom cooldown above the lobby value is
+        /// re-applied as long as it is running. No wire traffic; expires on its own.
+        /// </summary>
+        internal static void EnforceHostCooldownOverride()
+        {
+            try
+            {
+                if (HostCooldownOverrideEndsAt < 0f) return;
+                float rem = HostCooldownOverrideEndsAt - Time.time;
+                if (rem <= 0f) { HostCooldownOverrideEndsAt = -1f; return; }
+                var lp = PlayerControl.LocalPlayer;
+                if (lp == null || lp.Data == null || lp.Data.IsDead) { HostCooldownOverrideEndsAt = -1f; return; }
+                if (lp.killTimer < rem - 0.5f)
+                {
+                    lp.killTimer = rem;
+                    var hud = HudManager.Instance;
+                    if (hud != null && hud.KillButton != null) hud.KillButton.SetCoolDown(rem, rem);
+                    PocketRolesPlugin.Logger.LogInfo($"Rpc.EnforceHostCooldownOverride: host timer re-applied ({rem:0.#}s left)");
+                }
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Rpc.EnforceHostCooldownOverride: {e}");
+                HostCooldownOverrideEndsAt = -1f;
+            }
+        }
+
         public static void ResetKillCooldown(PlayerControl killer, float cooldown)
         {
             if (killer == null) return;
@@ -626,9 +658,11 @@ namespace PocketRoles.Net
                 // 2026.8.18: SetKillTimer clamps to the LOBBY kill cooldown on the host (the GetKillCooldown postfix is not what that clamp reads —
                 // live 2026-09-10: a host Samurai with [Samurai] KillCooldown 45 restarted at 25). A custom cooldown above the lobby value is
                 // written to the timer field directly; the button shows it as a full cooldown.
+                HostCooldownOverrideEndsAt = -1f;
                 if (cooldown > 0f && killer.killTimer < cooldown - 0.05f)
                 {
                     killer.killTimer = cooldown;
+                    HostCooldownOverrideEndsAt = Time.time + cooldown;   // vanilla writes the lobby value again after the kill animation: EnforceHostCooldownOverride keeps ours
                     try { var hud = HudManager.Instance; if (hud != null && hud.KillButton != null) hud.KillButton.SetCoolDown(cooldown, cooldown); }
                     catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Rpc.ResetKillCooldown: KillButton.SetCoolDown: {e.Message}"); }
                     PocketRolesPlugin.Logger.LogInfo($"Rpc.ResetKillCooldown: host timer set to {cooldown:0.#}s directly (vanilla clamp)");
