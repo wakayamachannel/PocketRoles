@@ -81,9 +81,7 @@ namespace PocketRoles.Game
                 if (queued.Count > 0) Kills.MarkSlash(stagger * queued.Count + HoldGrace);   // win check + Bait report wait for the batch
 
                 // 2. The pressed target: a normal kill (kill animation on both screens, body at the target's position;
-                //    the samurai client is expected to reset its timer from its private KillCooldown option when this arrives).
-                //    §12 X5 fallback if a live test shows the client's button NOT restarting: add
-                //    `Rpc.ResetKillCooldown(samurai, KillCooldown());` right after Rpc.Kill below (owned file, Implementer D).
+                //    the samurai client resets its timer from its private KillCooldown option when this arrives — §12 G6 passed live).
                 PocketRolesPlugin.Logger.LogInfo($"Kills: Samurai {Game.NameOf(s)} slashed {Game.NameOf(t)} (range {range:0.##}, lobby kill distance {LobbyKillDistance()}, cooldown {KillCooldown():0.#}s)");
                 Rpc.Kill(samurai, target);
                 // Host Samurai: the vanilla owner-side reset after MurderPlayer uses the LOBBY kill cooldown (live: the host button counted

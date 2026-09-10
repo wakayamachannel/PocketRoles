@@ -244,6 +244,10 @@ namespace PocketRoles.Game
                     PocketRolesPlugin.Logger.LogInfo($"SerialKiller: {Game.NameOf(killerId)} killed before its time-out death executed → cancelled");
                 }
                 Arm(killerId, Limit(), "kill");
+                // Host Serial Killer: like the Samurai, the vanilla owner-side reset after MurderPlayer used the LOBBY cooldown (static review
+                // 2026-09-10); a client restarts from its private options. SetKillTimer only, no wire traffic.
+                var hostSk = Game.Player(killerId);
+                if (hostSk != null && hostSk.AmOwner) Rpc.ResetKillCooldown(hostSk, Options.SerialKillerKillCooldown);
             }
             catch (Exception e)
             {
