@@ -112,7 +112,7 @@ namespace PocketRoles.Game
                         // the n-th one ResetStagger * n later (one client's immediate packets per frame; review 2026-09-10).
                         int warnSlot = warnsThisFrame++;
                         byte warnId = id; float warnLeft = Mathf.Max(0f, t.Remaining);
-                        void Warn() { if (Game.IsAlive(warnId) && Game.SerialKillerTimers.ContainsKey(warnId)) Kills.Notice(warnId, "serialkiller.warn", "あと {0:0.#} 秒以内にキルしないと死亡します！", "Kill within {0:0.#} s or you die!", warnLeft); }
+                        void Warn() { if (Game.IsAlive(warnId) && Game.SerialKillerTimers.TryGetValue(warnId, out var wt) && wt.Warned && wt.Remaining <= WarnAt()) Kills.Notice(warnId, "serialkiller.warn", "あと {0:0.#} 秒以内にキルしないと死亡します！", "Kill within {0:0.#} s or you die!", warnLeft); }
                         if (warnSlot == 0) Warn(); else Scheduler.After(ResetStagger * warnSlot, Warn);
                     }
                     if (t.Remaining > 0f)

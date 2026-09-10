@@ -38,6 +38,15 @@ namespace PocketRoles.Game
             return client != null && client.AmHost && client.IsGameStarted;
         }
 
+        /// <summary>Deaths inside a meeting (Assassin guess): announced 2 s after the exile screen, like the ejected player (a dead host must not open a revive window in the meeting).</summary>
+        private static readonly System.Collections.Generic.List<byte> Deferred = new System.Collections.Generic.List<byte>();
+
+        internal static void DeferUntilExileEnd(byte id)
+        {
+            try { if (Active() && !Deferred.Contains(id)) Deferred.Add(id); }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"RoleReveal.DeferUntilExileEnd: {e}"); }
+        }
+
         internal static void OnKilled(byte id)
         {
             try
@@ -56,13 +65,27 @@ namespace PocketRoles.Game
                 if (!Active() || exile == null) return;
                 NetworkedPlayerInfo info = null;
                 try { info = exile.initData != null ? exile.initData.networkedPlayer : null; } catch (Exception) { }
-                if (info == null) return;
+                if (info == null) { FlushDeferred(2f); return; }   // skip / tie: only the in-meeting deaths to announce
                 byte id = info.PlayerId;
                 // 2 s after the exile screen, not inside it: chat from a dead host opens Rpc.TempReviveHostForChat (an
                 // urgent Data(IsDead=false)) while clients still run their own exile end check → black screen.
                 Scheduler.After(2f, () => Announce(id, "reveal.exiled", "追放された {0} は {1} でした。", "Ejected {0} was {1}.", "被放逐的 {0} 是 {1}。"), "reveal.exiled");
+                FlushDeferred(2.6f);
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"RoleReveal.OnExiled: {e}"); }
+        }
+
+        /// <summary>The in-meeting deaths, one line each, spaced behind the ejected line (Chat.All paces per client anyway).</summary>
+        private static void FlushDeferred(float delay)
+        {
+            if (Deferred.Count == 0) return;
+            var list = new System.Collections.Generic.List<byte>(Deferred);
+            Deferred.Clear();
+            for (int i = 0; i < list.Count; i++)
+            {
+                byte id = list[i];
+                Scheduler.After(delay + 0.6f * i, () => Announce(id, "reveal.killed", "{0} は {1} でした。", "{0} was {1}.", "{0} 是 {1}。"), "reveal.exiled");
+            }
         }
 
         private static void Announce(byte id, string key, string ja, string en, string zh)

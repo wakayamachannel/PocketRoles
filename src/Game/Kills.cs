@@ -249,6 +249,23 @@ namespace PocketRoles.Game
         /// MurderPlayer (the GetKillCooldown postfix does not reach those writes — live 2026-09-10). Clients get theirs from their
         /// private options. Called 0.5 s after the intro, at WrapUp + 2 s and after the host's own kill (Rpc.Kill).
         /// </summary>
+        /// <summary>
+        /// A death that is certain and about to land (a lover following its partner, a Samurai bystander): win checks wait for it
+        /// (WinConditions.Check / CheckNow) instead of counting the doomed player alive — the doomed impostor lover was ending the game
+        /// as an impostor win it was about to lose. Bounded: an entry that is more than 3 s overdue (vent, ladder, protection) no longer holds.
+        /// </summary>
+        internal static bool ImminentDeathPending()
+        {
+            float now = Time.time;
+            foreach (var kv in Game.Bites)
+            {
+                if (kv.Value.Reason != "lovers" && kv.Value.Reason != "slash") continue;
+                if (!Game.IsAlive(kv.Key)) continue;
+                if (now < kv.Value.DueAt + 3f) return true;
+            }
+            return false;
+        }
+
         internal static void ApplyHostCustomCooldown(string why)
         {
             try

@@ -57,6 +57,7 @@ namespace PocketRoles.Game
                 if (Core.Game.HaisonActive) return; // 廃村: Lobby.Haison ends the game itself
                 if (MeetingHud.Instance != null || ExileController.Instance != null) return;
                 if (Kills.SlashInProgress()) return; // v0.5.0: a Samurai's paced slash finishes first (bounded, Kills.MarkSlash)
+                if (Kills.ImminentDeathPending()) return; // a lover's follow / a slash bystander dies within moments: evaluate after it (review 2026-09-10)
                 if (Core.Game.SoloWinner != CustomRole.None) return; // pending solo win, resolved at WrapUp
                 CheckNow();
             }
@@ -73,6 +74,7 @@ namespace PocketRoles.Game
             {
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress || Core.Game.Ending) return;
                 if (Core.Game.HaisonActive) return; // 廃村: Lobby.Haison ends the game itself
+                if (Kills.ImminentDeathPending()) return; // the pending death runs its own check when it lands (Kills.OnMurder)
                 if (Core.Game.TestMode)
                 {
                     // Test mode: no automatic end except the sabotage timer (and /end → EndGameOverridingTestMode).
@@ -273,9 +275,6 @@ namespace PocketRoles.Game
             {
                 if (id == exiledId) continue;
                 if (!Core.Game.IsAlive(id)) continue;
-                // A death that is already certain and imminent (a lover following its partner, a Samurai bystander) counts as dead:
-                // counting the doomed impostor lover alive ended the game as an impostor win it was about to lose (review 2026-09-10).
-                if (Core.Game.Bites.TryGetValue(id, out var doomed) && (doomed.Reason == "lovers" || doomed.Reason == "slash")) continue;
                 alive++;
                 if (Core.Game.IsImpostorTeamKiller(id)) imp++;
                 else if (Core.Game.IsJackal(id)) jackal++;

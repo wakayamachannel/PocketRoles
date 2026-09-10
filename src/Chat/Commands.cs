@@ -394,6 +394,7 @@ namespace PocketRoles.Chat
                     return Options.AdminLobbyControl;
             }
             if (k.StartsWith("vanilla.")) return Options.AdminLobbyControl;
+            if (k == "clampunreg") return Options.AdminLobbyControl;   // alias of vanilla.clampunreg
             if (k.StartsWith("sheriff.") || k.StartsWith("jackal.") || k.StartsWith("vampire.")
                 || k.StartsWith("mayor.") || k.StartsWith("snitch.") || k.StartsWith("lighter.") || k.StartsWith("speedbooster.")
                 || k.StartsWith("speed.") || k.StartsWith("sb.") || k.StartsWith("madmate.")

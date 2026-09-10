@@ -885,7 +885,7 @@ namespace PocketRoles.Chat
             text = text.Replace("\r\n", "\n").Replace('\r', '\n');
             // Compat public chat: the vanilla-chat sanitizer turns every line break into " / " (+2 chars); do it here so the
             // 86-char budget below counts the real length (the tail of a packed chunk was cut otherwise, review 2026-09-10).
-            if (Registration.CompatMode) text = text.Replace("\n", " / ");
+            if (Registration.CompatMode && !_keepColors) text = text.Replace("\n", " / ");
             int limit = MessageChars; // compat mode: room for the "[PocketRoles] " prefix inside the 100-char message
             var lines = new List<string>();
             foreach (var raw in text.Split('\n'))
