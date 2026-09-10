@@ -458,7 +458,7 @@ namespace PocketRoles.Net
         /// True while a dead host is temporarily marked alive (Data.IsDead == false) so its chat is shown on vanilla
         /// clients. Host-side logic (Game.IsDead / win checks) must keep treating the host as dead during this window.
         /// </summary>
-        public static bool HostTempRevived => _hostRevived && Scheduler.HasTag(ReviveTag);
+        public static bool HostTempRevived => _hostRevived;   // the window flag alone: inside the Scheduler tick that holds the restore the tag is already gone (review 2026-09-10)
 
         public static void TempReviveHostForChat(Action sendChat) => TempReviveHostForChat(sendChat, 1f, -1);
 
