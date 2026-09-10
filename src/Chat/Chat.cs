@@ -51,6 +51,13 @@ namespace PocketRoles.Chat
         // ------------------------------------------------------------------ public API
 
         /// <summary>Host screen only (no network).</summary>
+        /// <summary>Split for the host's own screen: colour tags kept, line breaks kept in compat mode (Commands.Reply uses it before Local).</summary>
+        internal static List<string> SplitLocal(string text)
+        {
+            _keepColors = true;
+            try { return Split(text); } finally { _keepColors = false; }
+        }
+
         public static void Local(string title, string text)
         {
             try

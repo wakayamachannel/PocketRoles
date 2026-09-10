@@ -150,6 +150,7 @@ namespace PocketRoles.Game
                 byte partner = Game.PartnerOf(deadId);
                 if (partner == 255 || !Game.IsAlive(partner) || Game.Bites.ContainsKey(partner)) return;
                 Game.Bites[partner] = new Game.VampireBite { Killer = partner, DueAt = Time.time + FollowDelay, Reason = "lovers" };
+                Kills.MarkImminent(FollowDelay + 1.5f);   // win checks wait for this certain death (bounded; review 2026-09-10)
                 PocketRolesPlugin.Logger.LogInfo($"Lovers: {Game.NameOf(deadId)} died → {Game.NameOf(partner)} follows in {FollowDelay:0.#} s");
                 Kills.Notice(partner, "lovers.follow", "恋人が死んだため、あなたも後を追います…", "Your lover died. You follow them...");
             }

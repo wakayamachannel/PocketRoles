@@ -41,6 +41,9 @@ namespace PocketRoles.Game
         /// <summary>Deaths inside a meeting (Assassin guess): announced 2 s after the exile screen, like the ejected player (a dead host must not open a revive window in the meeting).</summary>
         private static readonly System.Collections.Generic.List<byte> Deferred = new System.Collections.Generic.List<byte>();
 
+        /// <summary>New game (RoleManager.SelectRoles): a line deferred in a game that ended inside its meeting must not leak.</summary>
+        internal static void ClearDeferred() { Deferred.Clear(); }
+
         internal static void DeferUntilExileEnd(byte id)
         {
             try { if (Active() && !Deferred.Contains(id)) Deferred.Add(id); }
@@ -181,7 +184,7 @@ namespace PocketRoles.Game
     {
         private static void Prefix()
         {
-            try { RoleReveal.AliveRoles.Clear(); }
+            try { RoleReveal.AliveRoles.Clear(); RoleReveal.ClearDeferred(); }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"RoleReveal_SelectRolesPatch: {e}"); }
         }
     }

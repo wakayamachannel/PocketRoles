@@ -560,7 +560,7 @@ namespace PocketRoles.Chat
             if (sender == null || string.IsNullOrEmpty(text)) return;
             bool compatPublic = !sender.AmOwner && Registration.CompatMode;
             if (compatPublic) text = Chat.AtName(sender.PlayerId) + text; // before the split so the prefix counts
-            var chunks = Chat.Split(text);
+            var chunks = sender.AmOwner ? Chat.SplitLocal(text) : Chat.Split(text);   // host: colours and line breaks kept (review 2026-09-10)
             if (chunks.Count == 0) return;
             if (maxMessages < 1) maxMessages = 1;
             if (chunks.Count > maxMessages)

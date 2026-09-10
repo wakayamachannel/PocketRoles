@@ -74,7 +74,6 @@ namespace PocketRoles.Game
             {
                 if (!Core.Game.IsHostActive || !Core.Game.InProgress || Core.Game.Ending) return;
                 if (Core.Game.HaisonActive) return; // 廃村: Lobby.Haison ends the game itself
-                if (Kills.ImminentDeathPending()) return; // the pending death runs its own check when it lands (Kills.OnMurder)
                 if (Core.Game.TestMode)
                 {
                     // Test mode: no automatic end except the sabotage timer (and /end → EndGameOverridingTestMode).

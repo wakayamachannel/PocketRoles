@@ -250,19 +250,27 @@ namespace PocketRoles.Game
         /// private options. Called 0.5 s after the intro, at WrapUp + 2 s and after the host's own kill (Rpc.Kill).
         /// </summary>
         /// <summary>
-        /// A death that is certain and about to land (a lover following its partner, a Samurai bystander): win checks wait for it
-        /// (WinConditions.Check / CheckNow) instead of counting the doomed player alive — the doomed impostor lover was ending the game
-        /// as an impostor win it was about to lose. Bounded: an entry that is more than 3 s overdue (vent, ladder, protection) no longer holds.
+        /// A lover's follow-death is certain and lands 0.5 s after its partner's: WinConditions.Check waits for it instead of counting the
+        /// doomed player alive (the doomed impostor lover was ending the game as an impostor win it was about to lose). Absolute
+        /// deadline (MarkImminent), never extended by a vent postponement; the WrapUp evaluation (CheckNow) is NOT gated so it stays
+        /// consistent with AntiBlackout.Prepare. Samurai bystanders are covered by SlashInProgress.
         /// </summary>
+        private static float _imminentUntil = -1f;
+
+        internal static void MarkImminent(float seconds)
+        {
+            float until = Time.time + seconds;
+            if (until > _imminentUntil) _imminentUntil = until;
+        }
+
         internal static bool ImminentDeathPending()
         {
-            float now = Time.time;
+            if (Time.time >= _imminentUntil) return false;
             foreach (var kv in Game.Bites)
             {
-                if (kv.Value.Reason != "lovers" && kv.Value.Reason != "slash") continue;
-                if (!Game.IsAlive(kv.Key)) continue;
-                if (now < kv.Value.DueAt + 3f) return true;
+                if (kv.Value.Reason == "lovers" && Game.IsAlive(kv.Key)) return true;
             }
+            _imminentUntil = -1f;
             return false;
         }
 

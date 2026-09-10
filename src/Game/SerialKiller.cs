@@ -113,7 +113,8 @@ namespace PocketRoles.Game
                         int warnSlot = warnsThisFrame++;
                         byte warnId = id; float warnLeft = Mathf.Max(0f, t.Remaining);
                         void Warn() { if (Game.IsAlive(warnId) && Game.SerialKillerTimers.TryGetValue(warnId, out var wt) && wt.Warned && wt.Remaining <= WarnAt()) Kills.Notice(warnId, "serialkiller.warn", "あと {0:0.#} 秒以内にキルしないと死亡します！", "Kill within {0:0.#} s or you die!", warnLeft); }
-                        if (warnSlot == 0) Warn(); else Scheduler.After(ResetStagger * warnSlot, Warn);
+                        if (warnSlot == 0) Kills.Notice(warnId, "serialkiller.warn", "あと {0:0.#} 秒以内にキルしないと死亡します！", "Kill within {0:0.#} s or you die!", warnLeft);   // now (the struct copy is written back below)
+                        else Scheduler.After(ResetStagger * warnSlot, Warn);   // the guard re-reads the dictionary entry, written back by then
                     }
                     if (t.Remaining > 0f)
                     {
