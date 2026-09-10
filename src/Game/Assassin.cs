@@ -142,6 +142,8 @@ namespace PocketRoles.Game
                     HrChat.All(HrChat.Title, () => Lang.TF("guess.killed.all", "{0} は暗殺されました。", "{0} was assassinated.", Game.NameOf(victim)));
 
                 Rpc.ExileSilently(pc);   // Exiled RPC to all + local pc.Exiled(): dies without a body
+                Game.CountKill(assassinId);          // post-game kill count (review 2026-09-10)
+                RoleReveal.OnKilled(victim);         // [Roles] RevealRoleOnDeath, like any MurderPlayer
                 try { pc.Data.IsDead = true; pc.Data.MarkDirty(); Rpc.SendPlayerInfo(pc.Data); }
                 catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Assassin: data sync: {e.Message}"); }
                 RoleAssignment.SendGhostRole(pc);   // per-viewer ghost roles (ImpostorGhost for an impostor victim)
@@ -159,7 +161,7 @@ namespace PocketRoles.Game
                     // Second chance after vanilla MeetingHud.Update has processed the Data sync (SetDead on every client).
                     Scheduler.After(0.2f, () =>
                     {
-                        try { if (MeetingHud.Instance == hud && Game.InProgress) hud.CheckForEndVoting(); }
+                        try { if (MeetingHud.Instance == hud && Game.InProgress && hud.state < MeetingHud.MeetingStates.Results) hud.CheckForEndVoting(); }
                         catch (Exception) { }
                     }, "assassin.endvote");
                 }

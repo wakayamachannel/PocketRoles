@@ -735,6 +735,7 @@ namespace PocketRoles.Lobby
         {
             if (!Pending) return;
             PocketRolesPlugin.Logger.LogInfo("Haison: cancelled with the countdown");
+            Chat.Chat.All(Chat.Chat.Title, () => Lang.T("haison.cancelled", "廃村を取り消しました。そのまま続けます。", "Haison cancelled; the lobby continues.", "废村已取消，房间继续。"));
             Abort();
         }
 

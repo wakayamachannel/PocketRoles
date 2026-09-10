@@ -1952,9 +1952,11 @@ namespace PocketRoles.UI
             {
                 if (!SettingsTab.Find(__instance, out var d)) return true;
                 float step = SettingsTab.Step(d);
-                float v = __instance.Value + step;
+                float cur = __instance.Value;
+                float v = cur + step;
                 v = SettingsTab.Snap(d, v); // an off-grid config value (/opt, hand-edited cfg) gets back onto the step grid
-                if (d.Max > d.Min && v > d.Max + step * 0.01f) v = d.Min;
+                // Wrap only from the maximum itself; a value that merely overshoots (max not on the step grid) stops at the maximum (review 2026-09-10).
+                if (d.Max > d.Min && v > d.Max + step * 0.01f) v = cur >= d.Max - step * 0.01f ? d.Min : d.Max;
                 __instance.Value = SettingsTab.Clamp(d, v);
                 __instance.UpdateValue();
                 return false;
@@ -1976,9 +1978,11 @@ namespace PocketRoles.UI
             {
                 if (!SettingsTab.Find(__instance, out var d)) return true;
                 float step = SettingsTab.Step(d);
-                float v = __instance.Value - step;
+                float cur = __instance.Value;
+                float v = cur - step;
                 v = SettingsTab.Snap(d, v);
-                if (d.Max > d.Min && v < d.Min - step * 0.01f) v = d.Max;
+                // Wrap only from the minimum itself; a value that merely undershoots (minimum not on the step grid, e.g. 1 with step 5) stops at the minimum.
+                if (d.Max > d.Min && v < d.Min - step * 0.01f) v = cur <= d.Min + step * 0.01f ? d.Max : d.Min;
                 __instance.Value = SettingsTab.Clamp(d, v);
                 __instance.UpdateValue();
                 return false;

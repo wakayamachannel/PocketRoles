@@ -67,6 +67,7 @@ namespace PocketRoles.Lobby
                 float now = Time.time;
                 float limit = minutes * 60f;
                 var seen = new HashSet<byte>();
+                bool warnedNow = false, kickedNow = false;   // one private warning and one kick per poll: never several clients' immediate packets in one frame
                 foreach (var pc in Game.AllPlayers())
                 {
                     if (pc.AmOwner || pc.Data == null || pc.Data.Disconnected) continue;
@@ -93,6 +94,8 @@ namespace PocketRoles.Lobby
                     if (Permissions.LevelOf(id) != PermLevel.Player) continue; // VIP / moderator / admin are exempt
                     if (!t.Warned)
                     {
+                        if (warnedNow) continue;   // next poll (2 s later)
+                        warnedNow = true;
                         t.Warned = true;
                         PocketRolesPlugin.Logger.LogInfo($"AfkKick: {Game.NameOf(id)} idle {idle:0}s → warning");
                         Kills_NoticeShim(id, "afk.warn",
@@ -102,6 +105,8 @@ namespace PocketRoles.Lobby
                         continue;
                     }
                     if (idle < limit) continue;
+                    if (kickedNow) continue;       // next poll
+                    kickedNow = true;
                     string name = Lang.StripTags(Game.NameOf(id) ?? "").Trim();
                     PocketRolesPlugin.Logger.LogInfo($"AfkKick: {name} idle {idle:0}s ≥ {limit:0}s → kick (client {pc.OwnerId})");
                     _tracks.Remove(id);

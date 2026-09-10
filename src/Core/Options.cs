@@ -987,8 +987,8 @@ namespace PocketRoles.Core
                 .Tip("参加した人にこの部屋がMOD部屋であることを個別に知らせます。", "Privately tells every joining player that this lobby uses a host-side mod.", "私聊告知每位加入的玩家本房间使用房主模组。"));
             _descriptors.Add(Bool("roleinfo", gJa, gEn, "会議で役職説明", "Role info at meetings", _roleInfoAtMeeting)
                 .Tip("会議開始時に各自の役職説明を個別に送り直します。", "Re-sends each player's role description privately when a meeting starts.", "会议开始时再次私聊发送各自的职业说明。"));
-            _descriptors.Add(Bool("kick", gJa, gEn, "不正RPCでキック", "Kick on forged RPC", _antiCheatKick)
-                .Tip("不正なホスト専用RPCを繰り返した人をキックします（オフは記録のみ）。", "Kicks a player who keeps sending forged host-only RPCs (off = log only).", "踢出反复发送伪造房主专用 RPC 的玩家（关闭则仅记录）。"));
+            _descriptors.Add(Bool("kick", gJa, gEn, "不正RPCでキック（予約・現在は記録のみ）", "Kick on forged RPC (reserved, log only)", _antiCheatKick)
+                .Tip("現在は効果がありません: 偽装されたホスト専用RPCは常に捨てて記録しますが、中継された送信者を特定できないためキックはしません。", "No effect at the moment: forged host-only RPCs are always dropped and logged, but the relayed sender cannot be identified, so nobody is kicked.", "目前无效：伪造的房主专用 RPC 总是被丢弃并记录，但无法识别转发者，因此不会踢人。"));
             _descriptors.Add(Bool("general.ignoreversion", gJa, gEn, "バージョン不一致を無視", "Ignore version mismatch", _ignoreVersion)
                 .Tip("ゲームのバージョンが対応版と違ってもMODを動かします（自己責任）。", "Keeps the mod active on an unsupported game version (at your own risk).", "游戏版本不匹配时仍启用模组（风险自负）。"));
             _descriptors.Add(Bool("credits.show", gJa, gEn, "クレジット表示", "Show credits", _showCredits)
@@ -1305,6 +1305,7 @@ namespace PocketRoles.Core
                 case "perm.vipmarker": case "perm.vip": case "vipmarker": case "permissions.vipmarker": return SetBool(_permVipMarker, value, "perm.vipmarker", out message);
                 // v0.4b vanilla extended ranges
                 case "vanilla.ranges": case "vanilla.extendedranges": case "vanilla.extended": case "ranges": return SetBool(_vanExtendedRanges, value, "vanilla.ranges", out message);
+                case "vanilla.clampunreg": case "clampunreg": case "vanilla.clampinunregistered": return SetBool(_vanClampUnreg, value, "vanilla.clampunreg", out message);
                 case "vanilla.killmin": case "vanilla.killcooldownmin": return SetFloat(_vanKillMin, value, 0f, 60f, "vanilla.killmin", out message);
                 case "vanilla.killmax": case "vanilla.killcooldownmax": return SetFloat(_vanKillMax, value, 10f, 600f, "vanilla.killmax", out message);
                 case "vanilla.killstep": case "vanilla.killcooldownstep": return SetFloat(_vanKillStep, value, 0.5f, 10f, "vanilla.killstep", out message);

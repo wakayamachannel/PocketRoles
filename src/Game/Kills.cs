@@ -243,6 +243,30 @@ namespace PocketRoles.Game
             return true;
         }
 
+        /// <summary>
+        /// The HOST's own kill button for a role with its own cooldown (Sheriff, Jackal, Arsonist, Witch, Worshipper, Serial Killer,
+        /// Samurai): vanilla sets the host's timer to the LOBBY kill cooldown at the intro end, after every meeting and inside
+        /// MurderPlayer (the GetKillCooldown postfix does not reach those writes — live 2026-09-10). Clients get theirs from their
+        /// private options. Called 0.5 s after the intro, at WrapUp + 2 s and after the host's own kill (Rpc.Kill).
+        /// </summary>
+        internal static void ApplyHostCustomCooldown(string why)
+        {
+            try
+            {
+                if (!Game.IsHostActive || !Game.InProgress || Game.Ending) return;
+                var lp = PlayerControl.LocalPlayer;
+                if (lp == null || lp.Data == null || lp.Data.IsDead) return;
+                float cd = OptionsDesync_GetKillCooldownPatch.HostCustomCooldown(Game.RoleOf(lp.PlayerId));
+                if (cd <= 0f) return;
+                Rpc.ResetKillCooldown(lp, cd);
+                PocketRolesPlugin.Logger.LogInfo($"Kills: host {Game.RoleOf(lp.PlayerId)} kill timer set to {cd:0.#}s ({why})");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Kills.ApplyHostCustomCooldown: {e}");
+            }
+        }
+
         /// <summary>Private notice, built in the recipient's language (see Lang.PlayerLang). Texts may use {0}… placeholders.</summary>
         internal static void Notice(byte playerId, string key, string ja, string en, params object[] args)
         {

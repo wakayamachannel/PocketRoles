@@ -90,6 +90,7 @@ namespace PocketRoles.Game
 
                 float dt = Time.deltaTime, now = Time.time;
                 bool refreshTags = false, queued = false;
+                int warnsThisFrame = 0;   // same-frame warnings of two Serial Killers are staggered (see below)
                 Scratch.Clear();
                 foreach (var kv in Game.SerialKillerTimers) Scratch.Add(kv.Key);
                 for (int i = 0; i < Scratch.Count; i++)
@@ -107,7 +108,12 @@ namespace PocketRoles.Game
                     {
                         t.Warned = true;
                         PocketRolesPlugin.Logger.LogInfo($"SerialKiller: {Game.NameOf(id)} has {Mathf.Max(0f, t.Remaining):0.#} s left to kill");
-                        Kills.Notice(id, "serialkiller.warn", "あと {0:0.#} 秒以内にキルしないと死亡します！", "Kill within {0:0.#} s or you die!", Mathf.Max(0f, t.Remaining));
+                        // Two Serial Killers armed together cross WarnAt in the same frame: only the first warning leaves at once,
+                        // the n-th one ResetStagger * n later (one client's immediate packets per frame; review 2026-09-10).
+                        int warnSlot = warnsThisFrame++;
+                        byte warnId = id; float warnLeft = Mathf.Max(0f, t.Remaining);
+                        void Warn() { if (Game.IsAlive(warnId) && Game.SerialKillerTimers.ContainsKey(warnId)) Kills.Notice(warnId, "serialkiller.warn", "あと {0:0.#} 秒以内にキルしないと死亡します！", "Kill within {0:0.#} s or you die!", warnLeft); }
+                        if (warnSlot == 0) Warn(); else Scheduler.After(ResetStagger * warnSlot, Warn);
                     }
                     if (t.Remaining > 0f)
                     {
@@ -289,10 +295,12 @@ namespace PocketRoles.Game
                     }
                     float remaining = reset || !Game.SerialKillerTimers.TryGetValue(id, out var t) ? limit : Mathf.Max(t.Remaining, floor);
                     Arm(id, remaining, reset ? "meeting end, reset" : "meeting end, carried over");
-                    ScheduleCooldownReset(id, index++, "meeting end");
+                    // Slots start at 1: WrapUp + 2 s already carries the public Witch / Nekomata / RoleReveal lines (review 2026-09-10).
+                    int slot = ++index;
+                    ScheduleCooldownReset(id, slot, "meeting end");
                     // The "N s left" line rides with that Serial Killer's own staggered reset: two clients' immediate packets never share a frame
                     // (static review 2026-09-10; index 0 keeps the reset + chat pair to the same client in one frame, as before).
-                    byte sid = id; float rem = remaining; int slot = index - 1;
+                    byte sid = id; float rem = remaining;
                     void Notice() { if (Game.IsHostActive && Game.InProgress && !Game.Ending && Game.IsAlive(sid)) Kills.Notice(sid, "serialkiller.resume", "残り {0:0.#} 秒以内にキルしてください。", "{0:0.#} s left to kill.", rem); }
                     if (slot <= 0) Notice(); else Scheduler.After(ResetStagger * slot, Notice);
                 }

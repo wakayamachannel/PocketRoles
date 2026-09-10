@@ -32,6 +32,8 @@ namespace PocketRoles.Chat
     {
         /// <summary>Max chat messages for one command reply.</summary>
         private const int MaxReplyMessages = 3;
+        /// <summary>/cmd n and /cmd r: the longest English role descriptions need 5 messages (review 2026-09-10).</summary>
+        private const int RoleReplyMessages = 5;
         /// <summary>Minimum seconds between two commands from the same non-host player (anti-spam).</summary>
         private const float PlayerCooldown = 2f;
 
@@ -127,10 +129,10 @@ namespace PocketRoles.Chat
                         ReplyThrottled(sender, isHost, HelpText(isHost, level, hostCmds), HelpMessages);
                         return true;
                     case "n": case "now": case "me": case "役職":
-                        ReplyThrottled(sender, isHost, MyRoleText(sender));
+                        ReplyThrottled(sender, isHost, MyRoleText(sender), RoleReplyMessages);
                         return true;
                     case "r": case "role": case "roles":
-                        ReplyThrottled(sender, isHost, arg1 == null ? RoleListText() : RoleDescText(JoinArgs(tokens, 1)));
+                        ReplyThrottled(sender, isHost, arg1 == null ? RoleListText() : RoleDescText(JoinArgs(tokens, 1)), RoleReplyMessages);
                         return true;
                     case "s": case "settings": case "設定": case "设置":
                         // The settings summary left the welcome (v0.4.1): everyone can read it here instead.
@@ -223,7 +225,7 @@ namespace PocketRoles.Chat
                         return true;
                     case "show": Reply(sender, ShowText()); return true;
                     // v0.4.6: every player's role on the (dead) host's own screen — host-local, never a remote admin's (not in IsAdminCommand)
-                    case "who": case "生存": Reply(sender, GhostRoleList.OnDemandText(), 6); return true;
+                    case "who": case "生存": Reply(sender, GhostRoleList.OnDemandText(), 10); return true;   // host-local: 15 players need up to 8 chunks
                     case "reset": Reply(sender, ResetRoles()); return true;
                     case "reload":
                         // The file may contain Enabled=false: re-reading it mid-game would switch every host patch off
@@ -649,7 +651,7 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>Messages allowed for the host help page (8 lines ≤ 100 chars; host screen or a remote admin).</summary>
-        private const int HostHelpMessages = 9;
+        private const int HostHelpMessages = 12;   // 9 lines; an English line can split into two messages
 
         /// <summary>
         /// Messages allowed for the settings summary a player asks for with /cmd s (one short line per enabled role
@@ -690,7 +692,7 @@ namespace PocketRoles.Chat
                 "Diag: /diag prints the start / screen state to chat and the log (e.g. on a black screen). F7 twice = haison",
                 "诊断: /diag 将开局与画面状态输出到聊天和日志（例如黑屏时）。按两次 F7 = 废村"));
             sb.Append('\n');
-            sb.Append(Lang.T("help.host.8",
+            sb.Append(Lang.T("help.host.9",
                 "観戦: 死亡後は全員の役職一覧が自分の画面だけに出ます（会議ごとに再表示）。/who で再表示、/opt ghostlist off で停止",
                 "Spectating: once you are dead, every player's role is listed on your screen only (again at each meeting). /who shows it, /opt ghostlist off disables it",
                 "观战: 你死亡后，所有玩家的职业只显示在你的屏幕上（每次会议再显示）。/who 再次查看，/opt ghostlist off 关闭"));
@@ -865,7 +867,7 @@ namespace PocketRoles.Chat
                         OnOff(Options.EvilNekomataExcludeImpostors), OnOff(Options.EvilNekomataAnnounce));
                 case CustomRole.SerialKiller:
                     return Lang.TF("cmd.ro.serialkiller", "キルCD {0:0.#}秒、自殺まで {1:0.#}秒、会議でリセット: {2}", "Kill cooldown {0:0.#}s, suicide after {1:0.#}s, reset at meetings: {2}",
-                        Options.SerialKillerKillCooldown, Options.SerialKillerSuicideTime, OnOff(Options.SerialKillerResetAtMeeting));
+                        Options.SerialKillerKillCooldown, SerialKiller.Limit(), OnOff(Options.SerialKillerResetAtMeeting));   // the effective limit (raised to KillCooldown + margin when the option is lower)
                 case CustomRole.Samurai:
                     return Lang.TF("cmd.ro.samurai", "斬撃CD {0}、範囲 {1:0.#}、間隔 {2:0.#}秒、味方も斬る: {3}", "Slash cooldown {0}, range {1:0.#}, stagger {2:0.#}s, hits allies: {3}",
                         Options.SamuraiKillCooldown > 0f ? Options.SamuraiKillCooldown.ToString("0.#") + "s" : Lang.T("cmd.ro.samurai.samecd", "キルと同じ", "same as kill"),
@@ -906,14 +908,14 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>Messages allowed for the /opt key list (8 lines ≤ 100 chars, host-local only).</summary>
-        private const int OptUsageMessages = 8;
+        private const int OptUsageMessages = 12;   // compat mode packs 86 chars per message
 
         /// <summary>/opt without arguments: usage plus every accepted key (8 lines of ≤ 100 chars; v0.3 / v0.4 keys included).</summary>
         private static string OptUsageText()
         {
             return Lang.T("cmd.opt.usage2",
-                "使い方: /opt <キー> <値>  キー: <役職>.count|chance, sheriff.cooldown|killmadmate, jackal.cooldown|vent\nvampire.delay, mayor.votes, snitch.tasks, lighter.vision, speedbooster.speed, madmate.known, lang\nwelcome, roleinfo, register, kick, lobby.autorehost|autopublic|autopublicdelay|rehostmax|maxping\nchat.welcometext|welcomesettings, general.ignoreversion, credits.author|url|show\nlobby.autostart|autostartplayers|autostartcountdown|timermode|timerwarnat|extenddelay\nlobby.autoregion|dleks, gm, hotkeys, hotkeys.haison|endmeeting|cancelstart\nchat.playercommands|allcommands|rulesmode|rulestext, cos.enabled|music|musicfile|musicvolume\ncos.lobbypaint|dropship|menubg|cursor, guide.overlay|code|autoreg",
-                "/opt <key> <value>  Keys: <role>.count|chance, sheriff.cooldown|killmadmate, jackal.cooldown|vent\nvampire.delay, mayor.votes, snitch.tasks, lighter.vision, speedbooster.speed, madmate.known, lang\nwelcome, roleinfo, register, kick, lobby.autorehost|autopublic|autopublicdelay|rehostmax|maxping\nchat.welcometext|welcomesettings, general.ignoreversion, credits.author|url|show\nlobby.autostart|autostartplayers|autostartcountdown|timermode|timerwarnat|extenddelay\nlobby.autoregion|dleks, gm, hotkeys, hotkeys.haison|endmeeting|cancelstart\nchat.playercommands|allcommands|rulesmode|rulestext, cos.enabled|music|musicfile|musicvolume\ncos.lobbypaint|dropship|menubg|cursor, guide.overlay|code|autoreg");
+                "使い方: /opt <キー> <値>  キー: <役職>.count|chance と役職ごとの設定（/cmd r <役職> に表示）\nroles.reveal|ghostlist|vanilla, madmate.known, lang, welcome, roleinfo, register, kick\nlobby.autorehost|autopublic|autopublicdelay|rehostmax|maxping|afkkick|autoregion|dleks\nlobby.autostart|autostartplayers|autostartcountdown|timermode|timerwarnat|extenddelay\nchat.welcometext|welcomesettings|welcomeall|compatwelcome|compatwelcomeinterval|rulesmode|rulestext\nchat.playercommands|allcommands, perm.adminsettings|adminlobby|modkick|vipmarker, compat.risky\ntranslate.*, vanilla.ranges|clampunreg|killmin|killmax|votemin|votemax|taskmax, gm, hotkeys.*\ncos.enabled|music|musicfile|musicvolume|lobbypaint|dropship|menubg|cursor, credits.*, guide.overlay|code|autoreg",
+                "/opt <key> <value>  Keys: <role>.count|chance and each role's own settings (shown by /cmd r <role>)\nroles.reveal|ghostlist|vanilla, madmate.known, lang, welcome, roleinfo, register, kick\nlobby.autorehost|autopublic|autopublicdelay|rehostmax|maxping|afkkick|autoregion|dleks\nlobby.autostart|autostartplayers|autostartcountdown|timermode|timerwarnat|extenddelay\nchat.welcometext|welcomesettings|welcomeall|compatwelcome|compatwelcomeinterval|rulesmode|rulestext\nchat.playercommands|allcommands, perm.adminsettings|adminlobby|modkick|vipmarker, compat.risky\ntranslate.*, vanilla.ranges|clampunreg|killmin|killmax|votemin|votemax|taskmax, gm, hotkeys.*\ncos.enabled|music|musicfile|musicvolume|lobbypaint|dropship|menubg|cursor, credits.*, guide.overlay|code|autoreg");
         }
 
         private static string SetOption(string key, string value)

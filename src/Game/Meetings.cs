@@ -438,6 +438,7 @@ namespace PocketRoles.Game
                     if (!Core.Game.IsHostActive || !Core.Game.InProgress) return;
                     OptionsDesync.ResyncAll();
                     SerialKiller.OnMeetingEnd();   // v0.5.0: reset / carry over, authoritative kill-timer reset, private notice (before the forced tag refresh so the countdown tag rides along)
+                    Kills.ApplyHostCustomCooldown("meeting end");   // the host's own custom cooldown after vanilla's WrapUp reset
                     NameTags.RefreshAll(force: true);
                     WinConditions.Check();
                 });

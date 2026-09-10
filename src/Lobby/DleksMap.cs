@@ -156,7 +156,8 @@ namespace PocketRoles.Lobby
         {
             try
             {
-                if (!Enabled || !Selected || !AmHost() || !AllowedInThisLobby) return;
+                if (!Enabled) { SetFlipped(false); return; }   // switched off while Dleks was selected: the next game must load the normal Skeld (review 2026-09-10)
+                if (!Selected || !AmHost() || !AllowedInThisLobby) return;
                 if (CurrentMapId() == DleksIndex) SetMapId(0, "start requested: MapId stays 0 (AUR method)");
                 SetFlipped(true);
             }

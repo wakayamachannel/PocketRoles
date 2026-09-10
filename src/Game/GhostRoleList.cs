@@ -60,7 +60,7 @@ namespace PocketRoles.Game
                     _knownDead.Clear();
                     foreach (byte id in Game.AllPlayerIds()) if (Game.IsDead(id)) _knownDead.Add(id);
                     PocketRolesPlugin.Logger.LogInfo($"GhostRoleList: host died → list in {ShowDelay:0.#} s (enabled={Options.HostGhostRoleList})");
-                    if (Options.HostGhostRoleList) Scheduler.After(ShowDelay, () => Show("death"), ShowTag);
+                    if (Options.HostGhostRoleList) { Scheduler.Cancel(ShowTag); Scheduler.After(ShowDelay, () => Show("death"), ShowTag); }
                     return;
                 }
                 if (!Options.HostGhostRoleList) return;
@@ -83,6 +83,7 @@ namespace PocketRoles.Game
             try
             {
                 if (!HostDead || !Options.HostGhostRoleList) return;
+                Scheduler.Cancel(ShowTag);   // a death list still pending (host died right before the meeting) is replaced, not doubled
                 Scheduler.After(MeetingDelay, () => Show("meeting"), ShowTag);
             }
             catch (Exception e)

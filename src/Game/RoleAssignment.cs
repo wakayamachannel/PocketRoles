@@ -217,8 +217,10 @@ namespace PocketRoles.Game
             // Rebuild the task totals with the fresh role table (a recompute before SelectRoles used the previous game's roles).
             try { GameData.Instance?.RecomputeTaskCounts(); }
             catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"RoleAssignment: RecomputeTaskCounts failed: {e.Message}"); }
-            NameTags.RefreshAll(force: true);
+            // Options first (private cooldown / vision / speed must be on the client before its intro ends), then the name tags:
+            // both go through the paced queue and a 15-player name burst alone takes ~4.5 s (review 2026-09-10).
             OptionsDesync.ResyncAll();
+            NameTags.RefreshAll(force: true);
             Scheduler.After(8f, () =>
             {
                 if (!Core.Game.InProgress) return;
@@ -732,6 +734,7 @@ namespace PocketRoles.Game
                     NameTags.RefreshAll(force: true);
                     OptionsDesync.ResyncAll();
                     SerialKiller.OnIntroEnd();   // v0.5.0: schedules the countdown start after the LAST client's intro (paced dispatch)
+                    Scheduler.After(0.5f, () => Kills.ApplyHostCustomCooldown("intro end"), "hostcd.intro");   // after vanilla's own intro-end timer
                 }, "assign.introend");
             }
             catch (Exception e)

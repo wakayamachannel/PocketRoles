@@ -160,6 +160,7 @@ namespace PocketRoles.Core
             OriginalNames.Clear();
             Bites.Clear();
             KillCounts.Clear();
+            Rpc.HostCooldownOverrideEndsAt = -1f;   // a host cooldown override never outlives the game
             ResetRoleState();
             ExtraWinners.Clear();
             SoloWinner = CustomRole.None;

@@ -211,7 +211,8 @@ namespace PocketRoles.Net
             int count = Lobby.AutoStart.PlayerCount();
             int max = 15;
             try { var gom = GameOptionsManager.Instance; if (gom != null && gom.CurrentGameOptions != null) max = gom.CurrentGameOptions.MaxPlayers; } catch (Exception) { }
-            string kind = Registration.CompatMode
+            // A lobby inherited by host migration (Registration.Hosting false) runs no roles either (review 2026-09-10).
+            string kind = Registration.CompatMode || !Core.Game.IsHostActive
                 ? Lang.T("discord.kind.compat", "役職なし・登録オフ", "no roles (unregistered)", "无职业·未注册")
                 : Lang.T("discord.kind.roles", "役職あり", "with roles", "有职业");
             string state = _inGame

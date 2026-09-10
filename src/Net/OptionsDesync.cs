@@ -314,6 +314,22 @@ namespace PocketRoles.Net
     [HarmonyPatch(typeof(LogicOptions), nameof(LogicOptions.GetKillCooldown))]
     internal static class OptionsDesync_GetKillCooldownPatch
     {
+        /// <summary>The role's own kill cooldown for the host's button (-1 = the lobby value applies). Shared with Kills.ApplyHostCustomCooldown.</summary>
+        internal static float HostCustomCooldown(CustomRole role)
+        {
+            switch (role)
+            {
+                case CustomRole.Sheriff: return Mathf.Max(0.02f, Options.SheriffKillCooldown);
+                case CustomRole.Jackal: return Mathf.Max(0.02f, Options.JackalKillCooldown);
+                case CustomRole.Arsonist: return Mathf.Max(0.02f, Options.ArsonistDouseCooldown);
+                case CustomRole.Witch: return Options.WitchSpellCooldown > 0f ? Mathf.Max(0.02f, Options.WitchSpellCooldown) : -1f;
+                case CustomRole.Worshipper: return Mathf.Max(0.02f, Options.WorshipperCooldown);
+                case CustomRole.SerialKiller: return Mathf.Max(0.02f, Options.SerialKillerKillCooldown);
+                case CustomRole.Samurai: return Options.SamuraiKillCooldown > 0f ? Mathf.Max(0.02f, Options.SamuraiKillCooldown) : -1f;
+                default: return -1f;
+            }
+        }
+
         private static void Postfix(ref float __result)
         {
             try

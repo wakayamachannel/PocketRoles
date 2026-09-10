@@ -38,6 +38,8 @@ namespace PocketRoles.Chat
         public const int CompatMaxWelcomeMessages = 1;
         /// <summary>Pacing key of the compat-mode public channel in <see cref="NextSendAt"/> (one host broadcast per <see cref="ChunkSpacing"/>).</summary>
         private const int PublicKey = -1;
+        /// <summary>Set by Local() around its Split: colour tags are kept for the host's own screen (no 100-char network chunking concern).</summary>
+        private static bool _keepColors;
         /// <summary>Welcome cap when the current settings are appended (one line per enabled role needs the extra message).</summary>
         public const int MaxWelcomeMessagesWithSettings = 5;
         /// <summary>
@@ -53,7 +55,10 @@ namespace PocketRoles.Chat
         {
             try
             {
-                foreach (var chunk in Split(text))
+                List<string> chunks;
+                _keepColors = true;
+                try { chunks = Split(text); } finally { _keepColors = false; }
+                foreach (var chunk in chunks)
                 {
                     if (AmongUsClient.Instance != null) Rpc.SendChatTo(Rpc.HostClientId, title, chunk);
                     else AddLocalDirect(title, chunk);
@@ -193,7 +198,10 @@ namespace PocketRoles.Chat
                     SendPublicChunks(title, pub);
                     return;
                 }
-                foreach (var chunk in Split(builder())) Local(title, chunk);
+                // The host's own copy in the lobby language, not in the language of the player whose command triggered the broadcast.
+                List<string> mine;
+                using (Lang.Scope(Lang.Default)) mine = Split(builder());
+                foreach (var chunk in mine) Local(title, chunk);
                 float start = 0f;
                 foreach (var pc in Core.Game.AllPlayers())
                 {
@@ -875,6 +883,9 @@ namespace PocketRoles.Chat
             var result = new List<string>();
             if (string.IsNullOrEmpty(text)) return result;
             text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+            // Compat public chat: the vanilla-chat sanitizer turns every line break into " / " (+2 chars); do it here so the
+            // 86-char budget below counts the real length (the tail of a packed chunk was cut otherwise, review 2026-09-10).
+            if (Registration.CompatMode) text = text.Replace("\n", " / ");
             int limit = MessageChars; // compat mode: room for the "[PocketRoles] " prefix inside the 100-char message
             var lines = new List<string>();
             foreach (var raw in text.Split('\n'))
@@ -926,7 +937,7 @@ namespace PocketRoles.Chat
 
         private static string Sanitize(string chunk)
         {
-            chunk = LimitColorTags(chunk);
+            chunk = _keepColors ? chunk : LimitColorTags(chunk);   // host-local text keeps every colour (GhostRoleList lines)
             return Lang.FullWidthDigits(chunk);
         }
 

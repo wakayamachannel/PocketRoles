@@ -273,6 +273,9 @@ namespace PocketRoles.Game
             {
                 if (id == exiledId) continue;
                 if (!Core.Game.IsAlive(id)) continue;
+                // A death that is already certain and imminent (a lover following its partner, a Samurai bystander) counts as dead:
+                // counting the doomed impostor lover alive ended the game as an impostor win it was about to lose (review 2026-09-10).
+                if (Core.Game.Bites.TryGetValue(id, out var doomed) && (doomed.Reason == "lovers" || doomed.Reason == "slash")) continue;
                 alive++;
                 if (Core.Game.IsImpostorTeamKiller(id)) imp++;
                 else if (Core.Game.IsJackal(id)) jackal++;
