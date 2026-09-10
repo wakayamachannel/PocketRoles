@@ -623,6 +623,16 @@ namespace PocketRoles.Net
             if (killer.AmOwner)
             {
                 killer.SetKillTimer(cooldown);
+                // 2026.8.18: SetKillTimer clamps to the LOBBY kill cooldown on the host (the GetKillCooldown postfix is not what that clamp reads —
+                // live 2026-09-10: a host Samurai with [Samurai] KillCooldown 45 restarted at 25). A custom cooldown above the lobby value is
+                // written to the timer field directly; the button shows it as a full cooldown.
+                if (cooldown > 0f && killer.killTimer < cooldown - 0.05f)
+                {
+                    killer.killTimer = cooldown;
+                    try { var hud = HudManager.Instance; if (hud != null && hud.KillButton != null) hud.KillButton.SetCoolDown(cooldown, cooldown); }
+                    catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Rpc.ResetKillCooldown: KillButton.SetCoolDown: {e.Message}"); }
+                    PocketRolesPlugin.Logger.LogInfo($"Rpc.ResetKillCooldown: host timer set to {cooldown:0.#}s directly (vanilla clamp)");
+                }
                 return;
             }
             if (CompatBlocked("ResetKillCooldown")) return; // unregistered lobby: no per-client options / RPC
