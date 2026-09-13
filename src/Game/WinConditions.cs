@@ -334,19 +334,24 @@ namespace PocketRoles.Game
         private static void BuildSummary(WinKind kind, byte soloId, HashSet<byte> winners)
         {
             var list = new List<Core.Game.SummaryEntry>();
-            foreach (var id in Core.Game.AllPlayerIds())
+            // v0.5.0: the roster (everyone who started) — a player who left keeps its role line, marked as left, never a winner.
+            Core.Game.MarkLeftPlayers();
+            foreach (var id in Core.Game.SummaryIds())
             {
                 if (Core.Game.GameMasterActive && Core.Game.IsHost(id)) continue; // the Game Master is not part of the result
                 var info = Core.Game.Info(id);
+                bool left = Core.Game.Roster.TryGetValue(id, out var re) && re.Left;
                 Core.Game.KillCounts.TryGetValue(id, out int kills);
                 list.Add(new Core.Game.SummaryEntry
                 {
                     Id = id,
-                    Name = Core.Game.NameOf(id),
+                    Name = re != null ? re.Name : Core.Game.NameOf(id),
                     Role = Core.Game.RoleOf(id),
                     Vanilla = Core.Game.VanillaRoleOf(id),
-                    Dead = info == null || info.Disconnected || Core.Game.IsDead(id),
-                    Winner = winners.Contains(id),
+                    Dead = left || info == null || info.Disconnected || Core.Game.IsDead(id),
+                    Left = left,
+                    // a leaver is no winner — except the named solo winner (a Jester who quits on the ejection screen still won)
+                    Winner = winners.Contains(id) && (!left || (IsSoloKind(kind) && id == soloId)),
                     Kills = kills
                 });
             }
@@ -432,20 +437,24 @@ namespace PocketRoles.Game
                 _vanillaSummaryBuilt = true;
                 bool impostorsWin = mapped == Outcome.Impostor;
                 var list = new List<Core.Game.SummaryEntry>();
-                foreach (var id in Core.Game.AllPlayerIds())
+                // v0.5.0: the roster (everyone who started; 2026-09-13 a 14-player public game listed only the 5 still present).
+                Core.Game.MarkLeftPlayers();
+                foreach (var id in Core.Game.SummaryIds())
                 {
                     var info = Core.Game.Info(id);
                     var type = VanillaTypeWhileAlive(id);
-                    bool impSide = type == RoleTypes.Impostor || type == RoleTypes.Shapeshifter || type == RoleTypes.Phantom || type == RoleTypes.Viper || type == RoleTypes.ImpostorGhost;
+                    bool impSide = Core.Game.IsVanillaImpostorRole(type);
+                    bool left = Core.Game.Roster.TryGetValue(id, out var re) && re.Left;
                     Core.Game.KillCounts.TryGetValue(id, out int kills);
                     list.Add(new Core.Game.SummaryEntry
                     {
                         Id = id,
-                        Name = Core.Game.NameOf(id),
+                        Name = re != null ? re.Name : Core.Game.NameOf(id),
                         Role = CustomRole.None,
                         Vanilla = type,
-                        Dead = info == null || info.Disconnected || Core.Game.IsDead(id),
-                        Winner = impostorsWin == impSide,
+                        Dead = left || info == null || info.Disconnected || Core.Game.IsDead(id),
+                        Left = left,
+                        Winner = !left && impostorsWin == impSide,
                         Kills = kills
                     });
                 }
@@ -755,6 +764,26 @@ namespace PocketRoles.Game
             catch (Exception e)
             {
                 PocketRolesPlugin.Logger.LogError($"Win_SetEverythingUp: {e}");
+            }
+        }
+    }
+
+    /// <summary>v0.5.0: a player leaving mid-game stays in the summary roster, marked as left (Game.Roster).</summary>
+    [HarmonyPatch(typeof(AmongUsClient), nameof(AmongUsClient.OnPlayerLeft))]
+    internal static class Win_RosterPlayerLeftPatch
+    {
+        private static void Postfix()
+        {
+            try
+            {
+                var client = AmongUsClient.Instance;
+                if (client == null || !client.AmHost || !client.IsGameStarted) return;
+                if (Core.Game.Roster.Count == 0) return;
+                Core.Game.MarkLeftPlayers();
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Win_RosterPlayerLeftPatch: {e}");
             }
         }
     }

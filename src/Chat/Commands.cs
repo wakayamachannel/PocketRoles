@@ -34,6 +34,8 @@ namespace PocketRoles.Chat
         private const int MaxReplyMessages = 3;
         /// <summary>/cmd n and /cmd r: the longest English role descriptions need 5 messages (review 2026-09-10).</summary>
         private const int RoleReplyMessages = 5;
+        /// <summary>/cmd l: a full 15-player roster grouped by side plus kills and legend is up to 6 compat messages (review 2026-09-13).</summary>
+        private const int SummaryMessages = 8;
         /// <summary>Minimum seconds between two commands from the same non-host player (anti-spam).</summary>
         private const float PlayerCooldown = 2f;
 
@@ -141,15 +143,15 @@ namespace PocketRoles.Chat
                         if (!isHost && Registration.CompatMode)
                         {
                             ReplyThrottled(sender, isHost, Lang.T("cmd.show.compat.player",
-                                "この部屋は役職なしの普通のAmong Usです（便利ホスト）。設定は本体のロビー設定のとおりです。/cmd time で残り時間。",
-                                "This lobby is plain Among Us without roles (utility host). The settings are the vanilla lobby settings. /cmd time shows the time left.",
-                                "本房间是没有职业的普通 Among Us（便利房主）。设置即原版大厅设置。/cmd time 查看剩余时间。"));
+                                "この部屋は役職なしのふつうのAmong Usです。ルールは部屋の設定画面のとおりです。/cmd time で残り時間が見られます。",
+                                "Normal Among Us, no roles. Rules = lobby settings. /cmd time: time left",
+                                "本房间是没有职业的普通 Among Us。规则即大厅设置。/cmd time 查看剩余时间。"));
                             return true;
                         }
                         ReplyThrottled(sender, isHost, ShowText(), SettingsMessages);
                         return true;
                     case "l": case "last":
-                        ReplyThrottled(sender, isHost, Chat.SummaryText() ?? Lang.T("cmd.nolast", "まだ試合の記録がありません。", "No game recorded yet."));
+                        ReplyThrottled(sender, isHost, Chat.SummaryText() ?? Lang.T("cmd.nolast", "まだ試合の記録がありません。", "No game recorded yet."), SummaryMessages);
                         return true;
                     case "lang": case "language": case "言語":
                         if (!isHost && !PassCooldown(sender.PlayerId)) return true;
@@ -583,9 +585,9 @@ namespace PocketRoles.Chat
         /// <summary>
         /// Messages allowed for the general help page. ja/zh-CN pack into ≤ 4 chunks, but the English page with the
         /// translation note packs into 5 (help.1 and help.2 each need their own message, help.time cannot share with
-        /// help.lang+help.translate), so the cap is 5 to keep the level / "/h host" line from being truncated.
+        /// help.lang+help.translate) and a moderator's level line can need a 6th (review 2026-09-13), so the cap is 6.
         /// </summary>
-        private const int HelpMessages = 5;
+        private const int HelpMessages = 6;
 
         /// <summary>
         /// "/h": the general page. Every line is ≤ 100 chars and the page packs into ≤ 5 chat messages (Chat.Split):
@@ -597,20 +599,21 @@ namespace PocketRoles.Chat
             var sb = new StringBuilder();
             if (Registration.CompatMode && !isHost)
             {
-                // Unregistered (compat) lobby, player view: no roles here and every reply is public — two short lines.
+                // Unregistered (compat) lobby, player view: no roles here and every reply is public — two short lines
+                // in plain words (2026-09-13: "コマンド", "ja|zh|en" and the like read as jargon to a public lobby).
                 sb.Append(Lang.T("help.compat.1",
-                    "コマンド: /cmd h ヘルプ, /cmd time 部屋の残り時間, /cmd s この部屋の設定, /cmd lang ja|zh|en 言語",
-                    "Commands: /cmd h help, /cmd time lobby time left, /cmd s settings, /cmd lang ja|zh|en language",
-                    "命令: /cmd h 帮助, /cmd time 房间剩余时间, /cmd s 本房间设置, /cmd lang ja|zh|en 语言"));
+                    "チャットで打てるもの: /cmd time（部屋の残り時間） /cmd s（この部屋の設定） /cmd l（前の試合の結果）",
+                    "Type: /cmd time (time left), /cmd s (settings), /cmd l (last game)",
+                    "可以输入: /cmd time（房间剩余时间） /cmd s（本房间设置） /cmd l（上局结果）"));
                 sb.Append('\n');
                 sb.Append(Lang.T("help.compat.2",
-                    "この部屋は役職なしの普通のAmong Usです。コマンドの返事は全員に見えます",
-                    "This lobby has no roles (normal Among Us). Command replies are visible to everyone",
-                    "本房间没有职业(普通Among Us)。命令的回复所有人可见"));
+                    "この部屋は役職なしのふつうのAmong Usです。返事はみんなに見えます",
+                    "This is normal Among Us (no roles). Replies are visible to everyone",
+                    "本房间是没有职业的普通 Among Us。回复所有人可见"));
                 if (Chat.TranslationActive)
                 {
                     sb.Append('\n');
-                    sb.Append(Lang.T("help.translate", "外国語のチャットは自動翻訳されます。", "Foreign-language chat is translated automatically.", "外语聊天会自动翻译。"));
+                    sb.Append(Lang.T("help.translate", "外国語のチャットは自動翻訳されます。", "Foreign-language chat is auto-translated.", "外语聊天会自动翻译。"));
                 }
                 return sb.ToString();
             }
@@ -624,12 +627,15 @@ namespace PocketRoles.Chat
             sb.Append('\n');
             sb.Append(Lang.T("help.time", "/cmd time ロビーの残り時間, /cmd s この部屋の設定", "/cmd time = lobby time left, /cmd s = current settings", "/cmd time 房间剩余时间，/cmd s 本房间的设置"));
             sb.Append('\n');
-            sb.Append(Lang.TF("help.lang", "言語: {0}（/lang ja|zh|en で変更）", "Language: {0} (/lang ja|zh|en to change)", Lang.DisplayName(Lang.Current)));
-            // v0.4b §K: the translation note shares the /lang line (EN needs 5 messages with it, see HelpMessages).
+            sb.Append(Lang.TF("help.lang", "案内の言語: {0}（English は /lang en、中文は /lang zh、日本語は /lang ja）", "Language: {0} (/lang en, 中文 /lang zh, 日本語 /lang ja)", Lang.DisplayName(Lang.Current)));
+            // v0.4b §K: the translation note shares the /lang line (EN needs 5 messages with it, see HelpMessages) —
+            // unless the pair would exceed one message (the English pair is 117 chars, review 2026-09-13).
             if (Chat.TranslationActive)
             {
-                sb.Append(' ');
-                sb.Append(Lang.T("help.translate", "外国語のチャットは自動翻訳されます。", "Foreign-language chat is translated automatically.", "外语聊天会自动翻译。"));
+                string note = Lang.T("help.translate", "外国語のチャットは自動翻訳されます。", "Foreign-language chat is auto-translated.", "外语聊天会自动翻译。");
+                int lastLine = sb.Length - (sb.ToString().LastIndexOf('\n') + 1);
+                sb.Append(lastLine + 1 + note.Length <= Chat.MessageChars ? ' ' : '\n');
+                sb.Append(note);
             }
             sb.Append('\n');
             sb.Append(Lang.TF("help.perm", "あなたの権限: {0}", "Your level: {0}", Permissions.LevelName(level)));
@@ -727,7 +733,7 @@ namespace PocketRoles.Chat
         private static string LangStateText(PlayerControl sender, bool isHost)
         {
             string mine = Lang.DisplayName(Lang.PlayerLang(sender.PlayerId));
-            string s = Lang.TF("cmd.lang.state", "あなたの言語: {0}  /lang ja|zh|en で変更", "Your language: {0}  /lang ja|zh|en to change", mine);
+            string s = Lang.TF("cmd.lang.state", "あなたの案内の言語: {0}（English は /lang en、中文は /lang zh、日本語は /lang ja）", "Your language: {0} (English: /lang en, 中文: /lang zh, 日本語: /lang ja)", mine);
             if (isHost) s += "\n" + Lang.TF("cmd.lang.default", "部屋の既定言語: {0}  /lang default ja|zh|en で変更", "Lobby default: {0}  /lang default ja|zh|en to change", Lang.DisplayName(Lang.Default));
             return s;
         }
@@ -743,7 +749,7 @@ namespace PocketRoles.Chat
                 return Lang.T("cmd.lang.reset", "言語を部屋の既定に戻しました。", "Language reset to the lobby default.");
             }
             if (!Lang.TryNormalize(a, out var code))
-                return Lang.T("cmd.lang.usage", "使い方: /lang ja|zh|en", "Usage: /lang ja|zh|en");
+                return Lang.T("cmd.lang.usage", "使い方: /lang en（英語） /lang zh（中国語） /lang ja（日本語）", "Usage: /lang en (English), /lang zh (Chinese), /lang ja (Japanese)");
             if (isHost)
             {
                 // The host's own messages follow the lobby default, so the host's /lang IS the lobby default. No

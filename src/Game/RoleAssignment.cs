@@ -506,6 +506,8 @@ namespace PocketRoles.Game
                     Core.Game.AssigningRoles = false;
                     return;
                 }
+                // v0.5.0: everyone who starts this game is in the post-game summary, even after leaving mid-game.
+                Core.Game.SnapshotRoster();
                 if (Core.Game.HaisonActive || Registration.CompatMode)
                 {
                     // v0.4.4: the plain-role gap described below hits vanilla-only games as well — an unregistered

@@ -336,7 +336,7 @@ namespace PocketRoles.Chat
             if (!string.IsNullOrWhiteSpace(custom)) return custom.Replace("\\n", " ").Trim();
             return Lang.T("compat.welcome",
                 "ようこそ! この部屋は普通のAmong Us(役職なし)です。何も入れなくてOK、そのまま遊べます。困ったら /cmd h",
-                "Welcome! This is a normal Among Us lobby (no roles). Nothing to install, just play. Type /cmd h for help",
+                "Welcome! Normal Among Us here (no roles). Nothing to install, just play. Help: /cmd h",
                 "欢迎! 本房间是普通的Among Us(无职业)，无需安装任何东西，直接玩即可。需要帮助请输入 /cmd h");
         }
 
@@ -671,17 +671,17 @@ namespace PocketRoles.Chat
                 return Lang.T("welcome.2.nocmd", "この部屋ではチャットコマンドは使えません（ホストの設定）。", "Chat commands are disabled in this lobby (host setting).", "本房间已禁用聊天命令（房主设置）。");
             if (Registration.CompatMode) return CompatCommandHint();
             return Registration.ShouldRegister
-                ? Lang.T("welcome.2.private", "/cmd h でヘルプ（ホストにだけ届きます）。/lang en|zh|ja で言語変更。", "Type /cmd h for help (only the host sees it). /lang en|zh|ja changes your language.")
-                : Lang.T("welcome.2.public", "/h でヘルプ（全員に見えます）。/lang en|zh|ja で言語変更。", "Type /h for help (everyone sees it). /lang en|zh|ja changes your language.");
+                ? Lang.T("welcome.2.private", "/cmd h でヘルプ（ホストにだけ届きます）。English は /lang en、中文は /lang zh。", "Type /cmd h for help (only the host sees it). 日本語: /lang ja, 中文: /lang zh.")
+                : Lang.T("welcome.2.public", "/h でヘルプ（みんなに見えます）。English は /lang en、中文は /lang zh。", "Type /h for help (everyone sees it). 日本語: /lang ja, 中文: /lang zh.");
         }
 
         /// <summary>Compat mode: the server does not route "/cmd …" privately, so every command (including /cmd) is visible to all.</summary>
         internal static string CompatCommandHint()
         {
             return Lang.T("welcome.2.compat",
-                "/h でヘルプ。この部屋では「/cmd …」を含むコマンドは全員に見えます。/lang en|zh|ja で言語変更。",
-                "Type /h for help. In this lobby every command, \"/cmd ...\" included, is visible to everyone. /lang en|zh|ja changes your language.",
-                "/h 查看帮助。本房间中所有命令（包括 /cmd …）对所有人可见。/lang zh|en|ja 更改语言。");
+                "困ったら /h。この部屋ではコマンドの返事はみんなに見えます。English は /lang en、中文は /lang zh。",
+                "Type /h for help. Replies are visible to everyone. 日本語: /lang ja, 中文: /lang zh.",
+                "/h 查看帮助。本房间的回复所有人可见。日本語: /lang ja，English: /lang en。");
         }
 
         /// <summary>Current settings (Options.DescribeLines without colour tags) joined by newlines — the {settings} placeholder.</summary>
@@ -820,29 +820,33 @@ namespace PocketRoles.Chat
             // Compat mode: the public chat filter drops ☆ (finding 2026-09-10: "=勝者" arrived without its mark) → a letter marker there.
             bool compat = Registration.CompatMode;
             string win = compat ? Lang.T("summary.win.compat", "勝", "W", "胜") : "☆";
-            var entries = new List<string>();
+            string leftMark = Lang.T("summary.left.mark", "退", "L", "退");
+            // v0.5.0: grouped by side, the impostor side first — "who were the impostors?" is the question after every
+            // game, and in a public compat lobby the first message is the one everybody reads (2026-09-13).
+            var sides = new List<string>[3];   // 0 impostor side, 1 crew, 2 neutral
+            for (int i = 0; i < sides.Length; i++) sides[i] = new List<string>();
+            bool anyCustom = false, anyLeft = false;
             foreach (var e in summary)
             {
                 if (e == null) continue;
+                if (e.Role != CustomRole.None) anyCustom = true;
+                if (e.Left) anyLeft = true;
                 string name = e.Name ?? ("#" + e.Id);
                 string roleName = e.Role != CustomRole.None ? Roles.Info(e.Role).Name : VanillaRoleName(e.Vanilla);
-                string mark = (e.Winner ? win : "") + (e.Dead ? "×" : "");
-                entries.Add(mark + name + ":" + roleName);
+                string mark = (e.Winner ? win : "") + (e.Left ? leftMark : (e.Dead ? "×" : ""));
+                sides[SideOf(e)].Add(mark + name + ":" + roleName);
             }
-            string sep = "  ";
-            int limit = MessageChars; // compat mode: 86 (the "[PocketRoles] " prefix travels inside the text)
-            var cur = new StringBuilder();
-            foreach (var en in entries)
+            string[] labels =
             {
-                if (cur.Length > 0 && cur.Length + sep.Length + en.Length > limit)
-                {
-                    lines.Add(cur.ToString());
-                    cur.Clear();
-                }
-                if (cur.Length > 0) cur.Append(sep);
-                cur.Append(en);
+                anyCustom ? Lang.T("summary.side.imp", "インポスター陣営", "Impostor side", "内鬼阵营") : Lang.T("summary.side.imp.vanilla", "インポスター", "Impostors", "内鬼"),
+                Lang.T("summary.side.crew", "クルー", "Crew", "船员"),
+                Lang.T("summary.side.neutral", "第三陣営", "Neutral", "中立"),
+            };
+            int limit = MessageChars; // compat mode: 86 (the "[PocketRoles] " prefix travels inside the text)
+            for (int i = 0; i < sides.Length; i++)
+            {
+                if (sides[i].Count > 0) PackEntries(lines, labels[i] + ": ", sides[i], limit);
             }
-            if (cur.Length > 0) lines.Add(cur.ToString());
             // v0.4.6: kill counts (one line; only killers with at least one kill, most first)
             var killers = new List<Core.Game.SummaryEntry>();
             foreach (var e in summary) if (e != null && e.Kills > 0) killers.Add(e);
@@ -853,10 +857,51 @@ namespace PocketRoles.Chat
                 foreach (var k in killers) parts.Add((k.Name ?? ("#" + k.Id)) + "=" + k.Kills);
                 lines.Add(Lang.T("summary.kills", "キル数: ", "Kills: ", "击杀数: ") + string.Join(", ", parts));
             }
-            lines.Add(compat
-                ? Lang.T("summary.legend.compat", "勝=勝者 ×=死亡", "W=winner ×=dead", "胜=胜者 ×=死亡")
-                : Lang.T("summary.legend", "☆=勝者 ×=死亡", "☆=winner ×=dead"));
+            string legend = compat
+                ? Lang.T("summary.legend.compat", "勝=勝った人 ×=死んだ人", "W=won ×=died", "胜=胜者 ×=死亡")
+                : Lang.T("summary.legend", "☆=勝った人 ×=死んだ人", "☆=won ×=died", "☆=胜者 ×=死亡");
+            if (anyLeft) legend += " " + Lang.T("summary.legend.left", "退=途中でぬけた人", "L=left the game", "退=中途退出");
+            lines.Add(legend);
             return string.Join("\n", lines);
+        }
+
+        /// <summary>0 = impostor side (vanilla impostor roles, the mod's Team.Impostor incl. the Madmate family), 1 = crew, 2 = neutral.</summary>
+        private static int SideOf(Core.Game.SummaryEntry e)
+        {
+            if (e.Role != CustomRole.None)
+            {
+                switch (Roles.Info(e.Role).Team)
+                {
+                    case Team.Impostor: return 0;
+                    case Team.Neutral: return 2;
+                    default: return 1;
+                }
+            }
+            return Core.Game.IsVanillaImpostorRole(e.Vanilla) ? 0 : 1;
+        }
+
+        /// <summary>
+        /// "label: a  b  c" packed into lines of at most <paramref name="limit"/> characters; a continuation line carries
+        /// no label. Entries are never split, so a compat chunk boundary (Split keeps line boundaries) falls between two names.
+        /// </summary>
+        private static void PackEntries(List<string> lines, string label, List<string> entries, int limit)
+        {
+            const string sep = "  ";
+            var cur = new StringBuilder(label);
+            bool empty = true;
+            foreach (var en in entries)
+            {
+                if (!empty && cur.Length + sep.Length + en.Length > limit)
+                {
+                    lines.Add(cur.ToString());
+                    cur.Clear();
+                    empty = true;
+                }
+                if (!empty) cur.Append(sep);
+                cur.Append(en);
+                empty = false;
+            }
+            if (!empty) lines.Add(cur.ToString());
         }
 
         internal static string VanillaRoleName(RoleTypes r)
@@ -890,15 +935,22 @@ namespace PocketRoles.Chat
             var result = new List<string>();
             if (string.IsNullOrEmpty(text)) return result;
             text = text.Replace("\r\n", "\n").Replace('\r', '\n');
-            // Compat public chat: the vanilla-chat sanitizer turns every line break into " / " (+2 chars); do it here so the
-            // 86-char budget below counts the real length (the tail of a packed chunk was cut otherwise, review 2026-09-10).
-            if (Registration.CompatMode && !_keepColors) text = text.Replace("\n", " / ");
-            int limit = MessageChars; // compat mode: room for the "[PocketRoles] " prefix inside the 100-char message
+            // Compat public chat: the vanilla-chat sanitizer turns every line break into " / " (+2 chars). The lines are
+            // joined with that separator here (counted against the 86-char budget; the tail of a packed chunk was cut
+            // otherwise, review 2026-09-10) and a line that does not fit next to the previous one starts a new message
+            // (v0.5.0: a packed summary line is never cut in the middle of a name; 2026-09-13).
+            string sep = Registration.CompatMode && !_keepColors ? " / " : "\n";
+            bool compat = sep != "\n";
+            // compat mode: room for the "[PocketRoles] " prefix inside the 100-char message — on the wire only; the
+            // host's own screen (_keepColors: Chat.Local / SplitLocal) never carries that prefix (review 2026-09-13:
+            // the host's /h host page lost its last line in an unregistered lobby)
+            int limit = _keepColors ? MaxChars : MessageChars;
             var lines = new List<string>();
             foreach (var raw in text.Split('\n'))
             {
                 string line = raw.TrimEnd();
                 if (line.Length == 0) continue;
+                if (compat) { lines.Add(line); continue; }   // cut below: the tail of a long line shares its message with the next line
                 while (line.Length > limit)
                 {
                     int cut = FindCut(line, limit);
@@ -908,15 +960,35 @@ namespace PocketRoles.Chat
                 if (line.Length > 0) lines.Add(line);
             }
             var cur = new StringBuilder();
+            // compat: cur holds the remainder of a line longer than the limit → the next line joins it and the pair is
+            // cut at spaces as before v0.5.0 (a 96-char help line must not leave a 10-char message behind; the message
+            // caps are sized for that packing). Lines that fit whole keep their boundary.
+            bool tail = false;
             foreach (var line in lines)
             {
-                if (cur.Length > 0 && cur.Length + 1 + line.Length > limit)
+                bool joinable = compat && (tail || line.Length > limit);
+                if (cur.Length > 0 && cur.Length + sep.Length + line.Length > limit && !joinable)
                 {
                     result.Add(Sanitize(cur.ToString()));
                     cur.Clear();
                 }
-                if (cur.Length > 0) cur.Append('\n');
+                if (cur.Length > 0) cur.Append(sep);
                 cur.Append(line);
+                tail = false;
+                while (compat && cur.Length > limit)
+                {
+                    string s = cur.ToString();
+                    int cut = FindCut(s, limit);
+                    string head = s.Substring(0, cut).TrimEnd();
+                    string rest = s.Substring(cut).TrimStart();
+                    // a cut inside the " / " separator: the message boundary replaces the separator entirely
+                    if (head.EndsWith(" /")) head = head.Substring(0, head.Length - 2).TrimEnd();
+                    if (rest.StartsWith("/ ")) rest = rest.Substring(2).TrimStart();
+                    if (head.Length > 0) result.Add(Sanitize(head));
+                    cur.Clear();
+                    cur.Append(rest);
+                    tail = cur.Length > 0;
+                }
             }
             if (cur.Length > 0) result.Add(Sanitize(cur.ToString()));
             return result;
@@ -926,6 +998,7 @@ namespace PocketRoles.Chat
         private static int FindCut(string line, int limit)
         {
             int best = -1;
+            int bestPipe = -1;   // fallback for the space-less /opt key lists ("a|b|c…"): never before a space cut
             bool inTag = false;
             int lastSafe = -1;
             for (int i = 0; i < limit && i < line.Length; i++)
@@ -936,8 +1009,10 @@ namespace PocketRoles.Chat
                 if (inTag) continue;
                 lastSafe = i + 1;
                 if (c == ' ' || c == '、' || c == '。' || c == ',') best = i + 1;
+                else if (c == '|') bestPipe = i + 1;
             }
             if (best >= limit / 2) return best;
+            if (bestPipe >= limit / 2) return bestPipe;
             if (lastSafe > 0) return lastSafe;
             return limit;
         }
@@ -955,7 +1030,8 @@ namespace PocketRoles.Chat
         /// </summary>
         internal static string Truncated(string chunk)
         {
-            const string marker = "…";
+            // compat public chat: the vanilla filter drops "…" (not typeable) — three periods survive it
+            string marker = Registration.CompatMode ? "..." : "…";
             const string close = "</color>";
             if (chunk == null) chunk = "";
             int limit = MessageChars;

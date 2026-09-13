@@ -135,6 +135,54 @@ namespace PocketRoles.Core
             public bool Winner;
             /// <summary>Kills credited to this player in that game (v0.4.6: MurderPlayer seen on the host, bites to the biter; compat games too).</summary>
             public int Kills;
+            /// <summary>v0.5.0: the player left before the end (shown with its own mark; never a winner, its role still listed).</summary>
+            public bool Left;
+        }
+
+        /// <summary>
+        /// v0.5.0: a player of the running game as recorded at role selection. The post-game summary lists everyone who
+        /// started — a player who leaves mid-game is gone from PlayerControl / GameData by the end (2026-09-13: a
+        /// 14-player public game ended with 5 players in the summary), so the name is kept here and the roles stay in
+        /// Roles / VanillaRoles / RoleReveal.AliveRoles (none of them forgets a player on disconnect).
+        /// </summary>
+        public sealed class RosterEntry
+        {
+            public byte Id;
+            public string Name;
+            public bool Left;
+        }
+
+        /// <summary>Roster of the running game: <see cref="SnapshotRoster"/> at SelectRoles, <see cref="MarkLeftPlayers"/> on every OnPlayerLeft. Cleared by ResetForNewLobby (after the summary was built).</summary>
+        public static readonly Dictionary<byte, RosterEntry> Roster = new Dictionary<byte, RosterEntry>();
+
+        public static void SnapshotRoster()
+        {
+            Roster.Clear();
+            foreach (var pc in AllPlayers())
+            {
+                if (pc.Data == null || pc.Data.Disconnected) continue;
+                Roster[pc.PlayerId] = new RosterEntry { Id = pc.PlayerId, Name = NameOf(pc.PlayerId) };
+            }
+        }
+
+        /// <summary>Every roster player whose data is gone or flagged Disconnected is marked as left (idempotent; vanilla sets Disconnected before the OnPlayerLeft postfix).</summary>
+        public static void MarkLeftPlayers()
+        {
+            foreach (var e in Roster.Values)
+            {
+                if (e.Left) continue;
+                var info = Info(e.Id);
+                if (info == null || info.Disconnected) e.Left = true;
+            }
+        }
+
+        /// <summary>Ids for the post-game summary: the roster (everyone who started, left players included), plus any current player the roster misses; ascending.</summary>
+        public static List<byte> SummaryIds()
+        {
+            var ids = new List<byte>(Roster.Keys);
+            foreach (var id in AllPlayerIds()) if (!ids.Contains(id)) ids.Add(id);
+            ids.Sort();
+            return ids;
         }
 
         /// <summary>Kills per killer in the running game (Kills.OnMurder; a vampire bite counts for the biter). Cleared by Reset().</summary>
@@ -237,6 +285,7 @@ namespace PocketRoles.Core
                 SoloWinner = CustomRole.None;
                 SoloWinnerId = 255;
                 LastExiled = 255;
+                Roster.Clear();           // the summary (LastSummary) was built from it before the end was sent
                 BaseOptionBytes = null;   // OptionsDesync captures the base again at the next SelectRoles
                 // /assign list: consumed (and cleared) by ApplyForcedRoles at a real game start. A haison game never
                 // consumes it (SelectRoles returns early), so game end / play-again rejoin / lobby start keep it for
@@ -300,7 +349,7 @@ namespace PocketRoles.Core
             return info != null ? info.RoleType : RoleTypes.Crewmate;
         }
 
-        private static bool IsVanillaImpostorRole(RoleTypes r)
+        public static bool IsVanillaImpostorRole(RoleTypes r)
         {
             return r == RoleTypes.Impostor || r == RoleTypes.Shapeshifter || r == RoleTypes.Phantom || r == RoleTypes.Viper || r == RoleTypes.ImpostorGhost;
         }

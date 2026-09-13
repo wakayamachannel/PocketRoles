@@ -1554,6 +1554,7 @@ The other way round: gather people in a listed vanilla room (registration off), 
 ### 25.4 Notes on the vanilla room
 - v0.4.6: when a game ends and everyone is back in the lobby, the host posts the result to everyone ("Last game: Impostors win / ×name:Judge Wname:Viper … / Kills: name=2" — vanilla roles, winners, deaths, kills; also `/cmd l`). A player's `/cmd s` is one line here (no 4-message role list).
 - v0.4.6: the dead host's role list (`/who`) and the AFK kick (`[Lobby] AfkKickMinutes`) work in vanilla rooms too.
+- v0.5.0: the impostor line comes first and players who left mid-game are listed with their role, marked L (up to v0.4.6 only the players still present were listed). Translation: kanji-only Japanese (最終通信 …) is no longer taken for Chinese, a single Latin word (hi, gg …) is not translated, and a player's guide language switches only after two foreign-language lines (never for someone who already wrote in the lobby language). The host's own foreign-language lines are translated too. The guide texts for players (welcome line 2, `/cmd h`, `/cmd s`, `/lang`) use plain words.
 
 - No roles, name tags or private messages at all. The welcome and the notices become one broadcast, and every command, `/cmd …` included, is visible to everyone (the second welcome line says so).
 - The top-left display carries a yellow `(unregistered)`; sends are spaced 0.3 s and packets are smaller.
@@ -1671,9 +1672,13 @@ Names are sent per client by the host. Right after a death / leave or after the 
 
   ```
   Last game: Jester wins (Taro)
-  ☆Taro:Jester  ×Hanako:Sheriff  Jiro:Impostor  ☆Saburo:Opportunist
-  ☆=winner ×=dead
+  Impostor side: Jiro:Impostor
+  Crew: ×Hanako:Sheriff  LGoro:Crewmate
+  Neutral: ☆Taro:Jester  ☆Saburo:Opportunist
+  ☆=won ×=died L=left the game
   ```
+
+  Since v0.5.0 the list is grouped by side, impostor side first; players who left mid-game are listed with the role they started with (L).
 
 - `/cmd l` shows it again. Names and game settings are restored. After a haison the players get "The lobby was refreshed. You can keep playing." instead.
 
