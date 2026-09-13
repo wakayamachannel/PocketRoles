@@ -1850,9 +1850,12 @@ namespace PocketRoles.Chat
         /// <summary>/vset &lt;key&gt; &lt;value&gt;: a vanilla option beyond the menu's range (Game.VanillaRanges).</summary>
         private static string VanillaSet(string key, string value)
         {
-            if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(value))
+            // "/vset show" / "/vset" alone: the key list and the current values (TrySet answers both without a value)
+            bool show = string.IsNullOrEmpty(key) || (string.IsNullOrEmpty(value) && key.Trim().ToLowerInvariant() is "show" or "list" or "?" or "help");
+            if (!show && string.IsNullOrEmpty(value))
                 return Lang.T("cmd.vset.usage", "使い方: /vset <キー> <値>  例: /vset killcooldown 2.5（バニラ設定をメニューの範囲外に設定）", "Usage: /vset <key> <value>  e.g. /vset killcooldown 2.5 (sets a vanilla option beyond the menu range)");
             if (!InLobby()) return LobbyOnlyText();
+            if (show) { VanillaRanges.TrySet("show", "", out var current); return current ?? ""; }
             bool ok = VanillaRanges.TrySet(key, value, out var msg);
             if (ok) PocketRolesPlugin.Logger.LogInfo($"Commands: /vset {key} {value}");
             return (ok ? "" : Lang.T("cmd.opt.fail", "設定できません: ", "Failed: ")) + (msg ?? "");

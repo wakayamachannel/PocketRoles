@@ -31,12 +31,39 @@ namespace PocketRoles.Game
             public float VanMin, VanMax, VanStep;
             public Func<float> Min, Max, Step;       // extended limits from Options
             public StringNames Title;
+            public bool HasTitle = true;             // false for a role setting until its FloatGameSetting / IntGameSetting told us the title
             public bool Seconds;                     // unit: seconds (else multiplier)
+            public bool Plain;                       // unit: none (counts, percentages)
             public string NameJa, NameEn;
             public string Name => Lang.T("vset.name." + Key, NameJa, NameEn);
             /// <summary>Real vanilla range once seen on a settings row (null until the menu was opened).</summary>
             public float? SeenMin, SeenMax, SeenStep;
+            /// <summary>
+            /// v0.5.0: a vanilla ROLE setting (the advanced role pages: Scientist vitals, Engineer vent, Shapeshifter, Phantom,
+            /// Guardian Angel, Tracker, Noisemaker, Viper, Detective, Judge). VanMin/VanMax are only a guess until
+            /// <see cref="CaptureRoleRanges"/> read the real range from the role prefab: never clamp on the guess.
+            /// </summary>
+            public bool Role;
+            public bool KnownRange => !Role || SeenMin != null;
         }
+
+        /// <summary>A role setting in seconds: extended to 0–600 s, the arrows keep the vanilla step.</summary>
+        private static Spec RoleSec(string key, string[] aliases, FloatOptionNames name, float vMin, float vMax, float vStep, string ja, string en)
+        {
+            var s = new Spec { Key = key, Aliases = aliases, Float = name, VanMin = vMin, VanMax = vMax, VanStep = vStep, Seconds = true, Role = true, HasTitle = false, NameJa = ja, NameEn = en };
+            s.Min = () => 0f; s.Max = () => RoleSecondsMax; s.Step = () => s.SeenStep ?? s.VanStep;
+            return s;
+        }
+
+        /// <summary>A role setting that is a count or a percentage (float or int option): extended to 0–<paramref name="max"/>.</summary>
+        private static Spec RoleNum(string key, string[] aliases, FloatOptionNames f, Int32OptionNames i, float vMin, float vMax, float vStep, float max, string ja, string en)
+        {
+            var s = new Spec { Key = key, Aliases = aliases, Float = f, Int = i, VanMin = vMin, VanMax = vMax, VanStep = vStep, Plain = true, Role = true, HasTitle = false, NameJa = ja, NameEn = en };
+            s.Min = () => 0f; s.Max = () => max; s.Step = () => s.SeenStep ?? s.VanStep;
+            return s;
+        }
+
+        private const float RoleSecondsMax = 600f;
 
         private static readonly Spec[] Specs =
         {
@@ -73,7 +100,97 @@ namespace PocketRoles.Game
             new Spec { Key = "impvision", Aliases = new[] { "impostorvision", "implight", "impostorlight", "インポ視界" }, Float = FloatOptionNames.ImpostorLightMod,
                 VanMin = 0.25f, VanMax = 5f, VanStep = 0.25f, Min = () => 0.1f, Max = () => 10f, Step = () => 0.25f,
                 Title = StringNames.GameImpostorLight, Seconds = false, NameJa = "インポスター視界", NameEn = "Impostor vision" },
+            // v0.5.0: the vanilla role settings (user request 2026-09-13: vitals beyond the menu maximum, impostor role
+            // timers below the minimum). Same path as the rows above — the advanced role pages are NumberOption rows set
+            // up from the role's FloatGameSetting / IntGameSetting, so the SetUpFromData / Initialize patches widen them
+            // once the option name is in this table. The vanilla ranges below are guesses; the real ones are read from
+            // the role prefabs (CaptureRoleRanges) and only those are used for the unregistered-lobby clamp.
+            RoleSec("vitalscd", new[] { "scientistcd", "scientistcooldown", "vitalscooldown", "バイタルCD" }, FloatOptionNames.ScientistCooldown, 5f, 60f, 2.5f, "バイタルのクールダウン", "Vitals cooldown"),
+            RoleSec("vitals", new[] { "vitalstime", "vitalsduration", "scientistduration", "battery", "バイタル" }, FloatOptionNames.ScientistBatteryCharge, 5f, 30f, 2.5f, "バイタルの表示時間", "Vitals duration"),
+            RoleSec("ventcd", new[] { "engineercd", "engineercooldown", "ベントCD" }, FloatOptionNames.EngineerCooldown, 5f, 60f, 2.5f, "エンジニアのベントクールダウン", "Engineer vent cooldown"),
+            RoleSec("venttime", new[] { "engineertime", "inventtime", "ventmax", "ベント時間" }, FloatOptionNames.EngineerInVentMaxTime, 0f, 60f, 2.5f, "エンジニアのベント内時間", "Engineer max time in vents"),
+            RoleSec("shiftcd", new[] { "shapeshiftcd", "shapeshiftercooldown", "sscd", "変身CD" }, FloatOptionNames.ShapeshifterCooldown, 5f, 60f, 2.5f, "変身クールダウン", "Shapeshift cooldown"),
+            RoleSec("shift", new[] { "shapeshift", "shapeshiftduration", "shapeshifterduration", "sstime", "変身時間" }, FloatOptionNames.ShapeshifterDuration, 0f, 30f, 2.5f, "変身時間", "Shapeshift duration"),
+            RoleSec("phantomcd", new[] { "vanishcd", "phantomcooldown", "透明CD" }, FloatOptionNames.PhantomCooldown, 5f, 60f, 2.5f, "ファントムのクールダウン", "Phantom vanish cooldown"),
+            RoleSec("phantom", new[] { "vanish", "vanishduration", "phantomduration", "透明時間" }, FloatOptionNames.PhantomDuration, 5f, 60f, 2.5f, "ファントムの透明時間", "Phantom vanish duration"),
+            RoleSec("gacd", new[] { "guardiancd", "protectcd", "angelcd", "守護CD" }, FloatOptionNames.GuardianAngelCooldown, 35f, 120f, 5f, "守護天使のクールダウン", "Guardian Angel cooldown"),
+            RoleSec("ga", new[] { "protect", "protectduration", "guardian", "angel", "守護時間" }, FloatOptionNames.ProtectionDurationSeconds, 5f, 30f, 2.5f, "守護の持続時間", "Protect duration"),
+            RoleSec("trackcd", new[] { "trackercd", "trackercooldown", "追跡CD" }, FloatOptionNames.TrackerCooldown, 10f, 60f, 2.5f, "トラッカーのクールダウン", "Tracker cooldown"),
+            RoleSec("trackdelay", new[] { "trackerdelay", "追跡遅延" }, FloatOptionNames.TrackerDelay, 0f, 5f, 0.5f, "トラッカーの遅延", "Tracker delay"),
+            RoleSec("track", new[] { "tracking", "trackduration", "trackerduration", "追跡時間" }, FloatOptionNames.TrackerDuration, 5f, 30f, 2.5f, "トラッカーの追跡時間", "Tracker duration"),
+            RoleSec("noise", new[] { "noisemaker", "alert", "alertduration", "警報" }, FloatOptionNames.NoisemakerAlertDuration, 1f, 15f, 1f, "ノイズメーカーの警報時間", "Noisemaker alert duration"),
+            RoleSec("viper", new[] { "dissolve", "dissolvetime", "溶解" }, FloatOptionNames.ViperDissolveTime, 5f, 60f, 2.5f, "ヴァイパーの溶解時間", "Viper dissolve time"),
+            RoleNum("detective", new[] { "suspects", "suspectlimit", "探偵" }, FloatOptionNames.DetectiveSuspectLimit, Int32OptionNames.Invalid, 1f, 5f, 1f, 15f, "探偵が疑える人数", "Detective suspect limit"),
+            RoleNum("judge", new[] { "judgetasks", "judgepercent", "ジャッジ" }, FloatOptionNames.JudgeTaskRequirementPercentage, Int32OptionNames.Invalid, 0f, 100f, 5f, 100f, "ジャッジのタスク条件（%）", "Judge task requirement (%)"),
+            RoleNum("vitalscrew", new[] { "vitalscrewmates", "crewforvitals", "バイタル人数" }, FloatOptionNames.Invalid, Int32OptionNames.CrewmatesRemainingForVitals, 0f, 15f, 1f, 15f, "バイタルが使えるクルー残数", "Crewmates remaining for vitals"),
+            RoleNum("ventuses", new[] { "crewventuses", "crewvent", "ベント回数" }, FloatOptionNames.Invalid, Int32OptionNames.CrewmateVentUses, 0f, 10f, 1f, 99f, "クルーのベント使用回数", "Crewmate vent uses"),
         };
+
+        // ------------------------------------------------------------------ role ranges (v0.5.0)
+
+        private static bool _rolesCaptured;
+        private static float _roleCaptureTriedAt = -999f;
+
+        /// <summary>
+        /// Reads the real vanilla range, step and title of every role setting from the role prefabs
+        /// (RoleBehaviour.AllGameSettings — the same FloatGameSetting / IntGameSetting assets the advanced role pages are
+        /// built from). Cheap after the first success; retried at most every 5 s while RoleManager does not exist yet.
+        /// </summary>
+        internal static void CaptureRoleRanges()
+        {
+            if (_rolesCaptured) return;
+            float now = UnityEngine.Time.realtimeSinceStartup;
+            if (now - _roleCaptureTriedAt < 5f) return;
+            _roleCaptureTriedAt = now;
+            try
+            {
+                if (!RoleManager.InstanceExists) return;
+                var rm = RoleManager.Instance;
+                var roles = rm != null ? rm.AllRoles : null;
+                if (roles == null) return;
+                int n = 0;
+                var sb = new StringBuilder();
+                for (int r = 0; r < roles.Count; r++)
+                {
+                    var role = roles[r];
+                    var list = role != null ? role.AllGameSettings : null;
+                    if (list == null) continue;
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        var bs = list[i];
+                        if (bs == null) continue;
+                        var fs = bs.TryCast<FloatGameSetting>();
+                        if (fs != null)
+                        {
+                            var s = Find(fs.OptionName, Int32OptionNames.Invalid);
+                            if (s == null || !s.Role || s.SeenMin != null || fs.ValidRange == null) continue;
+                            s.SeenMin = fs.ValidRange.min; s.SeenMax = fs.ValidRange.max; s.SeenStep = fs.Increment;
+                            s.Title = fs.Title; s.HasTitle = true;
+                            n++; sb.Append($" {s.Key} {Fmt(fs.ValidRange.min)}-{Fmt(fs.ValidRange.max)}/{Fmt(fs.Increment)}");
+                            continue;
+                        }
+                        var ints = bs.TryCast<IntGameSetting>();
+                        if (ints != null)
+                        {
+                            var s = Find(FloatOptionNames.Invalid, ints.OptionName);
+                            if (s == null || !s.Role || s.SeenMin != null || ints.ValidRange == null) continue;
+                            s.SeenMin = ints.ValidRange.min; s.SeenMax = ints.ValidRange.max; s.SeenStep = ints.Increment;
+                            s.Title = ints.Title; s.HasTitle = true;
+                            n++; sb.Append($" {s.Key} {ints.ValidRange.min}-{ints.ValidRange.max}/{ints.Increment}");
+                        }
+                    }
+                }
+                if (n > 0)
+                {
+                    _rolesCaptured = true;
+                    PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: {n} role setting range(s) read from the role prefabs:{sb}");
+                    var missing = new StringBuilder();
+                    foreach (var s in Specs) if (s.Role && s.SeenMin == null) missing.Append(' ').Append(s.Key);
+                    if (missing.Length > 0) PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: role settings without a prefab range (guessed vanilla range, never clamped):{missing}");
+                }
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"VanillaRanges.CaptureRoleRanges: {e.Message}"); }
+        }
 
         /// <summary>Player speed accepted by the vanilla option validation (IGameOptions.AreInvalid): 0 &lt; speed ≤ 3.</summary>
         private const float SpeedLegalMin = 0.5f, SpeedLegalMax = 3f;
@@ -105,9 +222,13 @@ namespace PocketRoles.Game
         /// <summary>Effective limits: the vanilla ones, widened (never narrowed) by Options when ExtendedRanges is on.</summary>
         private static void Limits(Spec s, out float min, out float max, out float step)
         {
+            if (s.Role) CaptureRoleRanges();
             float vMin = s.SeenMin ?? s.VanMin, vMax = s.SeenMax ?? s.VanMax, vStep = s.SeenStep ?? s.VanStep;
             min = vMin; max = vMax; step = vStep;
-            if (!Options.ExtendedRanges || (Net.Rpc.CompatMode && Options.ClampInUnregistered)) return; // unregistered lobby: vanilla ranges only unless [Vanilla] ClampInUnregistered=false
+            // unregistered lobby: vanilla ranges only unless [Vanilla] ClampInUnregistered=false — except the role settings:
+            // the official server accepted vitals 40/45 s and a 3-s shapeshift cooldown at sync and at a join (live test
+            // 2026-09-13, and a lobby had run for months with vitals 132 s), so they are not part of its validation
+            if (!Options.ExtendedRanges || (Net.Rpc.CompatMode && Options.ClampInUnregistered && !s.Role)) return;
             try
             {
                 float m = s.Min(), x = s.Max(), st = s.Step();
@@ -149,7 +270,7 @@ namespace PocketRoles.Game
                 }
                 catch (Exception) { }
             }
-            if (!Options.ExtendedRanges || (Net.Rpc.CompatMode && Options.ClampInUnregistered)) return false;
+            if (!Options.ExtendedRanges || (Net.Rpc.CompatMode && Options.ClampInUnregistered && !s.Role)) return false;   // role rows: see Limits
             Limits(s, out float min, out float max, out float step);
             n.ValidRange = new FloatRange(min, max);
             n.Increment = step;
@@ -162,8 +283,25 @@ namespace PocketRoles.Game
         public static string Usage()
         {
             return Lang.T("vset.usage",
-                "使い方: /vset <killcd|vote|discuss|emergency|common|short|long|speed|vision|impvision> <値>",
-                "Usage: /vset <killcd|vote|discuss|emergency|common|short|long|speed|vision|impvision> <value>");
+                "使い方: /vset <項目> <値>  項目: killcd vote discuss emergency common short long speed vision impvision\n役職: vitalscd vitals ventcd venttime shiftcd shift phantomcd phantom gacd ga trackcd trackdelay track noise viper detective judge vitalscrew ventuses（/vset show で現在値）",
+                "Usage: /vset <key> <value>  keys: killcd vote discuss emergency common short long speed vision impvision\nroles: vitalscd vitals ventcd venttime shiftcd shift phantomcd phantom gacd ga trackcd trackdelay track noise viper detective judge vitalscrew ventuses (/vset show = current values)");
+        }
+
+        /// <summary>Current values of the role settings /vset can change ("key=value …", one line).</summary>
+        private static string ShowRoles(IGameOptions o)
+        {
+            var sb = new StringBuilder(Lang.T("vset.roles", "役職: ", "Roles: ", "职业: "));
+            bool first = true;
+            foreach (var s in Specs)
+            {
+                if (!s.Role) continue;
+                float v;
+                try { v = s.IsInt ? o.GetInt(s.Int) : o.GetFloat(s.Float); } catch (Exception) { continue; }
+                if (!first) sb.Append(' ');
+                first = false;
+                sb.Append(s.Key).Append('=').Append(Fmt(v));
+            }
+            return sb.ToString();
         }
 
         /// <summary>Current values of the settings /vset can change (one line).</summary>
@@ -182,7 +320,8 @@ namespace PocketRoles.Game
                     Fmt(o.GetFloat(FloatOptionNames.KillCooldown)), o.GetInt(Int32OptionNames.VotingTime), o.GetInt(Int32OptionNames.DiscussionTime),
                     o.GetInt(Int32OptionNames.EmergencyCooldown), o.GetInt(Int32OptionNames.NumCommonTasks), o.GetInt(Int32OptionNames.NumShortTasks),
                     o.GetInt(Int32OptionNames.NumLongTasks), Fmt(o.GetFloat(FloatOptionNames.PlayerSpeedMod)),
-                    Fmt(o.GetFloat(FloatOptionNames.CrewLightMod)) + "/" + Fmt(o.GetFloat(FloatOptionNames.ImpostorLightMod)), sec, x);
+                    Fmt(o.GetFloat(FloatOptionNames.CrewLightMod)) + "/" + Fmt(o.GetFloat(FloatOptionNames.ImpostorLightMod)), sec, x)
+                    + "\n" + ShowRoles(o);
             }
             catch (Exception e)
             {
@@ -231,8 +370,12 @@ namespace PocketRoles.Game
                 var o = gom != null ? gom.CurrentGameOptions : null;
                 if (o == null) return 0;
                 var sb = new StringBuilder();
+                CaptureRoleRanges();
+                var unknown = new StringBuilder();
                 foreach (var s in Specs)
                 {
+                    if (s.Role) continue;   // role settings pass the official validation out of range (live test 2026-09-13) and may hold a host's AUR-era values: never touched
+                    if (!s.KnownRange) { unknown.Append(' ').Append(s.Key); continue; }   // (a future non-role spec without a known range: never clamp on a guess)
                     float vMin = s.SeenMin ?? s.VanMin, vMax = s.SeenMax ?? s.VanMax, vStep = s.SeenStep ?? s.VanStep;
                     float cur;
                     try { cur = s.IsInt ? o.GetInt(s.Int) : o.GetFloat(s.Float); } catch (Exception) { continue; }
@@ -258,6 +401,7 @@ namespace PocketRoles.Game
                     PocketRolesPlugin.Logger.LogWarning($"VanillaRanges: {where}: {changed} option(s) pulled back into the vanilla range for the unregistered lobby:{sb}");
                 }
                 else PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: {where}: every option is inside the vanilla range");
+                if (unknown.Length > 0) PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: {where}: role settings left as they are (vanilla range not read yet):{unknown}");
             }
             catch (Exception e)
             {
@@ -343,11 +487,11 @@ namespace PocketRoles.Game
                 else PocketRolesPlugin.Logger.LogWarning("VanillaRanges: no LogicOptions to sync");
 
                 RefreshOpenMenu(s, v);
-                string shown = Fmt(v) + (s.Seconds ? Lang.T("vset.unit.sec", "秒", "s") : Lang.T("vset.unit.x", "倍", "x"));
+                string shown = Fmt(v) + (s.Seconds ? Lang.T("vset.unit.sec", "秒", "s") : s.Plain ? "" : Lang.T("vset.unit.x", "倍", "x"));
                 try
                 {
                     var hud = HudManager.Instance;
-                    if (hud != null && hud.Notifier != null) hud.Notifier.AddSettingsChangeMessage(s.Title, shown, true);
+                    if (s.HasTitle && hud != null && hud.Notifier != null) hud.Notifier.AddSettingsChangeMessage(s.Title, shown, true);
                 }
                 catch (Exception) { }
                 PocketRolesPlugin.Logger.LogInfo($"VanillaRanges: /vset {s.Key} = {Fmt(v)}");
@@ -368,15 +512,32 @@ namespace PocketRoles.Game
             try
             {
                 var menu = GameSettingMenu.Instance;
-                if (menu == null || menu.GameSettingsTab == null || menu.GameSettingsTab.Children == null) return;
-                var children = menu.GameSettingsTab.Children;
-                for (int i = 0; i < children.Count; i++)
+                if (menu == null) return;
+                if (menu.GameSettingsTab != null && menu.GameSettingsTab.Children != null)
                 {
-                    var n = children[i] != null ? children[i].TryCast<NumberOption>() : null;
-                    if (n == null) continue;
-                    if (Find(n.floatOptionName, n.intOptionName) != s) continue;
-                    n.Value = v; // FixedUpdate repaints the text when oldValue != Value
-                    Apply(n);
+                    var children = menu.GameSettingsTab.Children;
+                    for (int i = 0; i < children.Count; i++)
+                    {
+                        var n = children[i] != null ? children[i].TryCast<NumberOption>() : null;
+                        if (n == null) continue;
+                        if (Find(n.floatOptionName, n.intOptionName) != s) continue;
+                        n.Value = v; // FixedUpdate repaints the text when oldValue != Value
+                        Apply(n);
+                    }
+                }
+                // v0.5.0: an open advanced role page (RolesSettingsMenu.advancedSettingChildren) follows a /vset the same way
+                var roles = menu.RoleSettingsTab;
+                var adv = roles != null ? roles.advancedSettingChildren : null;
+                if (adv != null)
+                {
+                    for (int i = 0; i < adv.Count; i++)
+                    {
+                        var n = adv[i] != null ? adv[i].TryCast<NumberOption>() : null;
+                        if (n == null) continue;
+                        if (Find(n.floatOptionName, n.intOptionName) != s) continue;
+                        n.Value = v;
+                        Apply(n);
+                    }
                 }
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"VanillaRanges: menu refresh: {e.Message}"); }
@@ -414,6 +575,7 @@ namespace PocketRoles.Game
                 var sb = new StringBuilder("VanillaRanges: extended ranges on:");
                 foreach (var s in Specs)
                 {
+                    if (s.Role) continue;   // logged by CaptureRoleRanges once the role prefabs exist
                     Limits(s, out float min, out float max, out float step);
                     sb.Append($" {s.Key} {Fmt(min)}-{Fmt(max)} step {Fmt(step)} (vanilla {Fmt(s.VanMin)}-{Fmt(s.VanMax)});");
                 }

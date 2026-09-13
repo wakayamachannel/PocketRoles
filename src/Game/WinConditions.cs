@@ -816,11 +816,29 @@ namespace PocketRoles.Game
                 if (Core.Game.LastSummary != null && !WinConditions.SummaryShown && !Core.Game.HaisonActive && !Lobby.Haison.LastGameWasHaison)
                 {
                     WinConditions.SummaryShown = true;
-                    Scheduler.After(2f, () =>
+                    // The host is back in the lobby 2 s before anyone else (the players still sit on the end screen until
+                    // they press play again): wait until at least one client is in, up to a minute, or the broadcast goes
+                    // out to nobody (live test 2026-09-13: the summary was lost in a compat lobby; /cmd l was the only way).
+                    int attempts = 0;
+                    Action trySend = null;
+                    trySend = () =>
                     {
-                        try { Chat.Chat.SendSummary(); }
+                        try
+                        {
+                            attempts++;
+                            bool anyClient = false;
+                            try { foreach (var _ in Net.Rpc.AllClientIds(false)) { anyClient = true; break; } } catch (Exception) { }
+                            if (!anyClient && attempts < 30)
+                            {
+                                Scheduler.After(2f, trySend, "win.summary");
+                                return;
+                            }
+                            if (attempts > 1) PocketRolesPlugin.Logger.LogInfo($"Win: lobby summary sent after {attempts * 2} s (waited for the first client)");
+                            Chat.Chat.SendSummary();
+                        }
                         catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Win_LobbyStart SendSummary: {e}"); }
-                    }, "win.summary");
+                    };
+                    Scheduler.After(2f, trySend, "win.summary");
                 }
             }
             catch (Exception e)
