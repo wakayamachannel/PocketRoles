@@ -54,7 +54,7 @@ namespace PocketRoles.Game
         private static string SideText(Side s)
         {
             return s == Side.Impostor
-                ? Lang.T("me.name.impostor", "インポスター", "Impostor", "内鬼")
+                ? Lang.T("me.name.impostor", "インポスター", "Impostor", "伪装者")
                 : Lang.T("me.name.crew", "クルー", "Crewmate", "船员");
         }
 
@@ -142,7 +142,7 @@ namespace PocketRoles.Game
             if (ni > 3) imps.Append("+").Append(ni - 3);
             if (nc > 3) crews.Append("+").Append(nc - 3);
             var t = new StringBuilder();
-            if (imps.Length > 0) t.Append(Lang.T("next.tag.imp", "次:インポ=", "next: imp=", "下局:内鬼=")).Append(imps);
+            if (imps.Length > 0) t.Append(Lang.T("next.tag.imp", "次:インポ=", "next: imp=", "下局:伪装者=")).Append(imps);
             if (crews.Length > 0) { if (t.Length > 0) t.Append(' '); t.Append(Lang.T("next.tag.crew", "次:クルー=", "next: crew=", "下局:船员=")).Append(crews); }
             return t.ToString();
         }
@@ -152,7 +152,7 @@ namespace PocketRoles.Game
         {
             string who = null;
             foreach (var e in List) if (e.Side == Side.Impostor) { who = Shown(e); break; }
-            string label = Lang.T("ui.host.nextimp", "次のインポ", "Next imp", "下局内鬼") + ": "
+            string label = Lang.T("ui.host.nextimp", "次のインポ", "Next imp", "下局伪装者") + ": "
                            + (who ?? Lang.T("next.none", "なし", "none", "无"));
             int others = List.Count - (who != null ? 1 : 0);
             if (others > 0) label += " (+" + others + ")";

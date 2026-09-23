@@ -16,6 +16,8 @@ namespace PocketRoles.Net
     /// level deep (GameData / GameDataTo → Data / RPC / Spawn / SceneChange / Ready …), and every disconnect
     /// (HandleDisconnect) with the last unreliable packets. One "Wire:" line per packet; unreliable Data-only
     /// packets (movement) are only counted. Nothing here changes behaviour; off by default.
+    /// v0.5.5: the send / receive hooks below also feed <see cref="LagLog"/> (wire RTT, server line, lag log), which
+    /// runs whatever WireLog says.
     /// </summary>
     public static class WireLog
     {
@@ -44,7 +46,8 @@ namespace PocketRoles.Net
             catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"WireLog: Tags: {e.Message}"); }
         }
 
-        private static string Stamp()
+        /// <summary>"HH:mm:ss.fff 123.456s" (wall clock + realtimeSinceStartup); also used by LagLog and the hotkey log lines.</summary>
+        internal static string Stamp()
         {
             return DateTime.Now.ToString("HH:mm:ss.fff") + " " + UnityEngine.Time.realtimeSinceStartup.ToString("0.000") + "s";
         }
@@ -347,6 +350,7 @@ namespace PocketRoles.Net
     {
         private static void Prefix(MessageWriter msg)
         {
+            LagLog.OnSend(msg);   // always on, catches its own errors
             try { WireLog.OnSend(msg); }
             catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"WireLog send: {e.Message}"); }
         }
@@ -357,6 +361,7 @@ namespace PocketRoles.Net
     {
         private static void Prefix(MessageReader reader, SendOption sendOption)
         {
+            LagLog.OnRecv(reader, sendOption);   // always on, catches its own errors
             try { WireLog.OnRecv(reader, sendOption); }
             catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"WireLog recv: {e.Message}"); }
         }

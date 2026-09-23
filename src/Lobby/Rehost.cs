@@ -52,7 +52,8 @@ namespace PocketRoles.Lobby
         private static float _lobbyJoinedAt = -1f;
         private static DisconnectReasons _lastReason;
 
-        // ---- high-ping re-creation (finding #7): [Lobby] HostPingLimit (v0.5.4; was MaxHostPing)
+        // ---- high-ping re-creation (finding #7): [Lobby] PingRecreateLimit (v0.5.5, off by default; HostPingLimit in v0.5.4, MaxHostPing before).
+        // v0.5.5: decided on the wire RTT of the lobby's HostGame / JoinGame (Net.LagLog.LobbyRttMs), not client.Ping.
         /// <summary>Automatic high-ping re-creations in a row (stops at <see cref="MaxPingAttempts"/>).</summary>
         public static int PingAttempts;
         public const int MaxPingAttempts = 3;
@@ -66,6 +67,8 @@ namespace PocketRoles.Lobby
         private static bool _pingRecreate;
         /// <summary>The pending <see cref="RecreateNow"/> is the v0.4e /move migration (unregistered → registered lobby), not a ping re-creation.</summary>
         private static bool _moveRecreate;
+        /// <summary>v0.5.5: the pending <see cref="RecreateNow"/> replaces a 1-player haison at the lobby timer's end (AutoStart rule 2).</summary>
+        private static bool _timerRecreate;
         private static bool _pingCheckActive;
         private static float _pingCheckStartedAt;
         private static float _pingNextSampleAt;
@@ -241,8 +244,10 @@ namespace PocketRoles.Lobby
         /// conditions are not met (not host, game running, someone else in the lobby, a re-host already in progress).
         /// <paramref name="allowInUse"/> (v0.4e /move: the guide-room migration) skips the "nobody else is in the lobby"
         /// guard: the players were told 30 s earlier that the lobby is re-created as a registered one and must rejoin.
+        /// <paramref name="timer"/> (v0.5.5): the lobby timer ran out while the host was alone (AutoStart rule 2, instead of
+        /// a 1-player haison); only the notice in the new lobby differs.
         /// </summary>
-        public static bool RecreateNow(string reason, bool allowInUse = false)
+        public static bool RecreateNow(string reason, bool allowInUse = false, bool timer = false)
         {
             try
             {
@@ -266,6 +271,7 @@ namespace PocketRoles.Lobby
                 Pending = true;
                 _pingRecreate = true;
                 _moveRecreate = allowInUse;
+                _timerRecreate = timer && !allowInUse;
                 _pingCheckActive = false;
                 _state = State.Waiting;
                 _dueAt = Time.time + 1f;
@@ -332,7 +338,7 @@ namespace PocketRoles.Lobby
             _pingCheckActive = true;
             _pingCheckStartedAt = Time.time;
             _pingNextSampleAt = Time.time + PingSampleInterval;
-            PocketRolesPlugin.Logger.LogInfo($"Rehost: ping check started (limit {Options.MaxHostPing} ms, re-creations so far {PingAttempts}/{MaxPingAttempts})");
+            PocketRolesPlugin.Logger.LogInfo($"Rehost: ping check started (limit {Options.MaxHostPing} ms on the wire RTT, now {Net.LagLog.LobbyRttMs} ms; client.Ping {client.Ping} ms not used; re-creations so far {PingAttempts}/{MaxPingAttempts})");
         }
 
         private static void StopPingCheck(string why)
@@ -377,8 +383,11 @@ namespace PocketRoles.Lobby
                 StopPingCheck("no verdict within 30 s");
                 return;
             }
-            int ping = client.Ping;
-            if (ping <= 0) return; // not measured yet (the first values after a join are 0)
+            // v0.5.5: the wire RTT of this lobby's HostGame / JoinGame (Net.LagLog), not client.Ping, which read 73 ms on an
+            // 11 ms server and 85 ms on a 73 ms one (host log 2026-09-21). No wire sample = no verdict: the 30-s timeout
+            // above keeps the lobby.
+            int ping = Net.LagLog.LobbyRttMs;
+            if (ping <= 0) return;
             _lastPingMs = ping;
             if (ping <= max)
             {
@@ -508,6 +517,7 @@ namespace PocketRoles.Lobby
             Attempts = 0;
             _pingRecreate = false;
             _moveRecreate = false;
+            _timerRecreate = false;
         }
 
         /// <summary>One poll step: create the lobby when the client is back in the main menu and idle.</summary>
@@ -598,11 +608,13 @@ namespace PocketRoles.Lobby
             // were still waiting cancels the pending re-host (no public-state restore, no "re-hosted" notice).
             bool wasPending = Pending && _state == State.Creating;
             bool moveRecreate = wasPending && _moveRecreate;
-            bool pingRecreate = wasPending && _pingRecreate && !moveRecreate;
+            bool timerRecreate = wasPending && _timerRecreate && !moveRecreate;
+            bool pingRecreate = wasPending && _pingRecreate && !moveRecreate && !timerRecreate;
             if (Pending && !wasPending) PocketRolesPlugin.Logger.LogInfo("Rehost: a lobby was joined manually, pending re-host cancelled");
             Pending = false;
             _pingRecreate = false;
             _moveRecreate = false;
+            _timerRecreate = false;
             _pingCheckActive = false;
             _state = State.Idle;
             _lobbyJoinedAt = Time.time;
@@ -614,12 +626,14 @@ namespace PocketRoles.Lobby
             // fresh ping series; the cap only limits automatic re-creations in a row.
             if (!pingRecreate) { PingAttempts = 0; _pingGaveUpNoticed = false; }
             _lastLobbyWasPingRecreate = pingRecreate;
+            // v0.5.5: likewise only a timer re-creation continues AutoStart's series of re-creations while alone.
+            if (!timerRecreate) AutoStart.ResetTimerRecreates(wasPending ? "a lobby re-hosted for another reason" : "a lobby created / joined by hand");
 
             var client = AmongUsClient.Instance;
             if (client == null || !client.AmHost) { Attempts = 0; return; }
             // A lobby the user created / joined by hand starts a fresh attempt series (stale attempts from an earlier
             // series must not eat the RehostMaxAttempts cap). The ping series keeps its own counter.
-            if (!wasPending || pingRecreate || moveRecreate) Attempts = 0;
+            if (!wasPending || pingRecreate || moveRecreate || timerRecreate) Attempts = 0;
             if (client.NetworkMode != NetworkModes.OnlineGame) return;
             // The ping window belongs to a lobby that was just CREATED; the vanilla "play again" rejoin of the same
             // lobby (same GameId, players still on the end screen) must not re-create it under the returning players.
@@ -644,13 +658,13 @@ namespace PocketRoles.Lobby
             }
             if (wasPending)
             {
-                PocketRolesPlugin.Logger.LogInfo($"Rehost: new lobby joined (public={pub}, last reason {_lastReason}, pingRecreate={pingRecreate}, moveRecreate={moveRecreate})");
-                ScheduleNotice(3f, 0, pingRecreate, moveRecreate);
+                PocketRolesPlugin.Logger.LogInfo($"Rehost: new lobby joined (public={pub}, last reason {_lastReason}, pingRecreate={pingRecreate}, moveRecreate={moveRecreate}, timerRecreate={timerRecreate})");
+                ScheduleNotice(3f, 0, pingRecreate, moveRecreate, timerRecreate);
             }
         }
 
         /// <summary>Room-code notice once the lobby scene (and thus the local player / chat) exists.</summary>
-        private static void ScheduleNotice(float delay, int tries, bool pingRecreate, bool moveRecreate = false)
+        private static void ScheduleNotice(float delay, int tries, bool pingRecreate, bool moveRecreate = false, bool timerRecreate = false)
         {
             Scheduler.After(delay, () =>
             {
@@ -658,18 +672,26 @@ namespace PocketRoles.Lobby
                 if (c == null || !c.AmHost || c.GameState != InnerNetClient.GameStates.Joined) return;
                 if (PlayerControl.LocalPlayer == null)
                 {
-                    if (tries < 10) ScheduleNotice(1f, tries + 1, pingRecreate, moveRecreate);
+                    if (tries < 10) ScheduleNotice(1f, tries + 1, pingRecreate, moveRecreate, timerRecreate);
                     return;
                 }
                 string code = CurrentRoomCode();
+                if (timerRecreate)
+                {
+                    Chat.Chat.Local(Chat.Chat.Title, TF3("rehost.timer.done",
+                        "ロビーの時間切れのため部屋を作り直しました（1人のときは廃村しません）。新しい部屋コード: {0}",
+                        "The lobby was re-created because its time ran out (no haison while alone). New room code: {0}",
+                        "因房间时间到期已重新创建房间（只有一人时不进行废局）。新房间代码：{0}", code));
+                    return;
+                }
                 if (moveRecreate)
                 {
                     bool registered = false;
                     try { registered = Net.Registration.Hosting && Net.Registration.Registered; } catch (Exception) { }
                     Chat.Chat.Local(Chat.Chat.Title, TF3("guide.move.done",
-                        "役職ありの部屋として作り直しました（MOD登録={1}）。新しい部屋コード: {0}  /announce で案内部屋用にコピーできます。",
-                        "Re-created as the role lobby (registration={1}). New room code: {0}  /announce copies it for the guide room.",
-                        "已重建为职业房（MOD注册={1}）。新房间代码：{0}  用 /announce 可复制到引导房。",
+                        "追加役職ありの部屋として作り直しました（MOD登録={1}）。新しい部屋コード: {0}  /announce で案内部屋用にコピーできます。",
+                        "Re-created as the mod-roles lobby (registration={1}). New room code: {0}  /announce copies it for the guide room.",
+                        "已重建为有模组追加职业的房间（MOD注册={1}）。新房间代码：{0}  用 /announce 可复制到引导房。",
                         code, registered ? "on" : "off"));
                     return;
                 }

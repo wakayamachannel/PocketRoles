@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Game-free tests for the two privacy defaults (v0.5.5): [Translate] Enabled and [AntiCheat] AutoReport.
+    Runs without Among Us and without Unity: it reads the source / language / README files and drives the real
+    BepInEx ConfigFile against temporary files under %TEMP%.
+
+    Run it from the repo root with: dotnet run -c Release (project) tools\OptDefaultsTests
+    and -p:GameDir="C:\path\to\Among Us"; without GameDir it falls back to the folder PocketRoles.csproj uses.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>OptDefaultsTests</AssemblyName>
+    <RootNamespace>PocketRoles.Tests</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <GameDir Condition="'$(GameDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\Among Us PocketRoles</GameDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Private="true": the test process needs the assembly at run time (it drives a real ConfigFile).
+         The copy lands in tools/OptDefaultsTests/bin, which .gitignore keeps out of the repository. -->
+    <Reference Include="$(GameDir)\BepInEx\core\BepInEx.Core.dll" Private="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Group G drives the real Options.Init out of bin/PocketRoles.dll, which pulls in BepInEx.Unity.IL2CPP and the
+         interop assemblies. They are NOT copied (Assembly-CSharp alone is huge): the test resolves them from this
+         folder at run time, so the game directory has to reach the running process. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>GameDir</_Parameter1>
+      <_Parameter2>$(GameDir)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

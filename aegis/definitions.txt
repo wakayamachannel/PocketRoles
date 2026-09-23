@@ -1,11 +1,47 @@
-# Aegis definitions (like an antivirus's): edit on GitHub (main/aegis/definitions.txt); every Aegis fetches the newest
-# when the launcher opens and uses it from the next scan on. Raise version= on every change. Names are lower case.
+# Aegis definitions (like an antivirus's): edit on GitHub (main/aegis/definitions.txt). The Aegis tray app fetches the
+# newest when the launcher opens (used from the next scan on); from v0.5.5 the PocketRoles mod fetches it too when the
+# game starts, for the [rules] section. Raise version= on every change. Names are lower case.
 # [tools]    a running process name with spaces, '-' and '_' removed: "name*" matches the start, "name" the whole name.
 #            Memory editors, trainers, injectors, cheat menus — for any game, not only Among Us. Entries shorter than
 #            5 letters and anything matching the game, Steam, VALORANT / Riot, Discord, Windows etc. are ignored.
 # [dlls]     file names next to Among Us.exe that cheats load through (BepInEx's own winhttp.dll is never flagged)
 # [dllwords] parts of a DLL file name next to Among Us.exe (4 letters or more)
-version=1
+# [rules]    (the mod, v0.5.5+) numbers and rule levels of the in-game Aegis, documented below. The tray app skips it.
+# [ngwords] [ngallow] (the mod, v0.5.5+) NG words of the chat filter, documented at the end. The tray app skips them.
+# [bans]   (the mod, v0.5.5+) the shared ban list (hashed PUIDs), documented in the section. The tray app skips it.
+# [erase]  (the mod, v0.5.5+) the erase list (the codes players get from /cmd id), documented in the section. The tray
+#          app skips it.
+# [unban]  (the mod, v0.5.5+) the appeals the author accepted (the same codes), documented in the section. The tray app
+#          skips it.
+# [update] (the mod v0.5.5+, the tray app and the launcher) the minimum PocketRoles version that may create rooms,
+#          documented in the section.
+#
+# Hidden entries (v0.5.5): the code that reads this file is public (GPL), but the lists themselves are stored so they cannot
+# be read off at a glance — as salted HMAC hashes, not plain words. A hidden entry is a comment line (the salt is one header
+# line before the first section):
+#   hashsalt=<hex>                     one line, before the first section (a public salt: it is not secret)
+#   #h1 tool=<hash> [n=<len>]          a whole cheat process / module name          (in [tools])
+#   #h1 toolp=<hash> n=<N>             the first N letters of a name ("name*")       (in [tools])
+#   #h1 dll=<hash>                     a whole DLL file name                         (in [dlls])
+#   #h1 dllw=<hash> n=<W>              a W-letter part of a DLL name                 (in [dllwords])
+#   #h1 sha=<hash>                     a cheat file's CONTENT (SHA-256): renaming the exe/dll does not change it (in [tools]/[dlls])
+#   #h1 vi=<hash> f=o|i|p|d|c [n=<N>]  one embedded version-info field (Original/Internal/Product/Description/Company name)
+#   #h1 signer=<hash>                  the file's Authenticode signer name                                      (in [tools]/[dlls])
+#   #h1 ng=<hash> n=<len> [s=1][e=1][a=1]  a chat NG word (s/e = the < > marks, a = pure ASCII)   (in [ngwords])
+#   #h1 al=<hash> n=<len>              a chat allow phrase                           (in [ngallow])
+# The maintainer keeps the plain list on their own PC only (outside this repository) and writes these lines with
+# tools\sign-definitions.ps1 -UpdateHidden. Matching happens only on the host's PC; nothing is sent anywhere. Notices, logs
+# and ban records only ever show the matched part of what the player actually typed (in the normalized form used for
+# comparison), never a list entry. Old clients (v0.5.4) ignore the hashsalt= line and skip the #h1 comment lines, so mixing
+# them in is safe. New cheat tool names / NG words are reported privately (a support mail or an official-Discord ticket to the
+# maintainer), never as a public issue / PR.
+# HONEST LIMITS: the salt is public and each ng / toolp / dllw / vi line shows its length, so SHORT entries (many NG words,
+# short tool names, short DLL words) can be recovered by trying every combination on an ordinary PC in minutes to a few hours.
+# The hashing mainly stops casual reading and protects LONGER names; it is not strong secrecy for short words. Renaming a
+# cheat's exe no longer avoids the sha / vi / signer checks, but a rebuilt or repacked tool can. Entries already published as
+# plain lines stay public in git history. See the README "Aegis" section.
+version=5
+hashsalt=630ef08774a11420afb97b76c2f3b639537a7aee211af75721dab1c4e47ad522
 
 [tools]
 cheatengine*
@@ -38,3 +74,550 @@ opengl32.dll
 menu
 cheat
 inject
+
+[update]
+# Read by the PocketRoles mod (v0.5.5 or later), the Aegis tray app and the launcher: the minimum PocketRoles version.
+# A host whose PocketRoles is older cannot create rooms with it: the mod refuses the Create button, the automatic
+# re-host and the lobby re-creations (a room already open goes on) and shows a notice on the title screen and in
+# /ac rules; the launcher's "Launch" offers only "Update" (and plain Among Us from Steam); the tray app shows it in its
+# scan. Joining other people's rooms, the settings and Freeplay still work, and plain Among Us started from Steam is
+# not touched at all (PocketRoles lives only in its separate copy, "Among Us PocketRoles"). Used whatever
+# [AntiCheat] RemoteRules says; an offline host uses the newest verified file in its cache.
+# v0.5.4 and older do not read this section, so it cannot stop them; nor a host who built or changed the mod (the
+# source is GPL). Either way only that host's own rooms are affected.
+#
+# Format: minmod = <version> [@conditions], one per line ('#' starts a comment):
+#   version     3 numbers, e.g. 0.5.6 (a build like 0.5.6-beta counts as older than 0.5.6)
+#   conditions  as in [rules] (@mod / @game). The highest minmod whose conditions surely hold counts; a line whose
+#               condition the mod cannot judge never counts. Several lines are fine, e.g. a general one and a higher
+#               one for a new game version (minmod = 0.5.7 @game>=2026.9.1). Other keys are for later versions and
+#               are ignored. At most 50 lines.
+# Safety: the signing tool refuses a minmod above the version of this repository, and, when a minmod is raised, one
+# above the newest PocketRoles release published on GitHub (it asks GitHub; offline it refuses to raise it). The mod
+# ignores a minmod more than one major version ahead of its own (0.x ignores 2.0.0) or with a number above 999, as a
+# typo. The floor never depends on the PC's clock or date: only version numbers are compared.
+# Release day: publish the release on GitHub first, then write minmod here, raise version= at the top and sign.
+# A mistake: lower or remove the line, raise version= and sign. Hosts pick it up at their next start; a blocked host's
+# mod also asks GitHub again when the online menu opens or a room is refused (at most every 5 minutes).
+# A leaked signing key: a mod release that revokes it (RevokedKeyIds) makes every host ignore files signed with it,
+# a forged minmod too.
+#
+# Example (not active):
+# minmod = 0.5.6
+
+[rules]
+# Read by the PocketRoles mod (v0.5.5 or later), not by the tray app. Fixes a false positive or a loophole of the
+# in-game Aegis for every host without a mod release (a new kind of detection still needs a mod update). The mod
+# fetches this file when the game starts and with /ac rules reload, keeps the last one it applied in
+# BepInEx\PocketRoles\aegis-rules-cache.txt, and takes a fetched file only when its signature (definitions.txt.sig)
+# checks out and its version= is newer than the file in use (over the built-in values: at least 2, the oldest the mod
+# accepts). In every lobby the mod varies most values at random by up to [AntiCheat] Jitter percent (default 10;
+# never outside a key's range; not repeat.count, callout.*, votecallout.lobby, speed.snap, speed.window,
+# chatalive.grace; see /ac rules lobby). /ac rules shows the values in use; [AntiCheat] RemoteRules = false
+# (/opt anticheat.remoterules off) keeps the built-in numbers, but level lines that end at notice or off (after the
+# version conditions below) and the [update] section still apply there. Raise version= at the top when you change a
+# line here.
+#
+# Format: key = value, one per line ('#' starts a comment, keys are case-insensitive, at most 200 lines). A key that is
+# not written keeps its built-in value. A value outside its range is clamped into it; unknown keys and bad values are
+# ignored (both are written to the BepInEx log).
+#
+# key                  built-in  range       meaning
+# chatflood.count      5         3..20       ChatFlood: this many chat lines (typed or quick chat) ...
+# chatflood.window     3         1..10       ... within this many seconds
+# color.lobby.count    20        8..60       ColorSpam in the lobby: this many colour changes ...
+# color.lobby.window   3         1..10       ... within this many seconds
+# speed.kick           2.5       1.6..6      SpeedHack: moving faster than this x the player's speed setting
+# speed.notice         1.8       1.3..6      SpeedFast: faster than this x (never above speed.kick)
+# speed.window         2         1..5        seconds of movement averaged for both speed rules
+# speed.snap           1.2       0.5..3      a single-frame step longer than this (units) is a jump, not walking
+# vent.base            1.5       0.5..5      VentFar: farther from the vent than vent.base + max(2.5, speed) x vent.factor
+# vent.factor          0.8       0.3..3
+# repeat.count         2         2..5        Repeat rules: removed at this many separate episodes ...
+# repeat.gap           10        3..120      ... at least this many seconds apart ...
+# repeat.window        300       30..3600    ... each within this many seconds of the previous one
+# killcd.ratio         0.5       0.1..0.9    KillCooldown: a kill sooner than cooldown x killcd.ratio - killcd.margin (s)
+# killcd.margin        2         0..10
+# killdist.factor      2         1..5        KillDistance: farther than kill distance x killdist.factor + killdist.add
+# killdist.add         3         0..10
+# taskburst.count      4         3..10       TaskBurst: this many task completions ...
+# taskburst.window     2         0.5..10     ... within this many seconds
+# chatalive.grace      8         3..30       ChatAlive: chat this many seconds after a meeting / exile / intro is not counted
+# callout.game         2         2..6        Callout: hidden impostors named in one game (with no wrong name)
+# callout.lobby        3         3..10       CalloutRepeat: hidden impostors named over the games of one lobby
+# votecallout.lobby    3         3..10       VoteCallout: votes for hidden impostors in meetings with no clue yet (no
+#                                            impostor action, no impostor dead), from 2+ games of one lobby
+# (whole numbers only: chatflood.count, color.lobby.count, repeat.count, taskburst.count, callout.game, callout.lobby,
+#  votecallout.lobby)
+#
+# level.<rule> = off | notice | repeat | certain      (<rule> = the rule name in the log, e.g. level.SpeedFast = off)
+#   certain = removed at the first hit, repeat = removed at repeat.count episodes, notice = the host's screen only,
+#   off = the log line only (no notice, no count in /ac, no removal).
+#   A file may only make a rule's LEVEL more lenient than built in (off < notice < repeat < certain); a stricter
+#   value is ignored, so this file can never turn a notice rule into a removal. The numbers above can move either
+#   way (stricter too, to close a loophole), but only within their range.
+#   Built in: certain = KillRole VentRole AbilityRole TaskImpostor
+#             repeat  = ChatAlive ChatFlood SpeedHack
+#             notice  = KillDead SabotageCrew KillCooldown ProtectAlive TaskUnknown KillDistance RpcUnknown TaskBurst
+#                       ReportForge Teleport KillPhase Callout CalloutRepeat NameChange ColorSpam SpeedFast VentFar
+#                       VoteCallout
+#
+# Version-scoped lines (read from v0.5.5 on): a line may end with "@" and conditions on the PocketRoles version (mod)
+# and the Among Us version (game), separated by commas (all of them must hold):
+#   level.KillRole = notice      @mod<=0.5.5                  # only 0.5.5 and older; the fixed version and newer keep the built-in level
+#   speed.kick = 3               @mod>=0.5.6, game>=2026.9.1
+#   level.SpeedFast = off                                      # everyone
+#   level.SpeedFast = notice     @mod>=0.5.7                   # back to built-in from 0.5.7 (the last line that applies wins)
+#   Operators: <= >= == = < >. Write versions with 3 numbers (0.5.5; the signing tool refuses a condition it cannot
+#   read: "mod<=0.5" would mean 0.5.0 or older). A build like 0.5.6-beta counts as older than 0.5.6.
+#   The lines are read top to bottom and the last line that applies wins: write the general line first and the scoped
+#   ones after it. A condition the mod cannot judge (an unknown word, a typo, or the game version not known yet right
+#   after the start) only ever makes a rule more lenient: such a line is used only where it relaxes the value it would
+#   replace. A level still never goes above the built-in one. With RemoteRules = false only the level lines that end at
+#   notice or off are used (the numbers stay built in). v0.5.4 and older do not read [rules] at all.
+#
+# Example lines (none is active; remove the leading "# " to use one):
+# speed.kick = 3
+# level.SpeedFast = off
+# level.KillRole = notice @mod<=0.5.5
+
+[bans]
+# Read by the PocketRoles mod (v0.5.5 or later), not by the tray app: players banned from every host's lobbies. Used only
+# when this file's signature checks out (like [rules]) and [AntiCheat] SharedBans is on (default). A listed player who
+# joins is told first (in a registered lobby privately, in an unregistered one by a public line without a name; both
+# say: if you think it is a mistake, search PocketRoles (the Chinese text: on GitHub) and open "入室制限された人へ" /
+# "Restricted?" / "致被限制进入房间的人") and is kicked 30 s later; at once on an Aegis detection, an NG word, a chat
+# flood or a 4th chat line, and at the start countdown or the game start (they never enter a game). The others then
+# read that a restricted player was removed, without the name. One who comes back to that lobby is removed at once
+# with a room ban; VIP and above are never removed. Lists NO names and NO friend codes: only
+# SHA-256("PocketRoles.Aegis.v1" + the lower-case PUID) in lower-case hex. A PUID is 32 random hex digits, so its hash
+# cannot be guessed back; a friend code is a word and 4 digits, so a hash of it could be (the console app lists PUID
+# hashes only; the mod still matches a friend-code hash written by hand). Added only by the maintainer after a review
+# of the evidence (the Aegis console app "BAN 管理").
+#
+# Format: <hash> <level> <expires> <reason>, one per line, separated by spaces ('#' starts a comment):
+#   hash     64 hex digits
+#   level    the offence step, 1 or more (a larger number is read as 9; 3 = the third offence or later). It does NOT set
+#            the length of the shared ban: only expires does. The console app shows it and suggests an expiry from it
+#            (1: 30 days, 2: 180 days, 3: never). While the line has not expired (and [AntiCheat] SharedBans is on), the
+#            mod counts it as the player's earlier offences when this host bans them: a ban on the ladder ([AntiCheat]
+#            BanLadder) goes on from it (after level 1: 180 days, after 2 or more: permanent)
+#   expires  yyyy-mm-dd (UTC; the ban applies through the end of that day) or never
+#   reason   a short code of a-z 0-9 _ . - (e.g. killrole, speedhack, cheat, chat, harass, name, manual)
+# A hash listed twice keeps the line that ends later; an invalid line is skipped (the count goes to the host's log).
+# Remove a line to lift a shared ban (appeals), and list the player's code in [unban] so that every host's own bans of
+# that player up to that day go too (a line still here keeps the player banned, whatever [unban] says). Remove the
+# line in an earlier version than the one that adds the code: in the same version the public history links the line's
+# reason to the code. Raise version= at the top and sign the file after every change.
+#
+# Example (not active):
+# 0000000000000000000000000000000000000000000000000000000000000000 1 2026-10-22 killrole
+
+[erase]
+# Read by the PocketRoles mod (v0.5.5 or later), not by the tray app: the erase list. A player types /cmd id in a
+# PocketRoles room, gets a code (16 letters, e.g. BDZN XHNJ JSXD GZDG) and sends it to the author, who lists it here
+# with a date. Every verified file (signature and version checked as above) is used for this list, also with
+# [AntiCheat] RemoteRules = false: the mod then fetches the file for this list alone (when the game starts and once a
+# day while it runs). Each host's PC then erases that player's records up to the date + 2 days: the name, history and
+# other details in aegis-bans.json, and the evidence records (those younger than 30 days lose the name, the room code,
+# the detection text and the log lines; the rest, such as the hashes and the detection numbers, stays until their 30
+# days are up). It keeps what a ban still in force needs (and that ban's evidence, for appeals), the minimum of the
+# offence count (a year after the last ban), the host's own lists (Banlist.txt, VIP.txt, ...) and the logs (deleted
+# after 30 days anyway).
+# This file is public: list ONLY codes and dates. No names, no friend codes, no notes (not even after a '#' on a code
+# line: the mod ignores that text, but it is published with the file).
+#
+# Format: one request per line, fields separated by spaces or tabs ('#' at the start of a line is a comment):
+#   <code> <yyyy-mm-dd>   the code as /cmd id shows it (4 groups of 4 with spaces), or with '-' or nothing between the
+#                         groups, then the date
+#   @<yyyy-mm-dd>         a date line: every bare <code> line below it (up to the next @ line) takes this date
+#   code   16 letters of BDFGHJKMNPRSTVXZ (full-width letters also work). The last one is a check letter: a typo in
+#          one letter is caught 15 times in 16 and the line is rejected (only the count goes to the host's log).
+#   date   the day the request arrived (read as UTC), never a later day: a date more than 3 days ahead of a host's
+#          clock is rejected. Records after the date (+2 days) are not erased; they go by the 30-day deletion.
+# Keep a request listed for at least 90 days, so that hosts that have not started PocketRoles for a while still get it
+# (by then the 90-day deletion of evidence records (logs still go at 30 days) has removed most of the same anyway).
+# Not the evidence of a ban still in force: that is kept while the ban lasts, and when the ban ends a request still
+# listed erases it at once (as above), else it goes 30 days later. So for a player whose ban you know was in force on
+# the request date (a shared ban, a ban in your own rooms), keep the request until that ban has ended. Then it may go.
+# A code listed twice keeps the later date.
+# The mod uses the newest 1000 requests. Keep [erase] under 16 KB: the whole file must stay under 64 KB, or every
+# host refuses all of it (rules, NG words and shared bans too). Raise version= at the top and sign the file after
+# every change.
+#
+# Example (not active): a date line with a bare code under it, or a code with its own date:
+# @2026-09-22
+# BDZN XHNJ JSXD GZDG
+# BDZN-XHNJ-JSXD-GZDG 2026-09-22
+
+[unban]
+# Read by the PocketRoles mod (v0.5.5 or later), not by the tray app: the appeals the author accepted. Every verified
+# file is used for this list, also with [AntiCheat] RemoteRules = false (like [erase]).
+# The code: take it from the "Code (/cmd id)" field of the evidence record you tied to the player (the ban console shows
+# it), never from the appeal alone: the code in an appeal only helps you find the record (every host, and anyone who saw
+# a /cmd id answer in an unregistered room, knows other players' codes). Do not list a code that differs from the
+# record's, or when the record has no code (a record from before v0.5.5).
+# A line always names at least one evidence id (AEG-...) of a record you checked. The check before signing compares the
+# line's code with that record's code; a host PC that holds a named record of another player does not use the line and
+# tells its host.
+# On each host's PC (when the game starts, once a day while it runs, and when that player joins) every ban on that
+# player made with PocketRoles before the end of that day is lifted: Aegis's automatic bans, the host's /ban,
+# /aegis ban and ban-button bans (aegis-bans.json), the copies of shared bans whose [bans] line is gone, and the
+# Banlist.txt lines PocketRoles wrote up to that day. Banlist.txt lines without a date (written by hand or imported)
+# are the host's own and stay (the host is told). Bans made after the day stay (a host may ban again later), except
+# Aegis's automatic bans inside the 30 days (below), and so does a ban this PC made while it already knew the line.
+# The host sees one line on their own screen. Lifts and the offences taken back cannot be undone by removing the line.
+# The server-side ban of a room that is still open stays
+# until that room closes. Hosts on a PocketRoles older than v0.5.5, and PCs that do not start PocketRoles while the
+# line is listed, keep the ban.
+# The offence count: only the bans whose evidence ids the line names are taken off that player's count (each once), on
+# the PC that holds them. Every other ban is lifted and keeps its offence.
+# The 30 days: they end exactly 30 days after the line's date (from 00:00 UTC of a date, or from the moment of a time)
+# and start a day before it (for host clocks that run behind), while the line is listed (removing it ends them at once).
+# On every host's PC, Aegis never bans that player on its own, whatever the rule: it only removes them from the room.
+# Other players see an ordinary removal; the host's line lacks the ban and report sentences, and that PC's evidence
+# record ("hold") and log show it was within the 30 days. No ban, ladder step, offence or official report, and the ban
+# console never offers a "hold" record. An automatic ban a PC made inside the 30 days before it got the line is lifted
+# when the line arrives, and its offence taken back. On the PC that holds a named ban, the rule of the newest one (a
+# Certain or Repeat rule) does not even remove them (the host only gets the detection notice). A host who bans that
+# player again is asked to confirm first. Only the date you sign sets these 30 days: nothing the player does moves
+# them (a new date on the line does), and a line without a date is never read.
+# This file is public: list ONLY codes, dates and evidence ids. No names, no friend codes, no rule names, no notes, not
+# even on a '#' line (the check before signing refuses '#' lines below these comments). The code is made from the
+# player's PUID, so every host whose room that player joined can look up that they are on this list, and git keeps it:
+# tell the player and get their consent first. Take their [bans] line off in an earlier version than the one that adds
+# the code (in the same version the public history links that line's reason to the code); several appeals in one
+# version link even less.
+#
+# Format: one appeal per line, fields separated by spaces or tabs ('#' at the start of a line is a comment):
+#   <code> <date> <AEG-id> [AEG-id ...]   the code as /cmd id shows it (4 groups of 4 with spaces, or '-' or nothing
+#                                         between them; full-width letters also work), the date, the evidence ids
+#   @<date>   a date line: every bare "<code> <AEG-id> ..." line below it takes this date
+#   code      16 letters of BDFGHJKMNPRSTVXZ; the last one is a check letter (a one-letter typo is caught 15 times in 16)
+#   date      the day you accepted the appeal (UTC, yyyy-mm-dd), or the moment: yyyy-mm-ddTHH:mmZ (UTC; then a ban made
+#             later that day stays). Never a later day: a date more than 3 days ahead is rejected
+#   AEG-id    up to 4 evidence ids (AEG- and 5 or 6 letters or digits); any other word is ignored (the line still counts)
+# Keep a line at least 180 days: a host PC that does not start PocketRoles while the line is listed keeps its old ban.
+# To give a listed code a new date (a new accepted appeal), change the date on its line and keep its evidence ids (a
+# code listed twice keeps the later date and the ids of both lines). The mod uses the newest 1000 lines. Keep [unban]
+# (with these comments) under 12 KB: the whole file must stay under 64 KB. Raise version= at the top and sign the file
+# after every change.
+#
+# Example (not active):
+# BDZN XHNJ JSXD GZDG 2026-09-22 AEG-7F3K2
+
+[ngwords]
+# Read by the PocketRoles mod (v0.5.5 or later), not by the tray app: the NG words of the chat filter (/ng). When this
+# section exists it replaces the mod's built-in list (so a word deleted here is gone for every host), and [ngallow]
+# replaces the built-in allow list. The host's own BepInEx\PocketRoles\NgWords.txt is added on top of both.
+# Lines are matched against the normalized message (NFKC, lower case, katakana -> hiragana, a wave dash right after
+# kana -> the long-vowel mark); a separator is any character that is not a letter or digit (the long-vowel mark counts
+# as a letter). One entry per line, '#' comments:
+#   word     anywhere in the message with every separator removed (so it also catches the letters split by spaces)
+#   <word    starts at the start of the message or right after a separator (matched with the separators kept)
+#   word>    ends at the end of the message or right before a separator (matched with the separators kept)
+#   <word>   a whole token (both)
+# From v0.5.5 (2026-09-22), for entries that are not pure ASCII (pure-ASCII ones keep the rules above). The examples
+# below use an INVENTED word ほげら (hogera): no real entry is written in this file any more (they are all hashed):
+#   - romaji: the message is also read as romaji and matched again ("hogera" "hoge ra" "h o g e r a" = ほげら).
+#     ASCII that does not read wholly as romaji stays as it is (shiny, sky, the), and the allow list works on the
+#     reading too (hogeramu = ほげらむ), also across the spaces between romaji words when the phrase runs on past the
+#     NG word ("ore ga hogeraba" = がほげらば), and an ASCII allow phrase covers the reading of its letters. In the
+#     reading, a hit spread over several words must begin and end a word ("hoge ra" hits, "ichiman koete" does not).
+#   - spaced out: <word / word> also match with separators inside the word when its first letter starts the message or
+#     follows a separator and its last letter ends the message or comes before one ("ほ げら" hits; "よほ げらよう"
+#     does not).
+#   - a player's name written at the start of the message or after a separator counts as a separator before <word
+#     ("もりほげら" hits <ほげら when a player named もり is in the room).
+# An entry needs 2 letters after normalization, a pure-ASCII one 3 unless written as <word>; at most 1000 per section.
+# [ngallow]: phrases blanked out of the message before matching (they protect ordinary words that contain an NG string).
+# A blanked phrase also hides an NG word it overlaps, so never let an allow phrase start or end inside a common form of
+# an NG word (with the invented ほげら: write まえほげら, not えほげら, which would hide おまえほげら). A hit lying
+# wholly inside the name of another player in the room does not count either (the mod does that, not this file).
+# Raise version= at the top when you change a line here.
+#
+# v0.5.5 (2026-09-23): the entries themselves are NEVER written here in plain any more. They live only in the author's
+# private list on the author's PC and reach this file as the hashed "#h1 ng=" / "#h1 al=" lines below (HMAC-SHA256 with
+# hashsalt= at the top of this file, 10 bytes kept, plus the normalized length n= and the boundary marks s= / e= / a=).
+# To change them: edit the private list and run tools\sign-definitions.ps1 -UpdateHidden, then raise version= and sign.
+# The groups the list is made of (no examples: an example would be one of the words):
+# 日本語の暴言（単語の区切りがないので、ふつうの言い回しに紛れるものは < を付けるか [ngallow] で守る）
+# 色の名前＋暴言（会議で色を呼んで言うもの。ふつうの言い回しになりやすいものは < 付き。間をあけたものも当たる）
+# 差別語（「〜笑」の形のものは、笑った・笑顔を [ngallow] で守る）
+# 見た目への暴言・罵倒（単体の語だけ。ふつうの言葉の途中に現れるものは > を付けて語の終わりで区切る）
+# 性的な言葉（略語は 1 語のときだけ）
+# English
+# 中文（漢字・ピンイン・略語）
+# 한국어（ハングル・字母の略語・ローマ字・韓国語の配列のまま英字で打ったもの）
+# 運営・公式サポート・作者を名乗って個人情報を聞き出す言い回し（日本語・中文・English。ふつうの質問や打ち消しに当たらない形だけ）
+
+#h1 ng=01d2be7cd7cf6525f2bc n=6
+#h1 ng=02a04af84e49030434c6 n=4 s=1 e=1 a=1
+#h1 ng=08e10b6f4ae324f24707 n=4 s=1 a=1
+#h1 ng=0a85e7b8a10ca557bb38 n=4
+#h1 ng=0c3bf76c385c6b8f3be2 n=2
+#h1 ng=0f84d727fd45d114d922 n=5 a=1
+#h1 ng=1083775ffe98ad40843a n=2 s=1
+#h1 ng=10dd704d54dc2cc441e4 n=3
+#h1 ng=13001a5af34a920631fe n=2
+#h1 ng=14c2799dbc8069e7e77e n=13
+#h1 ng=14f13fa4af92267ba2f5 n=2
+#h1 ng=160a7c16ca107712702e n=2 s=1 e=1 a=1
+#h1 ng=1807b872d33bdee0dcaa n=2 s=1 e=1
+#h1 ng=18e99528185c5e1ef57e n=7
+#h1 ng=1a07a00a4f21f6194dbc n=4
+#h1 ng=1a34b341949fe04bdc0e n=5 s=1
+#h1 ng=1a38da4d49618b05e23b n=2
+#h1 ng=1d5cb39dc4ea9ee7a192 n=6 s=1
+#h1 ng=1e22d7ffbe35cf2e5ea2 n=10 a=1
+#h1 ng=219a7708a376d1250f67 n=5 e=1
+#h1 ng=232eefc9deb9f10531f6 n=4
+#h1 ng=23c770e8f9c8e3b1bede n=5 s=1
+#h1 ng=256a49e632cb260e81df n=3
+#h1 ng=258274928a167f45410c n=3 s=1
+#h1 ng=25f65cfc9fac67045842 n=5 s=1
+#h1 ng=293b0ca061c7dd35c04d n=13
+#h1 ng=2b68919ff6f3715f9fe8 n=6 s=1
+#h1 ng=315dbed034cab4b6b795 n=2 s=1 e=1
+#h1 ng=3300bfec4de469d7ad89 n=14
+#h1 ng=33d60596c792aa5cb1f1 n=3
+#h1 ng=340f7c449eedae6616ed n=5
+#h1 ng=395bec269cb17c7febfe n=4
+#h1 ng=3a755778367a7d330b67 n=3
+#h1 ng=3b1c0dc63dcda7de7510 n=3 s=1 e=1 a=1
+#h1 ng=3f457d8d6990c2079c33 n=2 s=1
+#h1 ng=4134222065c18352be10 n=3
+#h1 ng=43579e1e1d6155abf272 n=3 s=1 e=1 a=1
+#h1 ng=44786e90d7d8a5f42960 n=3 s=1
+#h1 ng=450c81ba509ff864526f n=4
+#h1 ng=495156033cea00b67168 n=3
+#h1 ng=4abc590ca8c48741fdf5 n=3
+#h1 ng=4bd709143ab7cf299465 n=4 s=1 a=1
+#h1 ng=4dd2d3973fb080c64699 n=3 s=1
+#h1 ng=4f972f3bbd8913b9fa61 n=3
+#h1 ng=506cd6955502c9a68026 n=4
+#h1 ng=5317174e831db3f69c99 n=4
+#h1 ng=559a8ed37d2b21e1bad3 n=4
+#h1 ng=57f25e40f3408738135d n=5 s=1
+#h1 ng=57f6a3e02ded52aa03f5 n=6 s=1
+#h1 ng=5f26fdd31ab64b141fce n=6 s=1
+#h1 ng=600b0ed38840974a734e n=6 s=1
+#h1 ng=61cb69b70d61b80496e3 n=6 s=1
+#h1 ng=649ae5558003b4209d7a n=4
+#h1 ng=664b49d0bb4569cac27e n=6 s=1
+#h1 ng=681010e4bf85c1c30ee5 n=2
+#h1 ng=685f0ef89481542c6579 n=4 s=1
+#h1 ng=6df774dceb069f730462 n=6
+#h1 ng=6e86f5e34cffea25a719 n=2
+#h1 ng=6f9ef4d1b7a1b64b9ab1 n=5
+#h1 ng=70c704395d02b06ec5ce n=16 a=1
+#h1 ng=73853fd79ddee5484374 n=2 s=1
+#h1 ng=7405c10116cd4bf13d58 n=6 s=1
+#h1 ng=772d174eac3e5264bd55 n=6 s=1
+#h1 ng=7815ac0bc67a2c6bb89a n=3
+#h1 ng=7c78780c3a0780867589 n=4
+#h1 ng=7cbcf1b67b9bd7320ea7 n=2
+#h1 ng=7d03e18a4b8f97933784 n=4 a=1
+#h1 ng=7d09833f4f3cda8d393a n=5 a=1
+#h1 ng=7dfd1d195eba4b50ce36 n=6 s=1
+#h1 ng=7f8ae128a0151dcfeda3 n=18 a=1
+#h1 ng=80a20242be1f49260eda n=6 a=1
+#h1 ng=822df2cb639ef0c2478a n=3 s=1 a=1
+#h1 ng=82b203363574a113a457 n=5 s=1
+#h1 ng=8379768fc77bd957688b n=5
+#h1 ng=85b9306430026856b388 n=5 s=1 e=1 a=1
+#h1 ng=85ec63b6e95508df316a n=5 s=1
+#h1 ng=861efe930157e423296f n=6 s=1
+#h1 ng=878c2d6940683c2eff70 n=5
+#h1 ng=878c9b91a66b20d199a5 n=2
+#h1 ng=87b237af26a957e49927 n=3 a=1
+#h1 ng=891a46a7dcb1b7cba37d n=3 s=1 e=1 a=1
+#h1 ng=8bb9e67e7c6efcfaf029 n=4
+#h1 ng=8c3d438a10178feeb074 n=2
+#h1 ng=8cdc7376114322634cf2 n=6 s=1
+#h1 ng=927539d36afb28159bea n=4
+#h1 ng=945f5652fc821612cc6e n=2
+#h1 ng=94c4bb515456131d5b63 n=3
+#h1 ng=94db0d9c06b68fea30ea n=4
+#h1 ng=968ee1eea1ab88b297ae n=16
+#h1 ng=96f28d17a00f267e4ce1 n=4 s=1 e=1 a=1
+#h1 ng=9df2cbc0f520d160a7ba n=2
+#h1 ng=9f9b3f9af9d131bc8ed9 n=4
+#h1 ng=a51c060bb72385d72b3b n=2
+#h1 ng=a70ff3c75ec40cdc1a24 n=2
+#h1 ng=a7b6708b6ccb6df033d7 n=4
+#h1 ng=a946624d49a323fb6703 n=4 e=1
+#h1 ng=a94bbf3879faee1d3b22 n=2
+#h1 ng=a9504d15b938ba053b7b n=6 s=1
+#h1 ng=aaead03cde9206e6e7a3 n=3
+#h1 ng=ab0ef37f4dd05230a1e5 n=8
+#h1 ng=acc5d3cc6ed81dfd94f6 n=2
+#h1 ng=ace9cbb8344b455d5d1d n=5 s=1
+#h1 ng=ad34f0a9e0470f2b8b4a n=7 a=1
+#h1 ng=ae499abe170d9c0499a6 n=6 s=1 e=1 a=1
+#h1 ng=ae698c9ce19b1a28c6ed n=6 s=1 a=1
+#h1 ng=b04d1ff5980d50ee4172 n=12 a=1
+#h1 ng=b1539708b4b12034debc n=15 a=1
+#h1 ng=b33bf4c04541742568b0 n=2 s=1 e=1
+#h1 ng=b33d87273cc92776fa56 n=2
+#h1 ng=b4505c8c348d7d76e449 n=2
+#h1 ng=b6606fa2a4ec3f1f8558 n=6 s=1
+#h1 ng=b73cf969cce9b18b4cbd n=6
+#h1 ng=b7ad14109af9add15921 n=5 s=1
+#h1 ng=b9ab21607767c571315b n=5
+#h1 ng=bae6cd8fd52583b7e20e n=5 s=1
+#h1 ng=bb44d7d6b6d65900639a n=6 s=1
+#h1 ng=bb9f60f2a935074497b9 n=3
+#h1 ng=bba2f27bf5be926ccdfb n=4
+#h1 ng=be4e5df6882512490a44 n=2
+#h1 ng=c1e3594c9665f139f366 n=2
+#h1 ng=c643437b1b35f1c64b3f n=4
+#h1 ng=c81e4beb33eab2f5ffea n=3 s=1
+#h1 ng=c94f578218a140a95634 n=4
+#h1 ng=ca798d1540f4971fdbcc n=5 s=1
+#h1 ng=cbbc93535233ae172191 n=5
+#h1 ng=ce75baa2b2a1f997ec38 n=4 s=1 e=1 a=1
+#h1 ng=d190f09f3c507cfbbcad n=4 e=1
+#h1 ng=d32c6851548e6cd02bdd n=2
+#h1 ng=d4028eeb561c795d49a3 n=6 s=1 a=1
+#h1 ng=d6cdab4c70854c8f9cf9 n=4 s=1 e=1 a=1
+#h1 ng=d7cc89472acf9b0abd83 n=8 s=1 a=1
+#h1 ng=d977e0fdbf042f11f815 n=4 s=1
+#h1 ng=dc746965e142eeece59a n=3 s=1
+#h1 ng=dca61747ec320f804a7d n=3
+#h1 ng=dfdd577045bd1f2d0ac3 n=2 s=1
+#h1 ng=e0554e6828b879fba60f n=12
+#h1 ng=e07a5b15f7ce86874b47 n=3
+#h1 ng=e13174832510245808ab n=3
+#h1 ng=e1e82fa0e8806b6bc41a n=6 s=1 a=1
+#h1 ng=e2e03f53e458b2171cf4 n=5 s=1 a=1
+#h1 ng=e389bb678c69f60cff1b n=5 s=1 a=1
+#h1 ng=e4d617ac8596698709fd n=5 s=1 a=1
+#h1 ng=e519483bc7ad0865e7b7 n=3
+#h1 ng=e56d1cd3ad65c746aa23 n=2
+#h1 ng=e6e4772b77beeddce4ea n=4 s=1
+#h1 ng=e8c3bcb2537cbaaeef94 n=4 s=1
+#h1 ng=e8d175959c6aaf2838b8 n=4 s=1
+#h1 ng=e93e20990b9af3bbaa6f n=3
+#h1 ng=ea0d24efc8254966c9a4 n=6 a=1
+#h1 ng=eb63138c78899e1dfe52 n=4
+#h1 ng=ecc0991dc426369fb331 n=3
+#h1 ng=ed6f2c635479b1a551a5 n=3 s=1
+#h1 ng=f09d12d0ab2e0a820c61 n=4 s=1 e=1 a=1
+#h1 ng=f0a0312cb0230191370f n=2
+#h1 ng=f17a58bcfa83e2f6552e n=2
+#h1 ng=f18152a4ed0aea921439 n=4 s=1 a=1
+#h1 ng=f192f2e33f86c7bcec58 n=5 s=1
+#h1 ng=f35aa092413b6c8fef74 n=3
+#h1 ng=f40e76700aa3b9edd503 n=2
+#h1 ng=f6a301e58111e79e1a7e n=6 a=1
+#h1 ng=f6f3bcbf678dada090e3 n=3 s=1 e=1 a=1
+#h1 ng=fec4c6a46c1f9129370c n=3
+[ngallow]
+# 平文は書きません（[ngwords] と同じ。私的リスト → -UpdateHidden → 下の "#h1 al=" の行）。
+# どんなものを守っているか（例は書けません。例そのものが守る語になるため。ほげら = 作り話の語）:
+# ・NG 語と同じ形になってしまう、ふつうの日本語の言い方（ほげら → ほげらむ、あほげら のような続き方）
+# ・名前や助詞のあとに NG 語と同じ形が現れるもの（「ほげ」＋「ら」のような切れ方）と、その英語・ローマ字の読み
+# ・NG 語を含むふつうの名詞（食べ物・地名・作業の名前など）
+# ・「〜笑」の形の差別語に対する、笑った・笑う・笑顔のような続き（中文の同じ言い方も）
+# ・中文・한국어 で、NG 語と同じ字の並びがふつうの言葉の一部になってしまうもの（日付・場所・出発点などの言い方）
+# 並び順には意味があります（前の語が消したところに、あとの語が重ねて消します）。行を入れ替えないでください。
+#h1 al=3cf54f6320ccc1c1fed8 n=3
+#h1 al=48085e45a2c83e4eab3a n=3
+#h1 al=c0aaf98a9edeb547a5e6 n=3
+#h1 al=8ad9f2dbb9efc38f823f n=3
+#h1 al=67eb7035127976561fae n=3
+#h1 al=d2f8c84e50886b687267 n=3
+#h1 al=0117d325568b06d214e1 n=4
+#h1 al=80a0ccc8e292cea8d012 n=5
+#h1 al=30513025e1e5e557df18 n=3
+#h1 al=4d487fe681a3eeb57973 n=3
+#h1 al=18b12fc206c58f61fb40 n=3
+#h1 al=969dea68e55539204837 n=4
+#h1 al=f553f3f0c15f6d86200a n=5
+#h1 al=aca4c460ba288827db99 n=3
+#h1 al=057350a6fb3c493ae0f0 n=3
+#h1 al=7cac701559b3d1c6248a n=4
+#h1 al=f1aecc5ae45d24b598db n=4
+#h1 al=d1682bf4f199a49dd1aa n=4
+#h1 al=58c60e070b7aaee0a81d n=4
+#h1 al=70669cf786808cdcbf04 n=5
+#h1 al=25576e46eaf5f0606fe3 n=6
+#h1 al=f0f6a7acf36924511f36 n=6
+#h1 al=6ccb060269eabc10c751 n=4
+#h1 al=38dda7e8b6806f08b256 n=5
+#h1 al=35ef9a3de6207056c276 n=5
+#h1 al=26f964bed6f64511dc25 n=6
+#h1 al=451cdb460b15df836730 n=6
+#h1 al=25278296d2362e66f390 n=4
+#h1 al=ec4e06792d5237b785d9 n=4
+#h1 al=2a3f339d461384b8714a n=4
+#h1 al=f0a4818239a5fd0a050e n=4
+#h1 al=ea67b0e42b5105549891 n=4
+#h1 al=960ef4cbe04ff1b095d3 n=4
+#h1 al=6b2758982c0269b87b83 n=4
+#h1 al=d5d48708cff2790d009a n=8
+#h1 al=b152fc2d448ecba014b5 n=4
+#h1 al=d67ef49d6e1cb80cb91f n=5
+#h1 al=812e3a2f038108a719df n=4
+#h1 al=c58d14f19dab7b5206dd n=6
+#h1 al=ddbf84ba7d218e03c26c n=5
+#h1 al=09d95284ba316b468707 n=6
+#h1 al=9bfdcf2381dc092600e3 n=5
+#h1 al=8bceed72ecd115313ecd n=5
+#h1 al=92a1cafcf102488f324a n=4
+#h1 al=9218e672c5a810ef21b3 n=4
+#h1 al=d1accf514e0667c2875c n=4
+#h1 al=56596eaa9120fb4701b2 n=5
+#h1 al=c0adcd8843ff9faabda5 n=5
+#h1 al=c70f01a63638723f4a43 n=5
+#h1 al=42af52d7862a5e1610c6 n=5
+#h1 al=34cf719a24a375d85e0e n=5
+#h1 al=659e9a8a6fa9bf8b6f72 n=5
+#h1 al=190ff5daec291a08311b n=4
+#h1 al=286c65b914ee78c6c281 n=4
+#h1 al=29e4468559aab57bb51e n=5
+#h1 al=b07e4ed738e6c3c49637 n=4
+#h1 al=76e995676aed24f85878 n=5
+#h1 al=2b21b2f06a7a66481091 n=6
+#h1 al=be8631cb03651955e4ba n=5
+#h1 al=2efc41b7d59bc87fe8f2 n=5
+#h1 al=a9a0b4cd1aa32552dd74 n=5
+#h1 al=1915c893275937571774 n=5
+#h1 al=4885049d0ec9533144d8 n=6
+#h1 al=de18ee1e9a75f5fafd36 n=6
+#h1 al=e352014a79b746ca8d19 n=5
+#h1 al=ce253d457b370204b14e n=5
+#h1 al=48eb3a6f209e709f9edb n=4
+#h1 al=30bc9d690f852a67d643 n=4
+#h1 al=abed814a3964975cd91f n=4
+#h1 al=f5ae8f8cc8728ed557c1 n=3
+#h1 al=4f47aa5860031e3d8958 n=4
+#h1 al=c64d8e842dad6d2df2e2 n=3
+#h1 al=a672ae1e33c0eaa1fd1c n=4
+#h1 al=ffead3731d21b8162c44 n=3
+#h1 al=1e46913e56e0016850b4 n=4
+#h1 al=00b4efc69b52b6d6b3cd n=4
+#h1 al=df93c08eb89b1d0586d4 n=4
+#h1 al=ad99de4e3cc9e5988eeb n=5
+#h1 al=8cb53a05c00f34073939 n=5
+#h1 al=26b2a978c65f87dc62a8 n=4
+#h1 al=a976872d2bcc6f52ba22 n=4
+#h1 al=4a982884f588bc86876d n=3
+#h1 al=bb902b7a7d46e7917136 n=3
+#h1 al=7e37263fb515b92d4688 n=3
+#h1 al=84ce2e265dfa64d13a1c n=3
+#h1 al=d467924b39574c0f84e6 n=4
+#h1 al=014ccb54660bd1d28220 n=3
+#h1 al=0b405f6ae1a6a157c08c n=3
+#h1 al=2c0e784d66e78d6e2c3e n=3
+#h1 al=363f28322962a6c0deb4 n=3
+#h1 al=194ed21e76b9cf064e65 n=3
+#h1 al=147049c41de4ab18fc28 n=3
+#h1 al=6822485f924f4ebc8434 n=3
+#h1 al=8daa0d13c04add697dac n=4
+#h1 al=e0b81acbb637b87fbe9d n=3
+#h1 al=6b227ebf083d2f89dd3c n=3
+#h1 al=5271769add798a78118a n=3
+#h1 al=4d3efd84e0b1ab6f2199 n=3
+#h1 al=66e8e57e14ed27c28970 n=3

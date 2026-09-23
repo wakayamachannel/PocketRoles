@@ -23,6 +23,57 @@ support/drafts/
 *.eml
 clips/
 
+# v0.5.5: the Aegis definitions signing key lives in %APPDATA%\PocketRoles\signing and must never be committed
+# (tools\sign-definitions.ps1 refuses to create it inside the repository; these patterns catch a copy placed here by hand)
+*private*.xml
+*private*.pem
+*private*.key
+*.pfx
+*.p12
+*.snk
+aegis/*.xml
+tools/*.xml
+signing/
+# ... and a copy under any other name, anywhere (the repository tracks no .xml / .pem / .key file; build-release.ps1 also
+# refuses a release while a tracked, staged or new file holds private-key material)
+*.xml
+*.pem
+*.key
+# v0.5.5: the password-protected copies of the key (tools\sign-definitions.ps1 -Protect / -Backup) stay out too
+*.prkey
+definitions-private*
+
+# records of Aegis BAN 管理 and files from report zips / game copies (players' names, PUID hashes, PC marks);
+# the same names as tools/check-files.ps1 refuses
+journal.json
+pending.json
+dismissed.txt
+owner-proof.txt
+audit.head
+imports/
+reviewed/
+unlock/
+aegis-log.txt
+system.txt
+source.txt
+discord-last.txt
+
+# v0.5.5 hidden lists: the private plain list of cheat names / NG words lives OUTSIDE the repository (a normal user folder,
+# never AppData). These patterns are insurance against a copy placed in the tree by hand (the signing tool also refuses one
+# inside the repository, and warns if any private entry appears in plain in a tracked file before signing).
+aegis-source.txt
+*private-list*
+PocketRoles-private/
+PocketRoles-Aegis-private/
+
 # internal automation (Claude workflow scripts) and daily work logs contain local paths: not published
-workflows/
+# (only the top-level folder: .github/workflows holds the public pull-request checks)
+/workflows/
 support/worklog-*.md
+
+# v0.5.5: the author-only release memo names the private list's folder and which branch histories still hold plain
+# words, so it stays out of the repository (the file itself lives in the working folder)
+RELEASE-CHECKLIST.md
+
+# v0.5.5: tools/terms/run.ps1 output (the game's own translation tables are Innersloth's text: never committed)
+tools/terms/local/

@@ -17,11 +17,15 @@ namespace PocketRoles.Core
         /// <summary>Same key accepted by Options.TrySet (e.g. "sheriff.count", "lang", "lobby.autopublic").</summary>
         public string Key;
         public string SectionJa, SectionEn;
+        /// <summary>v0.5.5: inline Simplified Chinese of the section (role rows: the role's Chinese name); null = the table only.</summary>
+        public string SectionZh;
         /// <summary>Display group: role name for role rows, or General / Lobby / Chat (localized; table key "opt.section.&lt;en&gt;").</summary>
-        public string Section => Lang.T("opt.section." + Slug(SectionEn), SectionJa, SectionEn);
+        public string Section => Lang.T("opt.section." + Slug(SectionEn), SectionJa, SectionEn, SectionZh);
         public string NameJa, NameEn;
-        /// <summary>Localized row name (table key "opt.name.&lt;key&gt;").</summary>
-        public string Name => Lang.T("opt.name." + Key, NameJa, NameEn);
+        /// <summary>v0.5.5: inline Simplified Chinese of the row name (<c>.Zh("…")</c>) for rows the zh table lacks; null = the table only.</summary>
+        public string NameZh;
+        /// <summary>Localized row name (table key "opt.name.&lt;key&gt;"; a Chinese reader gets English, never Japanese, when both are missing).</summary>
+        public string Name => Lang.T("opt.name." + Key, NameJa, NameEn, NameZh);
 
         private static string Slug(string s) => string.IsNullOrEmpty(s) ? "" : s.ToLowerInvariant().Replace(" ", "");
         /// <summary>Tooltip / help text (one sentence) shown by the settings tab "?" button; null = no help.</summary>
@@ -56,9 +60,14 @@ namespace PocketRoles.Core
         private static ConfigEntry<string> _discordWebhookUrl;
         private static ConfigEntry<bool> _discordAnnounce;
         private static ConfigEntry<string> _discordText;
+        private static ConfigEntry<string> _discordAvatarUrl;   // v0.5.5
         private static ConfigEntry<bool> _antiCheatKick;
         private static ConfigEntry<bool> _cheatDetect, _cheatAutoKick, _cheatAnnounceKick;   // v0.5.3 CheatDetector
+        private static ConfigEntry<bool> _cheatEndGame;   // v0.5.5 AegisMatchStop
         private static ConfigEntry<bool> _cheatCallout;   // v0.5.3 CalloutWatch
+        private static ConfigEntry<bool> _cheatRemoteRules;   // v0.5.5 AegisRules
+        private static ConfigEntry<int> _cheatJitter;         // v0.5.5 AegisRules per-lobby variation (percent)
+        private static ConfigEntry<bool> _cheatSharedBans, _cheatAutoReport, _cheatBanLadder;   // v0.5.5 AegisBans
         private static ConfigEntry<bool> _wireLog;
 
         private static ConfigEntry<bool> _autoRehost;
@@ -107,9 +116,14 @@ namespace PocketRoles.Core
         private static ConfigEntry<string> _rulesMode;
         private static ConfigEntry<string> _rulesText;
         private static ConfigEntry<bool> _welcomeAllLanguages;
+        // v0.5.5 [Chat] NG words (Chat.NgWords)
+        private static ConfigEntry<bool> _ngFilter, _ngBan, _ngAnnounce;
+        private static ConfigEntry<int> _ngKickAt;
 
         // v0.4b [Translate] (the DeepL key lives in BepInEx/PocketRoles/deepl-key.txt, never in the cfg)
         private static ConfigEntry<bool> _trEnabled;
+        /// <summary>v0.5.5: show the host-screen "chat translation is off" line (once per game session). Off = never.</summary>
+        private static ConfigEntry<bool> _trOffNotice;
         private static ConfigEntry<string> _trProvider;
         private static ConfigEntry<string> _trTargetLang;
         private static ConfigEntry<bool> _trShowOnHost;
@@ -202,23 +216,55 @@ namespace PocketRoles.Core
         /// Runs before any Bind(); BepInEx creates the new file on the first save otherwise.
         /// </summary>
         /// <summary>
-        /// v0.5.4: [Lobby] MaxHostPing (default 0 = off) became [Lobby] HostPingLimit (default 80 ms = on, request 9/21
-        /// "pingの改善も頼んだ"). A limit a host had set carries over; the old key is dropped from the file.
+        /// The high-ping re-creation limit moved twice: v0.5.4 renamed [Lobby] MaxHostPing (default 0 = off) to
+        /// [Lobby] HostPingLimit (default 80 ms = on, request 9/21 "pingの改善も頼んだ"); v0.5.5 turns it off by default
+        /// again under [Lobby] PingRecreateLimit (default 0, request 9/21 "pingのことは既定でオフして"). A limit the host
+        /// chose carries over: HostPingLimit when above 0 and not 80 (the untouched v0.5.4 default), else MaxHostPing when
+        /// above 0. Both old keys leave the file. Never throws.
         /// </summary>
-        private static void MigrateMaxHostPing(ConfigFile cfg)
+        private static void MigratePingLimit(ConfigFile cfg)
         {
             try
             {
-                var legacyDef = new ConfigDefinition("Lobby", "MaxHostPing");
-                int old = cfg.Bind(legacyDef, 0).Value;
-                cfg.Remove(legacyDef);
-                if (old > 0) _maxHostPing.Value = Math.Min(300, old);
-                cfg.Save();
-                if (old > 0) PocketRolesPlugin.Logger?.LogInfo($"Config migration: [Lobby] MaxHostPing {old} → HostPingLimit");
+                int v054 = TakeLegacyInt(cfg, "Lobby", "HostPingLimit", out bool has054);
+                int v053 = TakeLegacyInt(cfg, "Lobby", "MaxHostPing", out bool has053);
+                if (has054 && v054 > 0 && v054 != 80)
+                {
+                    _maxHostPing.Value = Math.Min(300, v054);
+                    PocketRolesPlugin.Logger?.LogInfo($"Config migration: [Lobby] HostPingLimit {v054} → PingRecreateLimit");
+                }
+                else if (has053 && v053 > 0)
+                {
+                    _maxHostPing.Value = Math.Min(300, v053);
+                    PocketRolesPlugin.Logger?.LogInfo($"Config migration: [Lobby] MaxHostPing {v053} → PingRecreateLimit");
+                }
+                else if (has054 || has053) PocketRolesPlugin.Logger?.LogInfo("Config migration: [Lobby] HostPingLimit / MaxHostPing removed (the v0.5.4 default or off); PingRecreateLimit stays as it is (default 0 = off)");
+                cfg.Save();   // the old keys (bound above only to be read) leave the file
             }
             catch (Exception e)
             {
-                PocketRolesPlugin.Logger?.LogWarning($"Config migration: [Lobby] MaxHostPing not carried over: {e.Message}");
+                PocketRolesPlugin.Logger?.LogWarning($"Config migration: [Lobby] ping limit not carried over: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// The value an older version left in the file under [<paramref name="section"/>] <paramref name="key"/>, then the
+        /// key is removed. <paramref name="present"/> is false when the file had no such key (or no whole number there).
+        /// </summary>
+        private static int TakeLegacyInt(ConfigFile cfg, string section, string key, out bool present)
+        {
+            present = false;
+            var def = new ConfigDefinition(section, key);
+            try
+            {
+                int v = cfg.Bind(def, int.MinValue).Value;   // the sentinel tells a missing key apart from any real value
+                present = v != int.MinValue;
+                return present ? v : 0;
+            }
+            catch (Exception) { return 0; }
+            finally
+            {
+                try { cfg.Remove(def); } catch (Exception) { }
             }
         }
 
@@ -244,6 +290,41 @@ namespace PocketRoles.Core
             }
         }
 
+        /// <summary>
+        /// v0.5.5 review: the v0.5.5 test builds bound [Chat] NgKickAt with default 2 (now 3). A file one of them wrote
+        /// still has "# Default value: 2" right above "NgKickAt = 2"; a 2 the host sets under this version sits under
+        /// "# Default value: 3" and is kept. Read as text before any Bind() (every save rewrites those comments); the
+        /// file is only scanned for that one entry, nothing of it is logged. Never throws.
+        /// </summary>
+        private static bool NgKickAtFromTestBuild(ConfigFile cfg)
+        {
+            try
+            {
+                string path = cfg.ConfigFilePath;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+                bool inChat = false;
+                string defaultLine = null;
+                foreach (string raw in File.ReadLines(path))
+                {
+                    string line = raw.Trim();
+                    if (line.Length == 0) continue;
+                    if (line[0] == '[') { inChat = line == "[Chat]"; defaultLine = null; continue; }
+                    if (!inChat) continue;
+                    if (line[0] == '#')
+                    {
+                        if (line.StartsWith("# Default value:", StringComparison.Ordinal)) defaultLine = line;
+                        continue;
+                    }
+                    int eq = line.IndexOf('=');
+                    if (eq > 0 && line.Substring(0, eq).Trim() == "NgKickAt")
+                        return line.Substring(eq + 1).Trim() == "2" && defaultLine == "# Default value: 2";
+                    defaultLine = null;   // the comment block belonged to this other entry
+                }
+            }
+            catch (Exception) { }
+            return false;
+        }
+
         /// <summary>The config was copied from jp.hostroles.mod.cfg in this run (rename migration).</summary>
         private static bool _migrated;
 
@@ -251,10 +332,13 @@ namespace PocketRoles.Core
         {
             _cfg = cfg;
             _migrated = MigrateLegacyConfig(cfg);
+            bool ngKickAtFromTestBuild = NgKickAtFromTestBuild(cfg);   // before the first Bind() saves the file
+            OptInUpgrade.Scan(cfg);                                    // same reason: the first save rewrites every "# Default value:" line
+            ReadLanguageBeforeBind(cfg);   // v0.5.5: the one-time Language = ja → auto migration needs the file as the old version wrote it
             cfg.SaveOnConfigSet = true;
 
             _enabled = cfg.Bind("General", "Enabled", true, "Enable PocketRoles (host only). Can be toggled in the lobby with /mod on|off");
-            _language = cfg.Bind("General", "Language", "ja", new ConfigDescription("Default language for player-facing text: ja (Japanese), zh (Simplified Chinese) or en (English). Players can pick their own with /lang; texts are editable in BepInEx/PocketRoles/lang/*.json", new AcceptableValueList<string>("ja", "zh", "en")));
+            _language = cfg.Bind("General", "Language", LangCore.Auto, new ConfigDescription("Default language for player-facing text: auto (v0.5.5 default: follow the game's own language; Simplified / Traditional Chinese → zh, Japanese → ja, English and the others → en), ja (Japanese), zh (Simplified Chinese) or en (English). Players can pick their own with /lang; texts are editable in BepInEx/PocketRoles/lang/*.json", new AcceptableValueList<string>(LangCore.Auto, "ja", "zh", "en")));
             _register = cfg.Bind("General", "RegisterAsModdedLobby", true,
                 "Mod-lobby registration (the so-called +25, the host-authority protocol flag): register the lobby as modded when hosting. REQUIRED by Innersloth's Among Us Mod Policy (2026-07-30) for any mod that changes gameplay / roles on official servers. " +
                 "Turning this off is a policy violation, disables the private /cmd command channel and exposes the host to the full server anti-cheat. Registered lobbies do not appear in the vanilla public lobby list (players join by room code or through the guide room).");
@@ -271,24 +355,33 @@ namespace PocketRoles.Core
             _revealLeaveToAll = cfg.Bind("Roles", "RevealLeaveToAll", false, "Also announce a leaving player's role to everyone (like RevealRoleOnDeath; when it happens inside a meeting the line is sent after the exile screen)");
             _revealOnDeath = cfg.Bind("Roles", "RevealRoleOnDeath", false, "Announce a player's role to everyone when they are killed or ejected ('X was Sheriff'; the vanilla role's name when there is no PocketRoles role, e.g. in an unregistered lobby)");
             _hostGhostRoleList = cfg.Bind("Roles", "HostGhostRoleList", true, "Once the host is dead, list every player's role (alive / dead) on the HOST's screen only: at the host's death, again at every meeting, plus one line per later death. Works in unregistered (compat) lobbies too (vanilla roles). Never sent to other players; /who shows it on demand");
-            _compatWelcomeText = cfg.Bind("Chat", "CompatWelcomeText", "", "Unregistered (compat) lobby only: your own one-line public welcome for every joiner (empty = built-in line 'ようこそ! この部屋は普通のAmong Us(役職なし)です…'). One chat message, at most 86 characters; characters a vanilla player cannot type ([ ] < > full-width ！（） etc.) are converted or dropped automatically");
+            _compatWelcomeText = cfg.Bind("Chat", "CompatWelcomeText", "", "Unregistered (compat) lobby only: your own one-line public welcome for every joiner (empty = built-in line 'ようこそ! 普通のAmong Usです。本来の役職は部屋の設定どおり、MODの追加役職はなし…'). One chat message, at most 86 characters; characters a vanilla player cannot type ([ ] < > full-width ！（） etc.) are converted or dropped automatically");
             _discordWebhookUrl = cfg.Bind("Discord", "WebhookUrl", "", "Discord webhook URL (channel settings → 連携サービス → ウェブフック → URL をコピー). When set, the host posts one message per lobby ('部屋コード ABCDEF — 3/15人 募集中') and edits it as players join / leave and games start / end. No bot needed. Keep this URL private (anyone with it can post to the channel). Not editable from chat");
             _discordAnnounce = cfg.Bind("Discord", "Announce", true, "Post / update the lobby line on Discord when WebhookUrl is set");
             _discordText = cfg.Bind("Discord", "Text", "", "Your own lobby line (empty = built-in). Placeholders: {code} {count} {max} {state} {kind}; \\n = line break; Discord markdown works (**bold**, @here)");
+            _discordAvatarUrl = cfg.Bind("Discord", "AvatarUrl", DefaultDiscordAvatarUrl, "v0.5.5: icon shown with the lobby message (sent as the webhook's avatar_url when the message is posted; edits keep it). https:// image URL, at most 512 characters. Empty = the icon set for the webhook in Discord");
             _wireLog = cfg.Bind("Diagnostics", "WireLog", false, "Investigation aid: log every packet this client sends (InnerNetClient.SendOrDisconnect) and receives (HandleMessage), decoded one level (GameData / GameDataTo -> Data / RPC / Spawn ...), plus every disconnect, to LogOutput.log. Off (default) = no effect");
             _antiCheatKick = cfg.Bind("AntiCheat", "KickOnForgedRpc", false, "Reserved, currently no effect: forged host-only RPCs (SetRole/SetName/MurderPlayer/...) are always dropped and logged, but the sender of a relayed RPC cannot be identified, so nobody is kicked");
 
             _cheatDetect = cfg.Bind("AntiCheat", "Detect", true, "v0.5.3: in unregistered lobbies, detect actions a vanilla client never produces (kill / vent / ability / task by a role that cannot, alive chat outside meetings, crew sabotage, kills faster than the cooldown or from too far, unknown RPC ids) and show them on the host's screen (/ac lists them)");
             _cheatAutoKick = cfg.Bind("AntiCheat", "AutoKick", true, "v0.5.3: remove (with a ban for this room) a player on the first CERTAIN detection (kill / vent / ability / task by a role that cannot) or on the second alive chat outside a meeting. VIP and above are never removed automatically. Note: the sender of a relayed message cannot be proven, so a spoofing cheater could in theory frame someone");
-            _cheatCallout = cfg.Bind("AntiCheat", "Callout", true, "v0.5.3: in unregistered lobbies, tell the host (screen only, never a kick) when a living crewmate names in a meeting impostors nobody could know yet (not the host, no kill / vent / shapeshift / vanish yet, not named first by someone else) - the one trace of a role-seeing cheat. Held until the host is dead or the game is over while the host is a living crewmate (it names impostors)");
+            _cheatCallout = cfg.Bind("AntiCheat", "Callout", true, "v0.5.3: in unregistered lobbies, tell the host (screen only, never a kick) when a living crewmate names in a meeting impostors nobody could know yet (not the host, no kill / vent / shapeshift / vanish yet, not named first by someone else) - a trace of a role-seeing cheat. v0.5.5: also a living crewmate who, over 2+ games, keeps voting for such impostors in meetings before any impostor action. Held until the host is dead or the game is over while the host is a living crewmate (it names impostors)");
             _cheatAnnounceKick = cfg.Bind("AntiCheat", "AnnounceKick", true, "v0.5.3: when the anti-cheat removes a player, tell everyone in one public line (who and why)");
+            _cheatEndGame = cfg.Bind("AntiCheat", "EndGameOnCheat", true, "v0.5.5: in unregistered lobbies, when Aegis removes a player during a match for a CERTAIN detection whose action changed the game for everyone (a kill that landed, a vent entry, a shapeshift / vanish / appear by a role that cannot), end that match at once for everyone (like Vanguard): the same end as the F7 haison (vanilla 'Impostor disconnected' screen with a winner that means nothing; the host returns to this lobby by itself, the others when they press Play Again) and, once the players are back in the lobby, tell everyone why in one public line without a name, sent once more for the players who came back after it (instead of the named AnnounceKick line, and even with AnnounceKick = false; the vanilla ban notice still shows the name). Waits for the intro and for the vote result / exile screens to finish; when the match cannot be ended (no safe moment within 30 s, the end not sent or not confirmed) or this is turned off meanwhile, the removal is announced as without this setting. Never for detections that could be lag (Repeat / Notice) or for actions that changed nothing (an impostor completing a task, a request only the host sees, a kill that did not land), at most once per match and 3 times an hour (a rehosted lobby keeps the count), never in registered lobbies (host authority refuses such actions there), never for VIP and above (not removed). Needs AutoKick = true. The definitions file can turn it off per rule ([rules] endgame = off). Note: like AutoKick, a detection trusts the owner of the object an action came through; a spoofing cheater could in theory frame someone, get them removed and end a match, and stays in the room (the caps above bound the stops, not the removals)");
+            _cheatRemoteRules = cfg.Bind("AntiCheat", "RemoteRules", true, "v0.5.5: take the numbers the in-game Aegis judges with (chat flood count, speed multipliers, repeat window ...) and the rule levels from the [rules] section of the Aegis definitions file on GitHub (main/aegis/definitions.txt; the last one applied is kept in BepInEx/PocketRoles/aegis-rules-cache.txt), so false positives and loopholes are fixed without a mod update. Rule levels can only be made more lenient (a file never turns a notice-only rule into a removal); the numbers can move either way, stricter too, but only within a fixed range each (e.g. speed.kick 1.6 to 6, chatflood.count 3 to 20). A [rules] line may end with the PocketRoles / Among Us versions it is for (e.g. \"@mod<=0.5.5\", or \"@mod>=0.5.6, game>=2026.9.1\" for both: one @, conditions joined by commas). /ac rules shows the values in use. false = built-in numbers and NG words, no shared bans; but level changes that make a rule stop removing players (notice or off), the required (minimum) PocketRoles version ([update] minmod: below it no room can be created) and the [erase] list (requests to erase a player's records) still apply: the signed file is still downloaded, verified and cached for these");
+            _cheatRemoteRules.SettingChanged += (_, __) => Net.AegisRules.OnRemoteRulesChanged();   // /opt, settings tab, /reload, /restore
+            _cheatJitter = cfg.Bind("AntiCheat", "Jitter", 10, new ConfigDescription("v0.5.5: move the in-game Aegis limits (speed.kick, chat flood count / seconds, colour changes, vent and kill distance, kill cooldown, task burst, repeat gap / window) up or down at random by at most this many percent, drawn anew for every lobby from the OS cryptographic random source (not from the lobby code), so a cheater cannot ride just under the published values of the definitions file. Applied to the file's values, then clamped to each key's allowed range; speed.notice stays below speed.kick. The limits that can remove a player (speed.kick, chat flood, repeat gap / window) move at most half this percentage toward stricter, and speed.kick only moves its margin above 1x, so no lobby cuts the room a laggy player has by more than half this percentage. Never varied: repeat.count, callout.game / callout.lobby (small whole numbers) and the lag filters speed.snap, speed.window and chatalive.grace. The drawn values go to the host's log (one line per lobby) and /ac rules lobby only. 0 = off (the file's values exactly)", new AcceptableValueRange<int>(0, Net.AegisRules.MaxJitterPercent)));
+            _cheatJitter.SettingChanged += (_, __) => Net.AegisRules.OnJitterChanged();   // /opt, settings tab, /reload, /restore
+            _cheatSharedBans = cfg.Bind("AntiCheat", "SharedBans", true, "v0.5.5: remove a joining player who is on the shared ban list of the signed Aegis definitions file ([bans] section on GitHub, needs RemoteRules = true): that player is told they cannot join (privately; in an unregistered lobby one public line without a name) and kicked 30 s later, at once on an Aegis detection, an NG word, a chat flood or a game start (one who comes back to the same lobby: removed at once with a ban for this room); the others then read one line without a name. Players are listed only as a salted SHA-256 of their PUID (not guessable back, unlike a friend code), never by name. VIP and above are never removed. Your own bans (BepInEx/PocketRoles/aegis-bans.json) apply whatever this says");
+            _cheatAutoReport = cfg.Bind("AntiCheat", "AutoReport", false, "v0.5.5: when Aegis removes a player for a CERTAIN detection (kill / vent / ability / task by a role that cannot), also send Among Us's own player report (Cheating / Hacking) for them, before the removal. OFF by default (v0.5.5: nobody is reported to Among Us unless the host turns this on): turn it on with /opt anticheat.autoreport on, or in the settings tab. When on: at most once per player every 30 days and 5 reports an hour. Single reports are always available with /aegis report <name> [cheat|chat|harass|name], whatever this says. Every report is logged and marked in aegis-bans.json. Note: like AutoKick, a detection trusts the owner of the object an action came through; a spoofing cheater could in theory frame someone, and a report cannot be taken back");
+            _cheatBanLadder = cfg.Bind("AntiCheat", "BanLadder", true, "v0.5.5: a removal for a CERTAIN detection also records a ban in BepInEx/PocketRoles/aegis-bans.json (applied in every lobby you host): 30 days for the first offence, 180 days for the second, permanent from the third (unbanning keeps the count; the count is forgotten a year after the last ban ends). An evidence record goes to BepInEx/PocketRoles/evidence/<id>.json. false = a ban for that room only (as before v0.5.5). /aegis bans lists them, /aegis unban lifts one. Note: like AutoKick, a detection trusts the owner of the object an action came through; a spoofing cheater could in theory frame someone");
             _autoRehost = cfg.Bind("Lobby", "AutoRehost", false, "Automatically create a new lobby after an unexpected disconnect (server error, timeout) while hosting");
             _autoPublic = cfg.Bind("Lobby", "AutoPublic", false, "Automatically make the lobby public a few seconds after it is created / re-hosted");
             _autoPublicDelay = cfg.Bind("Lobby", "AutoPublicDelay", 3, new ConfigDescription("Seconds to wait before making the lobby public", new AcceptableValueRange<int>(0, 60)));
             _rehostMaxAttempts = cfg.Bind("Lobby", "RehostMaxAttempts", 3, new ConfigDescription("Give up auto re-hosting after this many consecutive attempts", new AcceptableValueRange<int>(1, 10)));
             _afkKickMinutes = cfg.Bind("Lobby", "AfkKickMinutes", 0, new ConfigDescription("Kick (not ban) a lobby player who neither moves nor chats for this many minutes; one warning 30 s before. Host, VIPs, moderators and admins are exempt; nothing happens during the start countdown or a game. Works in unregistered lobbies too. 0 = off", new AcceptableValueRange<int>(0, 30)));
-            _maxHostPing = cfg.Bind("Lobby", "HostPingLimit", 80, new ConfigDescription("v0.5.4 (was MaxHostPing, off by default): re-create the lobby (same settings) while it is still empty when the host's ping to the game server stays above this many ms for 5 s right after the lobby is created (official regions mix near and far servers). The host is asked on screen first (Yes/No, once per lobby, or /rehost yes|no); with no answer for 15 s the lobby is re-created. At most 3 re-creations in a row, then the lobby is kept (short-lived lobbies can count as deliberate disconnects). 0 = off (/opt maxping <ms>)", new AcceptableValueRange<int>(0, 300)));
-            MigrateMaxHostPing(cfg);
+            _maxHostPing = cfg.Bind("Lobby", "PingRecreateLimit", 0, new ConfigDescription("v0.5.5 (was HostPingLimit, on at 80 in v0.5.4; MaxHostPing before that): re-create the lobby (same settings) while it is still empty when the round trip to the game server measured as the lobby is created (v0.5.5: the wire RTT of HostGame / JoinGame, not client.Ping) is above this many ms and nobody has joined 5 s later (official regions mix near and far servers). The host is asked on screen first (Yes/No, once per lobby, or /rehost yes|no); with no answer for 15 s the lobby is re-created. At most 3 re-creations in a row, then the lobby is kept (short-lived lobbies can count as deliberate disconnects). 0 = off, the default (/opt maxping <ms>)", new AcceptableValueRange<int>(0, 300)));
+            MigratePingLimit(cfg);
             _compatCommonTasks = cfg.Bind("Compat", "CommonTasks", 0, new ConfigDescription("Unregistered lobby: common tasks actually handed out per player (0 = the lobby setting; the synced setting stays inside the vanilla range)", new AcceptableValueRange<int>(0, 60)));
             _compatShortTasks = cfg.Bind("Compat", "ShortTasks", 0, new ConfigDescription("Unregistered lobby: short tasks actually handed out per player (0 = the lobby setting)", new AcceptableValueRange<int>(0, 60)));
             _compatLongTasks = cfg.Bind("Compat", "LongTasks", 0, new ConfigDescription("Unregistered lobby: long tasks actually handed out per player (0 = the lobby setting)", new AcceptableValueRange<int>(0, 60)));
@@ -341,7 +434,7 @@ namespace PocketRoles.Core
             _timerWarnAt = cfg.Bind("Lobby", "TimerWarnAt", 60, new ConfigDescription("Seconds of lobby time left at which the mod acts (auto-start when enough players, otherwise the TimerMode action)", new AcceptableValueRange<int>(30, 300)));
             _extendNoticeDelay = cfg.Bind("Lobby", "ExtendNoticeDelay", 5, new ConfigDescription("Seconds between the 'lobby time is running out' notice and the extension / haison", new AcceptableValueRange<int>(0, 60)));
             _timerMode = cfg.Bind("Lobby", "TimerMode", "extend", new ConfigDescription("What to do when the lobby timer is about to expire: extend (request the server extension, fall back to haison), haison (start and end a game immediately so everyone stays in the same lobby), notify (only tell the players)", new AcceptableValueList<string>(TimerModeChoices)));
-            _autoRegion = cfg.Bind("Lobby", "AutoRegion", false, "Before hosting, ping the official regions and select the one with the lowest latency (/region shows the table)");
+            _autoRegion = cfg.Bind("Lobby", "AutoRegion", false, "When the CREATE GAME screen opens, ping the official regions and select the one with the lowest latency (/region shows the table). v0.5.5: only on that screen - opening the online menu, 'find game' or joining a room by its code never changes your region. The ping run takes a few seconds: press Create before it ends and that room keeps the current region, the switch then happens the next time the screen opens");
             _enableDleks = cfg.Bind("Lobby", "EnableDleks", true, "Offer the mirrored Skeld (Dleks) in the lobby map picker. Vanilla clients ship the map and can play it");
 
             // ---- v0.4 Game Master + hotkeys
@@ -357,9 +450,25 @@ namespace PocketRoles.Core
             _rulesMode = cfg.Bind("Chat", "RulesMode", "none", new ConfigDescription("Rules line in the welcome message: none (built-in 'no special rules' text) or custom (RulesText, /rules <text>)", new AcceptableValueList<string>(RulesModeChoices)));
             _rulesText = cfg.Bind("Chat", "RulesText", "", "Custom rules text used by the {rules} placeholder when RulesMode = custom (\\n = line break)");
             _welcomeAllLanguages = cfg.Bind("Chat", "WelcomeAllLanguages", true, "Send the short welcome (2 lines) to every joining player in the player's language first, then in the two other languages (paced). Off = the player's language only plus one compact trilingual /lang line");
+            // ---- v0.5.5 NG words (request 9/21 "言動の対策もある？" → "NGは繰り返したら自動退出でできない？")
+            _ngFilter = cfg.Bind("Chat", "NgFilter", true, "v0.5.5: check every typed chat line of the other players (lobby and game, registered and unregistered lobbies, alive or dead; not quick chat, not commands) against the NG word list: the built-in list, or the [ngwords] / [ngallow] sections of the Aegis definitions file on GitHub when it has them, plus your own BepInEx/PocketRoles/NgWords.txt. Every hit before NgKickAt gets a public warning (with the hits left), NgKickAt hits a removal. Host, VIPs, moderators and admins are exempt. /ng shows the state and edits your own words");
+            _ngKickAt = cfg.Bind("Chat", "NgKickAt", 3, new ConfigDescription("v0.5.5: remove a player at this many NG-word hits in one lobby (hits less than 5 s after the previous counted one are the same outburst and count once). 0 = never remove (public warnings and host notices only). Removals stop for the rest of a lobby once 3 different players hit within 120 s (a sign of a wrong list)", new AcceptableValueRange<int>(0, 5)));
+            if (ngKickAtFromTestBuild && _ngKickAt.Value == 2)
+            {
+                _ngKickAt.Value = 3;
+                PocketRolesPlugin.Logger?.LogInfo("Config migration: [Chat] NgKickAt 2 (the default of the v0.5.5 test builds) → 3 (the new default)");
+            }
+            _ngBan = cfg.Bind("Chat", "NgBan", true, "v0.5.5: the NG-word removal also bans the player from this lobby (false = a plain kick; they can rejoin)");
+            _ngAnnounce = cfg.Bind("Chat", "NgAnnounce", true, "v0.5.5: when a player is removed for NG words, tell everyone in one public line");
 
             // ---- v0.4b chat translation (chat text is sent to Google / DeepL; the DeepL key is read from BepInEx/PocketRoles/deepl-key.txt and never written here)
-            _trEnabled = cfg.Bind("Translate", "Enabled", true, "Translate foreign-language chat (combined mode: broadcast in the host's language + private translation per player). ON by default: chat text of every player is sent to the translation provider (Google, or DeepL when BepInEx/PocketRoles/deepl-key.txt holds a key). Turn off with /opt translate off");
+            _trEnabled = cfg.Bind("Translate", "Enabled", false, "Translate foreign-language chat (combined mode: broadcast in the host's language + private translation per player). OFF by default (v0.5.5: no chat text leaves this PC unless the host turns this on): turn it on with /opt translate.enabled on, or in the settings tab. When on, the chat text of every player is sent to the translation provider (Google, or DeepL when BepInEx/PocketRoles/deepl-key.txt holds a key); turn it off again with /opt translate off");
+            // v0.5.5: the default is OFF, so "turn it on while players are already in the room" is now the normal way
+            // in. The "chat is translated" notice only rides along with the welcome, which the players who are
+            // already here will never see again, so tell the room at the moment it is switched on (README chapter 13
+            // and the FAQ promise the room is told while it runs). Turning it off re-arms the host-screen notice.
+            _trEnabled.SettingChanged += (_, __) => PocketRoles.Chat.Chat.OnTranslationEnabledChanged();   // /opt, settings tab, /reload, /restore
+            _trOffNotice = cfg.Bind("Translate", "OffNotice", true, "v0.5.5: while chat translation is off, put one line on the HOST's own screen (nobody else sees it) in the first lobby of each game session, saying it is off and which command turns it on. false = never show it (/opt translate.notice off). It is shown again after you turn translation on and off again");
             _trProvider = cfg.Bind("Translate", "Provider", "auto", new ConfigDescription("Translation provider: auto (DeepL when BepInEx/PocketRoles/" + DeepLKeyFileName + " contains an API key, else Google), google (public endpoint, no key), deepl (needs the key file). The key itself is never stored in this file", new AcceptableValueList<string>(TranslateProviderChoices)));
             _trTargetLang = cfg.Bind("Translate", "TargetLang", "", "Language the host reads translations in: ja, zh or en. Empty = same as [General] Language");
             _trShowOnHost = cfg.Bind("Translate", "ShowOnHost", true, "Show translations of foreign-language chat on the host's screen (local, nothing is sent)");
@@ -450,11 +559,114 @@ namespace PocketRoles.Core
             _evilHawkVision = cfg.Bind("EvilHawk", "VisionMultiplier", 2f, new ConfigDescription("Evil Hawk vision multiplier, applied to the impostor vision (always on)", new AcceptableValueRange<float>(1f, 5f)));
 
             BuildDescriptors();
+
+            // v0.5.5: the one-time upgrade check of the two opt-in defaults. It changes no value; see OptInUpgrade.
+            // The two handlers must be added AFTER the record is written, so the record keeps the value the file held.
+            OptInUpgrade.Apply();
+            if (_trEnabled != null) _trEnabled.SettingChanged += (_, __) => OptInUpgrade.OnChanged(true);
+            if (_cheatAutoReport != null) _cheatAutoReport.SettingChanged += (_, __) => OptInUpgrade.OnChanged(false);
         }
 
         public static bool ModEnabled { get => _enabled == null || _enabled.Value; set { if (_enabled != null) _enabled.Value = value; } }
-        /// <summary>Lobby default language: "ja" | "zh" | "en" (see Lang.Current for the language in effect).</summary>
-        public static string Language { get => _language == null ? "ja" : Lang.Normalize(_language.Value); set { if (_language != null) _language.Value = Lang.Normalize(value); } }
+        /// <summary>
+        /// Lobby default language in effect: "ja" | "zh" | "en" (see Lang.Current). v0.5.5: [General] Language = auto (the default)
+        /// follows the game's own language (<see cref="GameLanguage"/>). Setting a code stores it; setting "auto" goes back to following the game.
+        /// </summary>
+        public static string Language
+        {
+            get => LangCore.Resolve(_language == null ? LangCore.Auto : _language.Value, GameLanguage.Code);
+            set { if (_language != null) _language.Value = LangCore.IsAuto(value) ? LangCore.Auto : Lang.Normalize(value); }
+        }
+
+        /// <summary>Choices of the settings-tab row and the gear menu, in cycle order.</summary>
+        internal static readonly string[] LanguageChoices = { LangCore.Auto, "ja", "zh", "en" };
+
+        /// <summary>[General] Language as stored: "auto" | "ja" | "zh" | "en".</summary>
+        public static string LanguageSetting => _language == null || LangCore.IsAuto(_language.Value) ? LangCore.Auto : Lang.Normalize(_language.Value);
+
+        /// <summary>"auto(zh)" while following the game, else the code (for /opt and /cmd s lines).</summary>
+        public static string LanguageLabel => LanguageSetting == LangCore.Auto ? LangCore.Auto + "(" + Language + ")" : Language;
+
+        // v0.5.5 one-time language migration (see ReadLanguageBeforeBind / ApplyLanguageMigration)
+        private static bool _langMigrationOwed, _langMigrationChecked;
+        /// <summary>Set when the migration switched Language to auto: the host's next lobby shows one line (GameLanguage_LobbyNoticePatch).</summary>
+        internal static bool LanguageMigrationNoticePending;
+
+        /// <summary>
+        /// BepInEx/PocketRoles/language-migration.pending: the one-time migration is owed but not decided yet. The first
+        /// Bind() rewrites the cfg with "# Default value: auto", so without this marker a first v0.5.5 start that ends
+        /// before the main menu (a crash, closing the game, the game's language not known yet) would lose it for good.
+        /// </summary>
+        private static string LangMigrationMarker
+        {
+            get
+            {
+                try
+                {
+                    string root = BepInEx.Paths.BepInExRootPath;
+                    return string.IsNullOrEmpty(root) ? null : Path.Combine(root, "PocketRoles", "language-migration.pending");
+                }
+                catch (Exception) { return null; }
+            }
+        }
+
+        /// <summary>
+        /// Reads [General] Language and its "# Default value:" line as the previous version left them, before any Bind()
+        /// rewrites the file (a pre-v0.5.5 file says "ja" under "# Default value: ja", chosen or not), and keeps the
+        /// marker file in step: written while the migration is owed, removed when it is not. Never throws.
+        /// </summary>
+        private static void ReadLanguageBeforeBind(ConfigFile cfg)
+        {
+            try
+            {
+                string path = cfg.ConfigFilePath;
+                string marker = LangMigrationMarker;
+                bool markerPresent = marker != null && File.Exists(marker);
+                string value = null, defaultValue = null;
+                if (!string.IsNullOrEmpty(path) && File.Exists(path)) LangCore.ReadCfgLanguage(File.ReadLines(path), out value, out defaultValue);
+                _langMigrationOwed = LangCore.LanguageMigrationOwed(value, defaultValue, markerPresent);
+                if (marker == null) return;
+                if (_langMigrationOwed && !markerPresent)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(marker));
+                    File.WriteAllText(marker, "Language = ja (the pre-v0.5.5 default): PocketRoles decides auto / ja once the game's language is known\r\n");
+                }
+                else if (!_langMigrationOwed && markerPresent) File.Delete(marker);
+            }
+            catch (Exception) { }
+        }
+
+        private static void ClearLangMigrationMarker()
+        {
+            try
+            {
+                string marker = LangMigrationMarker;
+                if (marker != null && File.Exists(marker)) File.Delete(marker);
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger?.LogWarning($"Config migration: cannot remove the marker ({e.Message})"); }
+        }
+
+        /// <summary>
+        /// v0.5.5, once: every older config holds Language = ja (the old default, whatever the host's language), so a
+        /// Chinese host got Japanese menus (Discord 2026-09-22). When the file still says ja as the old default and the
+        /// game runs in another language, switch to auto and tell the host (their own screen only) at the next lobby.
+        /// Called from the main menu, when the game's language is known; a Japanese game keeps ja. Until it has decided,
+        /// the marker file keeps the migration owed across starts; after that a ja the host sets is never touched again.
+        /// </summary>
+        internal static void ApplyLanguageMigration()
+        {
+            if (_langMigrationChecked || _language == null) return;
+            if (!_langMigrationOwed) { _langMigrationChecked = true; return; }
+            string game = GameLanguage.Code;
+            if (game == null) return;   // not known yet: the next main menu (or the next start: the marker stays) decides
+            _langMigrationChecked = true;
+            ClearLangMigrationMarker();
+            // still ja now (not changed since the start) and the game runs in another language
+            if (!LangCore.ShouldMigrateToAuto(_language.Value, LangCore.Ja, game)) return;
+            _language.Value = LangCore.Auto;
+            LanguageMigrationNoticePending = true;
+            PocketRolesPlugin.Logger?.LogInfo($"Config migration: [General] Language ja (the pre-v0.5.5 default) → auto (the game runs in {game}); the host is told at the next lobby");
+        }
         public static bool HostAuthorityMode { get => _register == null || _register.Value; set { if (_register != null) _register.Value = value; } }
         public static bool IgnoreVersionMismatch { get => _ignoreVersion != null && _ignoreVersion.Value; set { if (_ignoreVersion != null) _ignoreVersion.Value = value; } }
         public static bool WelcomeMessage { get => _welcome == null || _welcome.Value; set { if (_welcome != null) _welcome.Value = value; } }
@@ -468,6 +680,18 @@ namespace PocketRoles.Core
         public static string DiscordWebhookUrl => _discordWebhookUrl == null ? "" : (_discordWebhookUrl.Value ?? "").Trim();
         public static bool DiscordAnnounce { get => _discordAnnounce == null || _discordAnnounce.Value; set { if (_discordAnnounce != null) _discordAnnounce.Value = value; } }
         public static string DiscordText => _discordText == null ? "" : (_discordText.Value ?? "");
+        /// <summary>Default of [Discord] AvatarUrl (v0.5.5): the PocketRoles icon in the GitHub repository.</summary>
+        public const string DefaultDiscordAvatarUrl = "https://raw.githubusercontent.com/wakayamachannel/PocketRoles/main/assets/PocketRoles-256.png";
+        /// <summary>[Discord] AvatarUrl (v0.5.5): icon of a newly posted lobby message ("" = the webhook's own icon). Validated by DiscordWebhook.</summary>
+        public static string DiscordAvatarUrl => _discordAvatarUrl == null ? DefaultDiscordAvatarUrl : (_discordAvatarUrl.Value ?? "").Trim();
+        /// <summary>[Chat] NgFilter (v0.5.5): Chat.NgWords checks the other players' chat (default true).</summary>
+        public static bool NgFilter { get => _ngFilter == null || _ngFilter.Value; set { if (_ngFilter != null) _ngFilter.Value = value; } }
+        /// <summary>[Chat] NgKickAt (v0.5.5): NG-word hits in one lobby that remove a player, 1..5; 0 = never (default 3).</summary>
+        public static int NgKickAt { get => Math.Max(0, Math.Min(5, _ngKickAt?.Value ?? 3)); set { if (_ngKickAt != null) _ngKickAt.Value = Math.Max(0, Math.Min(5, value)); } }
+        /// <summary>[Chat] NgBan (v0.5.5): the NG-word removal bans from this lobby (default true).</summary>
+        public static bool NgBan { get => _ngBan == null || _ngBan.Value; set { if (_ngBan != null) _ngBan.Value = value; } }
+        /// <summary>[Chat] NgAnnounce (v0.5.5): one public line for an NG-word removal (default true).</summary>
+        public static bool NgAnnounce { get => _ngAnnounce == null || _ngAnnounce.Value; set { if (_ngAnnounce != null) _ngAnnounce.Value = value; } }
         public static bool AntiCheatKick { get => _antiCheatKick != null && _antiCheatKick.Value; set { if (_antiCheatKick != null) _antiCheatKick.Value = value; } }
         /// <summary>[AntiCheat] Detect (v0.5.3): CheatDetector on (default true).</summary>
         public static bool CheatDetect { get => _cheatDetect == null || _cheatDetect.Value; set { if (_cheatDetect != null) _cheatDetect.Value = value; } }
@@ -477,6 +701,26 @@ namespace PocketRoles.Core
         /// <summary>[AntiCheat] Callout (v0.5.3): CalloutWatch host notice (default true).</summary>
         public static bool CheatCallout { get => _cheatCallout == null || _cheatCallout.Value; set { if (_cheatCallout != null) _cheatCallout.Value = value; } }
         public static bool CheatAnnounceKick { get => _cheatAnnounceKick == null || _cheatAnnounceKick.Value; set { if (_cheatAnnounceKick != null) _cheatAnnounceKick.Value = value; } }
+        /// <summary>[AntiCheat] EndGameOnCheat (v0.5.5 AegisMatchStop): end the match of a compat game after a CERTAIN removal whose action changed the game (default true).</summary>
+        public static bool CheatEndGame { get => _cheatEndGame == null || _cheatEndGame.Value; set { if (_cheatEndGame != null) _cheatEndGame.Value = value; } }
+        /// <summary>[AntiCheat] RemoteRules (v0.5.5): Aegis thresholds / levels from the GitHub definitions file (default true; false = built-in values).</summary>
+        public static bool CheatRemoteRules { get => _cheatRemoteRules == null || _cheatRemoteRules.Value; set { if (_cheatRemoteRules != null) _cheatRemoteRules.Value = value; } }
+        /// <summary>[AntiCheat] Jitter (v0.5.5): per-lobby variation of the Aegis limits in percent (default 10, 0..20; 0 = off).</summary>
+        public static int CheatJitter
+        {
+            get => _cheatJitter == null ? 10 : Math.Max(0, Math.Min(Net.AegisRules.MaxJitterPercent, _cheatJitter.Value));
+            set { if (_cheatJitter != null) _cheatJitter.Value = Math.Max(0, Math.Min(Net.AegisRules.MaxJitterPercent, value)); }
+        }
+        /// <summary>[AntiCheat] SharedBans (v0.5.5): apply the [bans] list of the signed definitions file at join time (default true).</summary>
+        public static bool CheatSharedBans { get => _cheatSharedBans == null || _cheatSharedBans.Value; set { if (_cheatSharedBans != null) _cheatSharedBans.Value = value; } }
+        /// <summary>
+        /// [AntiCheat] AutoReport (v0.5.5): Among Us's own report (Cheating / Hacking) for a CERTAIN removal.
+        /// OFF by default, and OFF whenever the value cannot be read (entry not bound yet / config unreadable):
+        /// nobody is ever reported automatically unless a host's own config file says true.
+        /// </summary>
+        public static bool CheatAutoReport { get => _cheatAutoReport != null && _cheatAutoReport.Value; set { if (_cheatAutoReport != null) _cheatAutoReport.Value = value; } }
+        /// <summary>[AntiCheat] BanLadder (v0.5.5): a CERTAIN removal records a local ban, 30 d / 180 d / permanent (default true).</summary>
+        public static bool CheatBanLadder { get => _cheatBanLadder == null || _cheatBanLadder.Value; set { if (_cheatBanLadder != null) _cheatBanLadder.Value = value; } }
         /// <summary>[Diagnostics] WireLog: packet-level send/receive trace (Net.WireLog), off by default.</summary>
         public static bool WireLog { get => _wireLog != null && _wireLog.Value; set { if (_wireLog != null) _wireLog.Value = value; } }
 
@@ -485,7 +729,7 @@ namespace PocketRoles.Core
         /// <summary>Seconds (0..60).</summary>
         public static int AutoPublicDelay { get => _autoPublicDelay?.Value ?? 3; set { if (_autoPublicDelay != null) _autoPublicDelay.Value = Math.Max(0, Math.Min(60, value)); } }
         public static int RehostMaxAttempts { get => _rehostMaxAttempts?.Value ?? 3; set { if (_rehostMaxAttempts != null) _rehostMaxAttempts.Value = Math.Max(1, Math.Min(10, value)); } }
-        /// <summary>Ping (ms, 0..300) above which a freshly created, still empty lobby is re-created automatically; 0 = off.</summary>
+        /// <summary>[Lobby] PingRecreateLimit (v0.5.5; HostPingLimit / MaxHostPing before): ping (ms, 0..300) above which a freshly created, still empty lobby is re-created; 0 = off (default).</summary>
         public static int MaxHostPing { get => _maxHostPing?.Value ?? 0; set { if (_maxHostPing != null) _maxHostPing.Value = Math.Max(0, Math.Min(300, value)); } }
         /// <summary>[Lobby] AfkKickMinutes: kick a lobby player idle (no movement / chat) for this many minutes; 0 = off (default).</summary>
         public static int AfkKickMinutes { get => _afkKickMinutes?.Value ?? 0; set { if (_afkKickMinutes != null) _afkKickMinutes.Value = Math.Max(0, Math.Min(30, value)); } }
@@ -623,7 +867,17 @@ namespace PocketRoles.Core
 
         // ------------------------------------------------------------------ v0.4b [Translate]
 
+        /// <summary>
+        /// [Translate] Enabled: chat translation. OFF by default, and OFF whenever the value cannot be read (entry not
+        /// bound yet / config unreadable): no chat text is ever sent to Google / DeepL unless a host's own config says true.
+        /// </summary>
         public static bool TranslateEnabled { get => _trEnabled != null && _trEnabled.Value; set { if (_trEnabled != null) _trEnabled.Value = value; } }
+        /// <summary>
+        /// [Translate] OffNotice: v0.5.5, show the host-screen "chat translation is off" line once per game session.
+        /// True when the entry cannot be read, so a host who never opens the config still learns the feature exists;
+        /// /opt translate.notice off silences it for a host who will never use translation.
+        /// </summary>
+        public static bool TranslateOffNotice { get => _trOffNotice == null || _trOffNotice.Value; set { if (_trOffNotice != null) _trOffNotice.Value = value; } }
         /// <summary>Configured provider: "auto" | "google" | "deepl" (see <see cref="TranslateProviderChoices"/>). Use <see cref="TranslateEffectiveProvider"/> to know which one to call.</summary>
         public static string TranslateProvider { get => GetChoice(_trProvider, TranslateProviderChoices); set => SetChoice(_trProvider, TranslateProviderChoices, value); }
         /// <summary>
@@ -909,6 +1163,13 @@ namespace PocketRoles.Core
             return d;
         }
 
+        /// <summary>v0.5.5: inline Simplified Chinese row name for a row the zh table lacks (official terms); returns the same descriptor.</summary>
+        private static OptionDescriptor Zh(this OptionDescriptor d, string name)
+        {
+            d.NameZh = name;
+            return d;
+        }
+
         private static void BuildDescriptors()
         {
             _descriptors.Clear();
@@ -918,13 +1179,14 @@ namespace PocketRoles.Core
                     "Once you (the host) are dead, every player's role (alive / dead) is shown on your screen only: again at each meeting, plus one line per later death. Works in unregistered lobbies too (vanilla roles). Never sent to others; /who shows it on demand.",
                     "房主死亡后，所有玩家的职业（存活/死亡）只显示在房主的屏幕上：每次会议再次显示，之后每有人死亡显示一行。未注册房间也可用（原版职业名）。不会发给其他人；/who 可随时查看。"));
             _descriptors.Add(Bool("roles.vanilla", "全般", "General", "本体の特殊役職も配る", "Also assign vanilla special roles", _vanillaRoles)
-                .Tip("オン = サイエンティスト・エンジニア・ジャッジなど本体の役職も本体の設定どおりに出ます。オフ（既定）= クルーとインポスターだけにして、そこから PocketRoles の役職を配ります。",
+                .Tip("オン = 科学者・エンジニア・ジャッジなど本体の役職も本体の設定どおりに出ます。オフ（既定）= クルーとインポスターだけにして、そこから PocketRoles の役職を配ります。",
                     "On = vanilla roles (Scientist, Engineer, Judge, ...) are assigned as set in the vanilla role settings. Off (default) = only Crewmates and Impostors, from which the PocketRoles roles are drawn.",
-                    "开 = 科学家、工程师、法官等原版职业按原版设置出现。关（默认）= 只有船员和内鬼，PocketRoles 的职业从中分配。"));
+                    "开 = 科学家、工程师、法官等原版职业按原版设置出现。关（默认）= 只有船员和伪装者，PocketRoles 的职业从中分配。"));
 
             foreach (var r in Roles.All)
             {
                 string sJa = r.NameJa, sEn = r.NameEn, color = r.Color;
+                int firstRow = _descriptors.Count;
                 var role = r.Id;
                 if (role == CustomRole.Lovers)
                     _descriptors.Add(Int(r.Key + ".count", sJa, sEn, "組数（0/1）", "Pairs (0/1)", _count[role], 0, 1, 1, color)
@@ -940,13 +1202,13 @@ namespace PocketRoles.Core
                         _descriptors.Add(Float("sheriff.cooldown", sJa, sEn, "キルクールダウン", "Kill cooldown", _sheriffKillCooldown, 2.5f, 180f, 2.5f, color)
                             .Tip("シェリフがキルボタンを再び使えるまでの秒数。", "Seconds before the Sheriff can shoot again.", "警长再次开枪所需的冷却秒数。"));
                         _descriptors.Add(Bool("sheriff.killmadmate", sJa, sEn, "マッド系を撃てる", "Can kill Mad roles", _sheriffCanKillMadmate, color)
-                            .Tip("オンならマッド系役職（マッドメイト・マッドメイヤー・マッドスタントマン・マッドホーク・崇拝者）を撃っても自分は死にません。", "On: shooting a Mad-type role (Madmate, Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper) does not kill the Sheriff.", "开启后射杀狂粉系职业（内鬼狂粉、狂粉市长、疯狂特技演员、鹰眼狂粉、崇拜者）不会让警长死亡。"));
+                            .Tip("オンならマッド系役職（マッドメイト・マッドメイヤー・マッドスタントマン・マッドホーク・崇拝者）を撃っても自分は死にません。", "On: shooting a Mad-type role (Madmate, Mad Mayor, Mad Stuntman, Mad Hawk, Worshipper) does not kill the Sheriff.", "开启后射杀狂信徒系职业（狂信徒、狂信徒市长、狂信徒特技演员、狂信徒鹰眼、传教士）不会让警长死亡。"));
                         break;
                     case CustomRole.Jackal:
                         _descriptors.Add(Float("jackal.cooldown", sJa, sEn, "キルクールダウン", "Kill cooldown", _jackalKillCooldown, 2.5f, 180f, 2.5f, color)
                             .Tip("ジャッカルのキルクールダウン（秒）。", "Jackal kill cooldown in seconds.", "豺狼的击杀冷却秒数。"));
                         _descriptors.Add(Bool("jackal.vent", sJa, sEn, "ベント使用", "Can vent", _jackalCanVent, color)
-                            .Tip("ジャッカルがベントに入れるかどうか。", "Whether the Jackal can use vents.", "豺狼是否可以跳管。"));
+                            .Tip("ジャッカルがベントに入れるかどうか。", "Whether the Jackal can use vents.", "豺狼是否可以钻通风口。"));
                         break;
                     case CustomRole.Vampire:
                         _descriptors.Add(Float("vampire.delay", sJa, sEn, "噛みつき遅延", "Kill delay", _vampireKillDelay, 1f, 60f, 1f, color)
@@ -954,7 +1216,7 @@ namespace PocketRoles.Core
                         break;
                     case CustomRole.Mayor:
                         _descriptors.Add(Int("mayor.votes", sJa, sEn, "票数", "Votes", _mayorVotes, 1, 5, 1, color)
-                            .Tip("メイヤーの1票を何票として数えるか。", "How many votes the Mayor's single vote counts as.", "市长的一票算作几票。"));
+                            .Tip("メイヤーの1票を何票として数えるか。", "How many votes the Mayor's single vote counts as.", "市长的一票作为多少票。"));
                         break;
                     case CustomRole.Snitch:
                         _descriptors.Add(Int("snitch.tasks", sJa, sEn, "残りタスクで警告", "Tasks left to warn", _snitchTasksLeftToWarn, 0, 10, 1, color)
@@ -962,7 +1224,7 @@ namespace PocketRoles.Core
                         break;
                     case CustomRole.Lighter:
                         _descriptors.Add(Float("lighter.vision", sJa, sEn, "視界倍率", "Vision multiplier", _lighterVision, 1f, 5f, 0.25f, color)
-                            .Tip("ライターの視界の倍率。", "Vision multiplier of the Lighter.", "点灯者的视野倍率。"));
+                            .Tip("ライターの視界の倍率。", "Vision multiplier of the Lighter.", "执灯人的视野倍率。"));
                         break;
                     case CustomRole.SpeedBooster:
                         _descriptors.Add(Float("speedbooster.speed", sJa, sEn, "速度倍率", "Speed multiplier", _speedBoosterSpeed, 1f, 3f, 0.25f, color)
@@ -970,12 +1232,12 @@ namespace PocketRoles.Core
                         break;
                     case CustomRole.Madmate:
                         _descriptors.Add(Bool("madmate.known", sJa, sEn, "インポスターに公開", "Known to impostors", _madmateKnownToImpostors, color)
-                            .Tip("オンならインポスターにマッド系役職（マッドメイト・マッドスタントマン・マッドホーク・崇拝者）が誰か表示されます（マッドメイヤーは別設定）。", "On: Impostors see who the Mad-type players are (Madmate, Mad Stuntman, Mad Hawk; Ⓦ for the Worshipper; the Mad Mayor has its own switch).", "开启后内鬼可以看到谁是狂粉系职业（内鬼狂粉、疯狂特技演员、鹰眼狂粉；崇拜者为 Ⓦ；狂粉市长另有设置）。"));
+                            .Tip("オンならインポスターにマッド系役職（マッドメイト・マッドスタントマン・マッドホーク・崇拝者）が誰か表示されます（マッドメイヤーは別設定）。", "On: Impostors see who the Mad-type players are (Madmate, Mad Stuntman, Mad Hawk; Ⓦ for the Worshipper; the Mad Mayor has its own switch).", "开启后伪装者可以看到谁是狂信徒系职业（狂信徒、狂信徒特技演员、狂信徒鹰眼；传教士为 Ⓦ；狂信徒市长另有设置）。"));
                         break;
                     // v0.4.1
                     case CustomRole.Lovers:
                         _descriptors.Add(Bool("lovers.impostor", sJa, sEn, "インポスターも恋人になる", "Impostor may be a lover", _loversAllowImpostor, color)
-                            .Tip("オンなら2人目の恋人がインポスターから選ばれることがあります（キルはできたままです）。", "On: the second lover may be a vanilla Impostor (it keeps its kill button).", "开启后第二位恋人可能从内鬼中选出（仍可击杀）。"));
+                            .Tip("オンなら2人目の恋人がインポスターから選ばれることがあります（キルはできたままです）。", "On: the second lover may be a vanilla Impostor (it keeps its kill button).", "开启后第二位恋人可能从伪装者中选出（仍可击杀）。"));
                         _descriptors.Add(Bool("lovers.lastthree", sJa, sEn, "残り3人で勝利", "Win as last 3", _loversLastThree, color)
                             .Tip("オンなら2人とも生きていて生存者が3人以下になった時点でラバーズの勝利です。", "On: the Lovers win as soon as both are alive and at most 3 players remain.", "开启后两人存活且存活者不超过3人时恋人立即获胜。"));
                         break;
@@ -983,7 +1245,7 @@ namespace PocketRoles.Core
                         _descriptors.Add(Float("arsonist.cooldown", sJa, sEn, "油のクールダウン", "Douse cooldown", _arsonistDouseCooldown, 2.5f, 180f, 2.5f, color)
                             .Tip("油をかけてから次にかけられるまでの秒数。", "Seconds between two douses.", "两次浇油之间的冷却秒数。"));
                         _descriptors.Add(Bool("arsonist.vent", sJa, sEn, "ベント使用", "Can vent", _arsonistCanVent, color)
-                            .Tip("放火魔がベントに入れるかどうか。", "Whether the Arsonist can use vents.", "纵火犯是否可以跳管。"));
+                            .Tip("放火魔がベントに入れるかどうか。", "Whether the Arsonist can use vents.", "纵火犯是否可以钻通风口。"));
                         break;
                     case CustomRole.Witch:
                         _descriptors.Add(Float("witch.cooldown", sJa, sEn, "呪いのクールダウン", "Spell cooldown", _witchSpellCooldown, 0f, 180f, 2.5f, color)
@@ -1000,45 +1262,45 @@ namespace PocketRoles.Core
                     // ---- v0.5.0
                     case CustomRole.MadMayor:
                         _descriptors.Add(Int("madmayor.votes", sJa, sEn, "票数", "Votes", _madMayorVotes, 1, 5, 1, color)
-                            .Tip("マッドメイヤーの1票を何票として数えるか。", "How many votes the Mad Mayor's single vote counts as.", "狂粉市长的一票算作几票。"));
+                            .Tip("マッドメイヤーの1票を何票として数えるか。", "How many votes the Mad Mayor's single vote counts as.", "狂信徒市长的一票作为多少票。"));
                         _descriptors.Add(Bool("madmayor.known", sJa, sEn, "インポスターに公開", "Known to impostors", _madMayorKnownToImpostors, color)
-                            .Tip("オンならインポスターに誰がマッドメイヤーか表示されます。", "On: Impostors see who the Mad Mayor is.", "开启后内鬼可以看到谁是狂粉市长。"));
+                            .Tip("オンならインポスターに誰がマッドメイヤーか表示されます。", "On: Impostors see who the Mad Mayor is.", "开启后伪装者可以看到谁是狂信徒市长。"));
                         break;
                     case CustomRole.MadStuntman:
                         _descriptors.Add(Int("madstuntman.lives", sJa, sEn, "耐えられるキル回数", "Kills survived", _madStuntmanLives, 1, 10, 1, color)
-                            .Tip("この回数まではキルされても死にません（投票による追放は防げません）。", "Kill attempts the Mad Stuntman survives before one goes through (votes are never blocked).", "在此次数内被击杀也不会死（无法阻止投票放逐）。"));
+                            .Tip("この回数まではキルされても死にません（投票による追放は防げません）。", "Kill attempts the Mad Stuntman survives before one goes through (votes are never blocked).", "在此次数内被击杀也不会死（无法阻止投票驱逐）。"));
                         _descriptors.Add(Bool("madstuntman.notify", sJa, sEn, "本人に通知", "Notify stuntman", _madStuntmanNotify, color)
                             .Tip("オンならキルを耐えたことと残り回数を本人にチャットで知らせます（ヴァンパイアの噛みつきや魔女の呪いを耐えた時も知らせます。キルした側にはいつも知らせます）。", "On: the stuntman is told in chat that it survived and how many attempts are left (also for an absorbed Vampire bite or Witch spell; the killer is always told).", "开启后会用聊天告诉本人挡下了击杀以及剩余次数（挡下吸血鬼的咬或女巫的诅咒时也会告知；击杀者始终会被告知）。"));
                         break;
                     case CustomRole.MadHawk:
                         _descriptors.Add(Float("madhawk.vision", sJa, sEn, "視界倍率", "Vision multiplier", _madHawkVision, 1f, 5f, 0.25f, color)
-                            .Tip("マッドホークの視界の倍率（停電中は、狭くなった視界にこの倍率がかかります）。", "Vision multiplier of the Mad Hawk (during a blackout the shrunken vision is multiplied).", "鹰眼狂粉的视野倍率（停电时是缩小后视野的倍数）。"));
+                            .Tip("マッドホークの視界の倍率（停電中は、狭くなった視界にこの倍率がかかります）。", "Vision multiplier of the Mad Hawk (during a blackout the shrunken vision is multiplied).", "狂信徒鹰眼的视野倍率（停电时是缩小后视野的倍数）。"));
                         _descriptors.Add(Float("madhawk.speed", sJa, sEn, "速度倍率", "Speed multiplier", _madHawkSpeed, 0.5f, 1.5f, 0.25f, color)
-                            .Tip("マッドホークの移動速度の倍率（1 = 通常。広い視界の代償に遅くするなら 1 未満）。", "Movement speed multiplier of the Mad Hawk (1 = normal; below 1 to pay for the wide vision).", "鹰眼狂粉的移动速度倍率（1 = 普通；小于 1 可作为大视野的代价）。"));
+                            .Tip("マッドホークの移動速度の倍率（1 = 通常。広い視界の代償に遅くするなら 1 未満）。", "Movement speed multiplier of the Mad Hawk (1 = normal; below 1 to pay for the wide vision).", "狂信徒鹰眼的移动速度倍率（1 = 普通；小于 1 可作为大视野的代价）。"));
                         break;
                     case CustomRole.Worshipper:
                         _descriptors.Add(Int("worshipper.uses", sJa, sEn, "崇拝回数", "Worships", _worshipperUses, 1, 5, 1, color)
-                            .Tip("1 試合に崇拝できる回数（成功した分だけ数えます）。", "How many players the Worshipper may convert per game (only successes count).", "每局可以崇拜的次数（只计成功的次数）。"));
+                            .Tip("1 試合に崇拝できる回数（成功した分だけ数えます）。", "How many players the Worshipper may convert per game (only successes count).", "每局可以传教的次数（只计成功的次数）。"));
                         _descriptors.Add(Float("worshipper.cooldown", sJa, sEn, "崇拝のクールダウン", "Worship cooldown", _worshipperCooldown, 2.5f, 180f, 2.5f, color)
-                            .Tip("崇拝してから次に崇拝できるまでの秒数（キルボタンのクールダウン）。", "Seconds between two worships (the kill button's cooldown).", "两次崇拜之间的秒数（击杀键冷却）。"));
+                            .Tip("崇拝してから次に崇拝できるまでの秒数（キルボタンのクールダウン）。", "Seconds between two worships (the kill button's cooldown).", "两次传教之间的秒数（击杀键冷却）。"));
                         break;
                     case CustomRole.JackalFriends:
                         _descriptors.Add(Bool("jackalfriends.known", sJa, sEn, "ジャッカルに公開", "Known to Jackal", _jackalFriendsKnownToJackal, color)
-                            .Tip("オンならジャッカルにジャッカルフレンズの名前が青く見えます。", "On: the Jackal sees the Jackal Friends' names in blue.", "开启后豺狼能看到豺狼之友的名字（蓝色）。"));
+                            .Tip("オンならジャッカルにジャッカルフレンズの名前が青く見えます。", "On: the Jackal sees the Jackal Friends' names in blue.", "开启后豺狼能看到跟班的名字（蓝色）。"));
                         _descriptors.Add(Bool("jackalfriends.sheriff", sJa, sEn, "シェリフに撃たれる", "Sheriff can shoot", _jackalFriendsSheriffCanKill, color)
-                            .Tip("オンならシェリフはジャッカルフレンズを撃っても死にません。オフなら誤射扱いでシェリフが死にます。", "On: the Sheriff may shoot Jackal Friends without dying. Off: shooting one is a misfire (the Sheriff dies).", "开启后警长射杀豺狼之友不会死亡；关闭则视为误杀，警长死亡。"));
+                            .Tip("オンならシェリフはジャッカルフレンズを撃っても死にません。オフなら誤射扱いでシェリフが死にます。", "On: the Sheriff may shoot Jackal Friends without dying. Off: shooting one is a misfire (the Sheriff dies).", "开启后警长射杀跟班不会死亡；关闭则视为误杀，警长死亡。"));
                         break;
                     case CustomRole.EvilHawk:
                         _descriptors.Add(Float("evilhawk.vision", sJa, sEn, "視界倍率", "Vision multiplier", _evilHawkVision, 1f, 5f, 0.25f, color)
-                            .Tip("イビルホークの視界の倍率（インポスターの視界に掛けます。常時有効）。", "Vision multiplier of the Evil Hawk (applied to the impostor vision, always on).", "邪恶鹰眼的视野倍率（乘以内鬼视野，始终有效）。"));
+                            .Tip("イビルホークの視界の倍率（インポスターの視界に掛けます。常時有効）。", "Vision multiplier of the Evil Hawk (applied to the impostor vision, always on).", "邪恶鹰眼的视野倍率（乘以伪装者视野，始终有效）。"));
                         break;
                     case CustomRole.EvilNekomata:
                         _descriptors.Add(Bool("evilnekomata.voters", sJa, sEn, "道連れは投票者から", "Drag a voter only", _nekomataVotersOnly, color)
                             .Tip("オンなら自分に投票した人の中から、オフなら生存者全員の中から道連れを選びます。", "On: the victim is one of the players who voted for you. Off: any living player.", "开启：从投票给你的人中选择；关闭：从所有存活玩家中选择。"));
                         _descriptors.Add(Bool("evilnekomata.excludeimp", sJa, sEn, "インポスター陣営を除外", "Exclude impostor team", _nekomataExcludeImpostors, color)
-                            .Tip("オンならインポスター陣営（マッド系役職含む）は道連れになりません。", "On: Impostor-team players (Madmate family included) are never dragged.", "开启后内鬼阵营（含狂粉系职业）不会被拖走。"));
+                            .Tip("オンならインポスター陣営（マッド系役職含む）は道連れになりません。", "On: Impostor-team players (Madmate family included) are never dragged.", "开启后伪装者阵营（含狂信徒系职业）不会被拖走。"));
                         _descriptors.Add(Bool("evilnekomata.announce", sJa, sEn, "道連れを全員に通知", "Announce the drag", _nekomataAnnounce, color)
-                            .Tip("オンなら追放画面の後に「○○ は △△ の道連れになりました」と全員に届きます。オフなら本人にだけ届きます。", "On: after the ejection screen everyone reads who was dragged along. Off: only the victim is told.", "开启后放逐画面结束时所有人都会看到谁被拖走；关闭则只通知本人。"));
+                            .Tip("オンなら追放画面の後に「○○ は △△ の道連れになりました」と全員に届きます。オフなら本人にだけ届きます。", "On: after the ejection screen everyone reads who was dragged along. Off: only the victim is told.", "开启后驱逐画面结束时所有人都会看到谁被拖走；关闭则只通知本人。"));
                         break;
                     case CustomRole.SerialKiller:
                         _descriptors.Add(Float("serialkiller.cooldown", sJa, sEn, "キルクールダウン", "Kill cooldown", _serialKillerKillCooldown, 1f, 60f, 1f, color)
@@ -1052,39 +1314,63 @@ namespace PocketRoles.Core
                         _descriptors.Add(Float("samurai.cooldown", sJa, sEn, "斬撃のクールダウン", "Slash cooldown", _samuraiKillCooldown, 0f, 180f, 2.5f, color)
                             .Tip("斬撃から次の斬撃までの秒数（0 = キルクールダウンと同じ）。", "Seconds between two slashes (0 = same as the kill cooldown).", "两次斩击之间的秒数（0 = 与击杀冷却相同）。"));
                         _descriptors.Add(Float("samurai.range", sJa, sEn, "斬撃の範囲", "Slash range", _samuraiRange, 0.5f, 5f, 0.25f, color)
-                            .Tip("侍を中心にした半径。バニラのキル距離はおよそ 短1 / 中1.8 / 長2.5。", "Radius around the Samurai. Vanilla kill distances are roughly short 1 / medium 1.8 / long 2.5.", "以武士为中心的半径。原版击杀距离约为 短1 / 中1.8 / 长2.5。"));
+                            .Tip("侍を中心にした半径。バニラのキル距離はおよそ 短1 / 中1.8 / 長2.5。", "Radius around the Samurai. Vanilla kill distances are roughly short 1 / medium 1.8 / long 2.5.", "以武士为中心的半径。原版击杀范围约为 短1 / 中1.8 / 长2.5。"));
                         _descriptors.Add(Float("samurai.stagger", sJa, sEn, "倒れる間隔", "Death interval", _samuraiStagger, 0.1f, 1f, 0.1f, color)
                             .Tip("巻き込まれた人が順に倒れる間隔の秒数（0.3 = 公式サーバーの送信間隔）。", "Seconds between two bystander deaths (0.3 = the official server's packet spacing).", "被波及者依次倒下的间隔秒数（0.3 = 官方服务器的发送间隔）。"));
                         _descriptors.Add(Bool("samurai.teammates", sJa, sEn, "味方も斬る", "Hits allies", _samuraiHitTeammates, color)
-                            .Tip("オンなら範囲内のインポスター陣営（インポスター・マッド系役職など）も死にます。", "On: Impostor-team players in range (Impostors, Madmate family …) die too.", "开启后范围内的内鬼阵营（内鬼、狂粉系职业等）也会死亡。"));
+                            .Tip("オンなら範囲内のインポスター陣営（インポスター・マッド系役職など）も死にます。", "On: Impostor-team players in range (Impostors, Madmate family …) die too.", "开启后范围内的伪装者阵营（伪装者、狂信徒系职业等）也会死亡。"));
                         break;
                 }
+                // v0.5.5: the role section heading in Chinese even without a zh table entry
+                for (int i = firstRow; i < _descriptors.Count; i++) _descriptors[i].SectionZh = r.NameZh;
             }
 
             const string gJa = "全般", gEn = "General";
-            _descriptors.Add(Bool("register", gJa, gEn, "MOD部屋登録（公式ルール・役職に必須）", "Mod-lobby registration (official rule, required for roles)", _register)
+            _descriptors.Add(Bool("register", gJa, gEn, "MOD部屋登録（公式ルール・追加役職に必須）", "Mod-lobby registration (official rule, needed for mod roles)", _register)
                 .Tip("2026年7月からの公式ルールで、MODを使う部屋はサーバーに登録する必要があります。登録した部屋は公開一覧に出ないので、部屋コードか案内部屋から入ってもらいます。", "Since July 2026 the official servers require lobbies that use mods to register. Registered lobbies do not appear in the public list, so players join by room code or through the guide room.", "根据 2026 年 7 月起的官方规则，使用 MOD 的房间必须向服务器注册。已注册的房间不会出现在公开列表里，请用房间代码或引导房加入。"));
             _descriptors.Add(new OptionDescriptor
             {
                 Key = "lang", SectionJa = gJa, SectionEn = gEn, NameJa = "言語", NameEn = "Language", Kind = OptionKind.Choice,
-                Min = 0, Max = 2, Step = 1, Choices = new[] { "ja", "zh", "en" },
-                GetNumber = () => Language == "en" ? 2f : (Language == "zh" ? 1f : 0f),
-                SetNumber = v => Language = v >= 1.5f ? "en" : (v >= 0.5f ? "zh" : "ja"),
-            }.Tip("チャットや説明の既定の言語。各プレイヤーは /lang で変更できます。", "Default language for chat texts; each player can change theirs with /lang.", "聊天文本的默认语言；每位玩家可用 /lang 更改。"));
+                Min = 0, Max = 3, Step = 1, Choices = LanguageChoices,
+                GetNumber = () => Math.Max(0, Array.IndexOf(LanguageChoices, LanguageSetting)),
+                SetNumber = v => Language = LanguageChoices[(int)Math.Round(Clamp(v, 0, LanguageChoices.Length - 1))],
+            }.Tip("チャットや説明の既定の言語。auto = ゲームの言語に合わせる（中国語 → 中文、日本語 → 日本語、それ以外 → English）。各プレイヤーは /lang で変更できます。", "auto = follow the game's language (Chinese → 中文, Japanese → 日本語, else English). Players: /lang", "聊天文本的默认语言。auto = 跟随游戏语言（中文 → 中文，日语 → 日本語，其他 → English）。每位玩家可用 /lang 更改。"));
             _descriptors.Add(Bool("welcome", gJa, gEn, "参加時の挨拶", "Welcome message", _welcome)
                 .Tip("参加した人にこの部屋がMOD部屋であることを個別に知らせます。", "Privately tells every joining player that this lobby uses a host-side mod.", "私聊告知每位加入的玩家本房间使用房主模组。"));
-            _descriptors.Add(Bool("roles.reveal", gJa, gEn, "死亡・追放時に役職を表示", "Reveal role on death / ejection", _revealOnDeath));
-            _descriptors.Add(Bool("roles.revealall", gJa, gEn, "役職表示を全員に(オフ=ホストのみ)", "Reveal to everyone (off = host only)", _revealToAll));
+            _descriptors.Add(Bool("roles.reveal", gJa, gEn, "死亡・追放時に役職を表示", "Reveal role on death / ejection", _revealOnDeath).Zh("死亡或被驱逐时显示职业"));
+            _descriptors.Add(Bool("roles.revealall", gJa, gEn, "役職表示を全員に(オフ=ホストのみ)", "Reveal to everyone (off = host only)", _revealToAll).Zh("职业显示给所有人(关=仅房主)"));
             _descriptors.Add(Bool("roleinfo", gJa, gEn, "会議で役職説明", "Role info at meetings", _roleInfoAtMeeting)
                 .Tip("会議開始時に各自の役職説明を個別に送り直します。", "Re-sends each player's role description privately when a meeting starts.", "会议开始时再次私聊发送各自的职业说明。"));
             _descriptors.Add(Bool("anticheat", gJa, gEn, "Aegisアンチチート(登録オフ)", "Aegis anti-cheat (unregistered)", _cheatDetect)
-                .Tip("登録オフの部屋で、普通のAmong Usではありえない操作(キルできない役のキル、ベント、能力、タスク、生存中の会議外チャットなど)を見つけてホストの画面に出します。/ac で一覧。", "In unregistered rooms, spots actions vanilla Among Us never produces (kills, vents, abilities, tasks by roles that cannot, alive chat outside meetings...) and shows them on the host's screen. /ac lists them.", "在未登记房间中，发现原版Among Us不可能出现的操作(不能击杀的职业击杀、通风管、能力、任务、存活时会议外聊天等)并显示在主持画面上。/ac 查看列表。"));
+                .Tip("登録オフの部屋で、普通のAmong Usではありえない操作(キルできない役のキル、ベント、能力、タスク、生存中の会議外チャットなど)を見つけてホストの画面に出します。/ac で一覧。", "In unregistered rooms, spots actions vanilla Among Us never produces (kills, vents, abilities, tasks by roles that cannot, alive chat outside meetings...) and shows them on the host's screen. /ac lists them.", "在未注册房间中，发现原版Among Us不可能出现的操作(不能击杀的职业击杀、不能钻通风口的职业钻通风口、使用没有的能力、伪装者完成任务、存活时会议外聊天等)并显示在房主的画面上。/ac 查看列表。"));
             _descriptors.Add(Bool("anticheat.kick", gJa, gEn, "チートの人を自動で退出", "Remove cheaters automatically", _cheatAutoKick)
-                .Tip("確実な検知(キル・ベント・能力・タスク)は1回、会議外チャットは2回で、この部屋へのバン付きで退出させます。VIP以上は対象外。", "Removes (with a ban for this room) on the first certain detection (kill / vent / ability / task) or the second alive chat outside a meeting. VIP and above are exempt.", "确定的检测(击杀/通风管/能力/任务)1次、会议外聊天2次即移出并禁止再次进入本房间。VIP以上除外。"));
+                .Tip("確実な検知(キル・ベント・能力・タスク)は1回、会議外チャットは2回で、この部屋へのバン付きで退出させます。VIP以上は対象外。", "Removes (with a ban for this room) on the first certain detection (kill / vent / ability / task) or the second alive chat outside a meeting. VIP and above are exempt.", "确定的检测(击杀/通风口/能力/任务)1次、会议外聊天2次即移出并限制其再次进入本房间。VIP以上除外。"));
             _descriptors.Add(Bool("anticheat.announce", gJa, gEn, "退出させたことを全員に知らせる", "Announce removals to everyone", _cheatAnnounceKick)
                 .Tip("チート検知で退出させた時、誰をなぜ退出させたかを全員のチャットに1行出します。", "When the anti-cheat removes someone, one public chat line says who and why.", "因作弊检测移出玩家时，在所有人的聊天中显示一行：谁以及原因。"));
+            _descriptors.Add(Bool("anticheat.endgame", gJa, gEn, "確実なチートで試合を止める", "Stop the match on a sure cheat", _cheatEndGame)
+                .Tip("登録オフの部屋の試合中に、ありえない操作(キルできない役職のキルなど)で人を退出させた時、その試合をすぐに終わりにします(廃村と同じ終わり方)。ホストは自動で、ほかの人は「もう一度プレイ」でロビーに戻り、名前なしで理由を知らせます。インポスターのタスクのように試合が変わらない操作や、ラグかもしれない検知では止めません。1試合1回・1時間3回まで。「チートの人を自動で退出」がオンの時だけ。",
+                    "Unregistered rooms: when a player is removed mid-match for an impossible action (e.g. a kill by a role that cannot kill), the match ends at once, like the haison. The host returns by itself, the others with Play Again; then all are told why, with no name. Not for actions that change nothing (an impostor's task) or possible lag. Once per match, 3 times an hour. Needs 'Remove cheaters automatically'.",
+                    "在未注册房间的对局中，因不可能的操作(如不能击杀的职业击杀了人)移出玩家时，立即结束本局(与废局相同的结束方式)。房主自动回到大厅，其他人按“再玩一次”回来，然后不点名地告诉大家原因。伪装者做任务这类不改变对局的操作、可能是延迟的检测不会结束对局。每局1次、每小时3次为限。仅在“自动移出作弊者”开启时有效。"));
             _descriptors.Add(Bool("anticheat.callout", gJa, gEn, "インポを言い当てた人を知らせる", "Tell me about impostor callouts", _cheatCallout)
-                .Tip("登録オフの部屋で、生きているクルーがまだ何もしていないインポスターを会議で言い当てたら、ホストの画面にだけ出します(インポスターが見えるチートの目印。退出はさせません)。ホストが生きたクルーの間はネタバレになるので、死亡後か試合後に出します。", "In unregistered rooms: when a living crewmate names, in a meeting, impostors that have done nothing yet, the host alone is told (a sign of a role-seeing cheat; nobody is removed). While the host is a living crewmate it waits until the host dies or the game ends.", "在未登记房间中，存活的船员在会议中点中尚未行动的内鬼时，只在主持画面上提示(能看到内鬼的作弊的迹象，不会移出)。主持作为存活船员时为避免剧透，会在死亡后或赛后显示。"));
+                .Tip("登録オフの部屋で、生きているクルーがまだ何もしていないインポスターを会議で言い当てたら、ホストの画面にだけ出します(インポスターが見えるチートの目印。退出はさせません)。手がかりのない会議で、そういうインポスターに何試合も投票する人も知らせます。ホストが生きたクルーの間はネタバレになるので、死亡後か試合後に出します。", "In unregistered rooms: when a living crewmate names, in a meeting, impostors that have done nothing yet, the host alone is told (a sign of a role-seeing cheat; nobody is removed). Also someone who, game after game, votes for such impostors in meetings with no clue yet. While the host is a living crewmate it waits until the host dies or the game ends.", "在未注册房间中，存活的船员在会议中点中尚未行动的伪装者时，只在房主的画面上提示(能看到伪装者的作弊的迹象，不会移出)。在没有线索的会议中多局投票给这类伪装者的人也会提示。房主作为存活船员时为避免剧透，会在死亡后或赛后显示。"));
+            _descriptors.Add(Bool("anticheat.remoterules", gJa, gEn, "Aegisの判定値をGitHubから更新", "Update Aegis rules from GitHub", _cheatRemoteRules)
+                .Tip("Aegisが判定に使う数値(チャット連投の回数、スピードの倍率など)とルールの強さを、GitHubの定義ファイルから取って更新します。誤検知や抜け穴をMODの更新なしで直せます(ルールの強さはゆるくする方向だけ。数値は項目ごとに決めた範囲の中で上下します)。オフなら数値とNGワードは組み込みのものを使い、共有BANは使いません。ただし、退出させないようにゆるめる変更(知らせるだけ・オフ)、必要な版、記録を消す依頼の一覧は、オフでも受け取ります。/ac rules で確認。", "Takes the numbers Aegis judges with (chat flood count, speed multiplier...) and the rule levels from the definitions file on GitHub, so false positives and loopholes get fixed without a mod update (rule levels only get more lenient; the numbers move either way within fixed ranges). Off: built-in numbers and NG words, no shared bans; but changes that make a rule stop removing players (notice only / off), the required version and the list of erase requests are still received. /ac rules shows them.", "从GitHub的定义文件获取Aegis判定用的数值(刷屏次数、速度倍率等)和规则强度并更新，无需更新模组即可修正误检和漏洞(规则强度只会放宽；数值在每项固定的范围内上下调整)。关闭则使用内置数值和违禁词，不使用共享限制进入名单，但让规则不再移出玩家的放宽更改(仅提示・关闭)、所需版本和删除记录请求的名单仍会接收。/ac rules 查看。"));
+            _descriptors.Add(Int("anticheat.jitter", gJa, gEn, "Aegisの判定値を部屋ごとにずらす(%)", "Vary Aegis limits per lobby (%)", _cheatJitter, 0, Net.AegisRules.MaxJitterPercent, 1)
+                .Tip("Aegisの判定値(スピードの倍率、チャット連投の回数と秒数など)を、部屋ごとにこの%の範囲でランダムに上下させます。公開されている定義ファイルの値ぎりぎりを狙うチートを防ぎます(退出につながる値は、厳しくする側へはこの%の半分まで)。ずらした値はホストだけが見られます(/ac rules lobby とログ)。0 = ずらさない。既定 10。",
+                    "Moves the Aegis limits (speed multiplier, chat flood count and seconds...) up or down at random within this percentage for every lobby, so a cheater cannot sit just under the published values (limits that can remove a player get at most half of it toward stricter). Only the host sees the drawn values (/ac rules lobby and the log). 0 = off. Default 10.",
+                    "按房间在此百分比范围内随机上下调整Aegis的判定值(速度倍率、刷屏次数和秒数等)，防止作弊者卡在公开数值的边缘(会导致移出的判定值，往更严的方向最多只调整此百分比的一半)。调整后的值只有房主能看到(/ac rules lobby 和日志)。0 = 不调整。默认 10。"));
+            _descriptors.Add(Bool("anticheat.banladder", gJa, gEn, "確実なチートは長期BAN(30日→180日→無期限)", "Long bans for certain cheats (30 d, 180 d, permanent)", _cheatBanLadder)
+                .Tip("確実な検知(キルできない役のキルなど)で退出させた人を、自分が立てるすべての部屋でBANします。1回目30日、2回目180日、3回目から無期限。解除は /aegis unban(回数は、BANが終わってから1年残ります)。証拠の記録も残します。オフなら、その部屋だけのBAN。なりすましで他人をはめることも理論上はできるので、誤りの申し立ては証拠の記録で確かめてください。",
+                    "Players removed for a certain detection (a kill by a role that cannot...) are banned from every lobby you host: 30 days the first time, 180 days the second, permanent from the third. /aegis unban lifts one (the count is kept for a year after a ban ends). An evidence record is kept. Off: a ban for that room only. A spoofing cheater could in theory frame someone: check appeals against the evidence record.",
+                    "因确定的检测(不能击杀的职业击杀等)被移出的玩家，将被限制进入你创建的所有房间：第1次30天，第2次180天，第3次起永久。/aegis unban 解除(次数在限制进入结束后保留1年)。同时保存证据记录。关闭则只限制进入该房间。理论上作弊者可以冒充他人陷害别人，申诉请对照证据记录确认。"));
+            _descriptors.Add(Bool("anticheat.autoreport", gJa, gEn, "確実なチートを公式に自動通報", "Auto-report certain cheats to Among Us", _cheatAutoReport)
+                .Tip("既定はオフ（自動では誰も通報しません）。オンにすると、確実な検知で退出させる前に Among Us の公式の通報(チート)を送ります。同じ人へは30日に1回、1時間に5件まで。/opt anticheat.autoreport on でもオンにできます。オフのままでも /aegis report <名前> で1人ずつ通報できます。通報は取り消せません(なりすましで他人をはめることも理論上はできます)。",
+                    "Off by default (nobody is reported automatically). When on, Among Us's own player report (cheating) is sent before a removal for a certain detection: at most once per player every 30 days and 5 an hour. /opt anticheat.autoreport on also turns it on. Even while off, /aegis report <name> reports one player. A report cannot be taken back (a spoofing cheater could in theory frame someone).",
+                    "默认关闭（不会自动举报任何人）。开启后，在因确定的检测移出玩家前向 Among Us 官方发送举报(作弊)：同一玩家30天1次，每小时最多5次。也可用 /opt anticheat.autoreport on 开启。即使关闭，也可用 /aegis report <名字> 单独举报。举报无法撤回(理论上作弊者可以冒充他人陷害别人)。"));
+            _descriptors.Add(Bool("anticheat.sharedbans", gJa, gEn, "共有BANリストを使う", "Use the shared ban list", _cheatSharedBans)
+                .Tip("署名されたAegisの定義ファイルにある共有BANリストの人が入ってきたら、その人に「この部屋には入れません」と知らせて(登録オフの部屋では名前を出さずに全員へ)、30秒後に退出させます。待つ間にチートの検知・NGワード・連投があった時と、試合を始める時はすぐに退出(同じ部屋にまた来たら、すぐにその部屋へのBAN付きで退出)。リストには名前もフレンドコードも載らず、推測できないPUIDのハッシュだけが載ります。VIP以上は対象外。",
+                    "When someone on the shared ban list of the signed Aegis definitions file joins, they are told they cannot join (in unregistered rooms: one public line without a name) and removed 30 s later, at once on a cheat detection, an NG word, a chat flood or a game start (back in the same lobby: removed at once with a ban for that room). The list holds no names and no friend codes, only a hash of the PUID, which cannot be guessed back. VIP and above are exempt.",
+                    "签名的Aegis定义文件中的共享限制进入名单上的玩家加入时，告知其“无法进入本房间”(未注册房间中不显示名字，向所有人发一条)，30秒后移出；等待期间出现作弊检测、违禁词、刷屏或开始游戏时立即移出(再次进入同一房间时立即移出并限制其进入该房间)。名单上没有名字也没有好友编号，只有无法推测的PUID哈希。VIP以上除外。"));
             _descriptors.Add(Bool("general.ignoreversion", gJa, gEn, "バージョン不一致を無視", "Ignore version mismatch", _ignoreVersion)
                 .Tip("ゲームのバージョンが対応版と違ってもMODを動かします（自己責任）。", "Keeps the mod active on an unsupported game version (at your own risk).", "游戏版本不匹配时仍启用模组（风险自负）。"));
             _descriptors.Add(Bool("credits.show", gJa, gEn, "クレジット表示", "Show credits", _showCredits)
@@ -1100,9 +1386,9 @@ namespace PocketRoles.Core
             _descriptors.Add(Int("lobby.rehostmax", lJa, lEn, "再ホスト最大回数", "Re-host max attempts", _rehostMaxAttempts, 1, 10, 1)
                 .Tip("自動再ホストを連続で試す最大回数。", "Maximum consecutive automatic re-host attempts.", "自动重建房间的最大连续尝试次数。"));
             _descriptors.Add(Int("lobby.maxping", lJa, lEn, "高PINGなら部屋を作り直す(ms)", "Re-host when ping above (ms)", _maxHostPing, 0, 300, 10)
-                .Tip("部屋を作った直後5秒間PINGがこの値(ms)を超え、まだ自分しかいなければ「作り直しますか？」と聞きます。15秒答えがなければ作り直します（続けて最大3回、0 = しない。既定 80）。", "Right after creating the lobby, if the ping stays above this (ms) for 5 s while you are alone, you are asked whether to re-create it; with no answer for 15 s it is re-created (up to 3 times in a row; 0 = off; default 80).", "创建房间后 5 秒内延迟一直高于此值(ms)且房间里只有自己时，会询问是否重建；15 秒内未回答则自动重建（连续最多 3 次，0 = 关闭，默认 80）。"));
+                .Tip("部屋を作った時に測ったサーバーまでの往復時間（PING）がこの値(ms)を超え、5秒たってもまだ自分しかいなければ「作り直しますか？」と聞きます。15秒答えがなければ作り直します（続けて最大3回）。既定 0 = しない。", "If the round trip to the game server measured when the lobby is created is above this (ms) and you are still alone 5 s later, you are asked whether to re-create it; with no answer for 15 s it is re-created (up to 3 times in a row). Default 0 = off.", "创建房间时测得的到服务器的往返时间高于此值(ms)，且 5 秒后房间里仍只有自己时，会询问是否重建；15 秒内未回答则自动重建（连续最多 3 次）。默认 0 = 关闭。"));
             _descriptors.Add(Int("lobby.afkkick", lJa, lEn, "AFKキック(分, 0=なし)", "AFK kick (min, 0 = off)", _afkKickMinutes, 0, 30, 1)
-                .Tip("ロビーでこの分数だけ動きも発言もない人に30秒前に警告し、退出させます（BANではありません）。ホスト・VIP・モデレーター・管理者は対象外。未登録の部屋でも動きます。0 = しない。", "A lobby player who neither moves nor chats for this many minutes is warned 30 s ahead and then kicked (not banned). Host, VIPs, moderators and admins are exempt. Works in unregistered lobbies too. 0 = off.", "在大厅中这段分钟数内既不移动也不发言的玩家会在 30 秒前收到警告，然后被移出（不是封禁）。房主、VIP、管理员除外。未注册房间也可用。0 = 关闭。"));
+                .Tip("ロビーでこの分数だけ動きも発言もない人に30秒前に警告し、退出させます（BANではありません）。ホスト・VIP・モデレーター・管理者は対象外。未登録の部屋でも動きます。0 = しない。", "A lobby player who neither moves nor chats for this many minutes is warned 30 s ahead and then kicked (not banned). Host, VIPs, moderators and admins are exempt. Works in unregistered lobbies too. 0 = off.", "在大厅中这段分钟数内既不移动也不发言的玩家会在 30 秒前收到警告，然后被移出（不是限制进入）。房主、VIP、管理员除外。未注册房间也可用。0 = 关闭。"));
             _descriptors.Add(Bool("lobby.autostart", lJa, lEn, "自動開始", "Auto start", _autoStart)
                 .Tip("設定した人数が揃ったら自動でゲームを開始します。", "Starts the game automatically once enough players are in.", "凑齐设定人数后自动开始游戏。"));
             _descriptors.Add(Int("lobby.autostartplayers", lJa, lEn, "自動開始の人数", "Auto start players", _autoStartPlayers, 4, 15, 1)
@@ -1110,23 +1396,23 @@ namespace PocketRoles.Core
             _descriptors.Add(Int("lobby.autostartcountdown", lJa, lEn, "開始カウントダウン(秒)", "Start countdown (s)", _autoStartCountdown, 1, 30, 1)
                 .Tip("自動開始・強制開始前のカウントダウン秒数。", "Countdown seconds before an automatic or forced start.", "自动或强制开始前的倒计时秒数。"));
             _descriptors.Add(Choice("lobby.timermode", lJa, lEn, "ロビー残り時間の動作", "Lobby timer action", _timerMode, TimerModeChoices)
-                .Tip("ロビーの制限時間が切れそうなときの動作（延長 / 廃村 / 通知のみ）。", "What to do when the lobby timer is about to expire (extend / haison / notify only).", "房间倒计时快结束时的处理（延长 / 废村 / 仅通知）。"));
+                .Tip("ロビーの制限時間が切れそうなときの動作（延長 / 廃村 / 通知のみ）。", "What to do when the lobby timer is about to expire (extend / haison / notify only).", "房间倒计时快结束时的处理（延长 / 废局 / 仅通知）。"));
             _descriptors.Add(Int("lobby.timerwarnat", lJa, lEn, "残り時間の警告(秒)", "Timer warning at (s)", _timerWarnAt, 30, 300, 10)
                 .Tip("残り時間がこの秒数になったら警告して動作します。", "Lobby seconds left at which the warning and the action happen.", "剩余秒数达到此值时发出警告并执行动作。"));
             _descriptors.Add(Int("lobby.extenddelay", lJa, lEn, "警告から延長までの秒数", "Extend notice delay (s)", _extendNoticeDelay, 0, 60, 1)
-                .Tip("警告から延長・廃村までの待ち秒数。", "Seconds between the warning and the extension / haison.", "从警告到延长或废村之间的等待秒数。"));
+                .Tip("警告から延長・廃村までの待ち秒数。", "Seconds between the warning and the extension / haison.", "从警告到延长或废局之间的等待秒数。"));
             _descriptors.Add(Bool("lobby.autoregion", lJa, lEn, "自動で最速の地域を選ぶ", "Auto lowest-ping region", _autoRegion)
-                .Tip("部屋を作る前に各地域のpingを測り、最も速い地域を選びます。", "Pings the regions before hosting and picks the fastest one.", "创建房间前测试各区域延迟并选择最快的区域。"));
+                .Tip("「部屋を作る」の画面を開いた時だけ各地域のpingを測り、最も速い地域を選びます。部屋コードで参加する時は変わりません。計測に数秒かかるので、すぐ「作成」を押した部屋は元の地域のままで、次に画面を開いた時に切り替わります。", "Pings the regions when the CREATE GAME screen opens and picks the fastest one. Joining a room by its code never changes your region. The run takes a few seconds: a room created before it ends keeps the current region and the switch happens the next time the screen opens.", "只在打开“创建房间”界面时测试各区域延迟并选择最快的区域。用房间代码加入时不会更改区域。测量需要几秒，在此之前就点“创建”的房间仍使用原区域，会在下次打开该界面时切换。"));
             _descriptors.Add(Bool("lobby.dleks", lJa, lEn, "逆スケルド(Dleks)を出す", "Offer Dleks map", _enableDleks)
                 .Tip("マップ選択に逆スケルド（Dleks）を出します。バニラの人も遊べます。", "Offers the mirrored Skeld (Dleks) in the map picker; vanilla players can play it.", "在地图选择中提供镜像 Skeld（Dleks）；原版玩家也可以游玩。"));
 
             const string hJa = "ホスト支援", hEn = "Host tools";
             _descriptors.Add(Bool("gm", hJa, hEn, "ゲームマスター", "Game Master", _gameMaster)
-                .Tip("ホストは役職を持たず、開始時に死亡して観戦・進行役になります。", "The host gets no role, dies at the start and only watches / moderates.", "房主不持有职业，开局即死亡，只观战和主持。"));
+                .Tip("ホストは役職を持たず、開始時に死亡して観戦・進行役になります。", "The host gets no role, dies at the start and only watches / moderates.", "房主不持有职业，开局即死亡，只观战（不参与游戏）。"));
             _descriptors.Add(Bool("hotkeys", hJa, hEn, "ホットキー有効", "Hotkeys enabled", _hotkeysEnabled)
-                .Tip("廃村・会議終了・開始キャンセルのホットキーを有効にします。", "Enables the host hotkeys for haison, end meeting and cancel start.", "启用废村、结束会议、取消开始的快捷键。"));
+                .Tip("廃村・会議終了・開始キャンセルのホットキーを有効にします。", "Enables the host hotkeys for haison, end meeting and cancel start.", "启用废局、结束会议、取消开始的快捷键。"));
             _descriptors.Add(Hotkey("hotkeys.haison", hJa, hEn, "廃村キー(2回押し)", "Haison key (press twice)", _hotkeyHaison, "F7")
-                .Tip("このキーを3秒以内に2回押すとゲームを廃村で終了します。", "Press this key twice within 3 seconds to end the game as haison.", "3 秒内按两次此键以废村结束游戏。"));
+                .Tip("このキーを3秒以内に2回押すとゲームを廃村で終了します。", "Press this key twice within 3 seconds to end the game as haison.", "3 秒内按两次此键以废局结束游戏。"));
             _descriptors.Add(Hotkey("hotkeys.endmeeting", hJa, hEn, "会議終了キー(2回押し)", "End meeting key (press twice)", _hotkeyEndMeeting, "F8")
                 .Tip("このキーを3秒以内に2回押すと会議を強制終了します。", "Press this key twice within 3 seconds to force-end the meeting.", "3 秒内按两次此键强制结束会议。"));
             _descriptors.Add(Hotkey("hotkeys.cancelstart", hJa, hEn, "開始キャンセルキー", "Cancel start key", _hotkeyCancelStart, "F9")
@@ -1142,7 +1428,7 @@ namespace PocketRoles.Core
             _descriptors.Add(Bool("guide.overlay", hJa, hEn, "部屋コードを大きく表示", "Big room-code overlay", _guideShowCodeOverlay)
                 .Tip("ロビー中、ホストの画面左上に部屋コードを大きく表示します（/code で切替。案内部屋の名前に書き写す用）。", "Shows the room code large at the top-left of the host's lobby screen (/code toggles it; copy it into the guide room's name).", "在大厅中于房主屏幕左上角大字显示房间代码（/code 切换；用于抄写到引导房的名字）。"));
             _descriptors.Add(Bool("guide.autoreg", hJa, hEn, "/move 後に登録部屋へ作り直す", "/move: re-create as registered", _guideAutoRecreateRegistered)
-                .Tip("/move の 30 秒後に、この便利ホスト部屋を MOD 登録ありの役職部屋として作り直します（全員がコードで入り直し）。", "30 s after /move, re-creates this unregistered lobby as a registered role lobby (everyone rejoins with the new code).", "/move 30 秒后，把这个未注册房间重建为已注册的职业房（所有人用新代码重新加入）。"));
+                .Tip("/move の 30 秒後に、この便利ホスト部屋を MOD 登録ありの追加役職部屋として作り直します（全員がコードで入り直し）。", "30 s after /move, re-creates this unregistered lobby as a registered mod-roles lobby (everyone rejoins with the new code).", "/move 30 秒后，把这个未注册房间重建为已注册的模组职业房（所有人用新代码重新加入）。"));
             // v0.4b vanilla extended ranges (also host-tools page)
             _descriptors.Add(Bool("vanilla.ranges", hJa, hEn, "バニラ設定の範囲拡張", "Vanilla extended ranges", _vanExtendedRanges)
                 .Tip("バニラの数値設定をバニラの上限・下限を超えて設定できるようにします。", "Lets the vanilla numeric settings go beyond their vanilla limits.", "允许原版数值设置超出原版上下限。"));
@@ -1160,11 +1446,11 @@ namespace PocketRoles.Core
                 .Tip("議論時間の最大値（秒）。", "Highest discussion time (s).", "讨论时间的最大值（秒）。"));
             _descriptors.Add(Int("vanilla.emergencymax", hJa, hEn, "緊急会議CD最大(秒)", "Emergency cooldown max (s)", _vanEmergencyMax, 0, 600, 10)
                 .Tip("緊急会議クールダウンの最大値（秒）。", "Highest emergency-meeting cooldown (s).", "紧急会议冷却的最大值（秒）。"));
-            _descriptors.Add(Int("vanilla.gauses", hJa, hEn, "守護天使の回数(登録あり,0=無制限)", "Guardian Angel uses (reg., 0=unlimited)", _vanGaUses, 0, 9, 1));
-            if (HostShieldUnlocked) _descriptors.Add(Int("host.shield", hJa, hEn, "ホストのシールド回数(登録あり)", "Host shield kills (reg.)", _hostShieldKills, 0, 9, 1));
-            _descriptors.Add(Int("compat.tasks.common", hJa, hEn, "配るコモン数(登録オフ,0=設定)", "Common tasks dealt (unreg., 0=setting)", _compatCommonTasks, 0, 60, 1));
-            _descriptors.Add(Int("compat.tasks.short", hJa, hEn, "配るショート数(登録オフ,0=設定)", "Short tasks dealt (unreg., 0=setting)", _compatShortTasks, 0, 60, 1));
-            _descriptors.Add(Int("compat.tasks.long", hJa, hEn, "配るロング数(登録オフ,0=設定)", "Long tasks dealt (unreg., 0=setting)", _compatLongTasks, 0, 60, 1));
+            _descriptors.Add(Int("vanilla.gauses", hJa, hEn, "守護天使の護衛回数(登録あり,0=無制限)", "Guardian Angel uses (reg., 0=unlimited)", _vanGaUses, 0, 9, 1).Zh("守护天使保护次数(已注册,0=无限)"));
+            if (HostShieldUnlocked) _descriptors.Add(Int("host.shield", hJa, hEn, "ホストのシールド回数(登録あり)", "Host shield kills (reg.)", _hostShieldKills, 0, 9, 1).Zh("房主护盾次数(已注册)"));
+            _descriptors.Add(Int("compat.tasks.common", hJa, hEn, "配るコモン数(登録オフ,0=設定)", "Common tasks dealt (unreg., 0=setting)", _compatCommonTasks, 0, 60, 1).Zh("实际分发普通任务数(未注册,0=按设置)"));
+            _descriptors.Add(Int("compat.tasks.short", hJa, hEn, "配るショート数(登録オフ,0=設定)", "Short tasks dealt (unreg., 0=setting)", _compatShortTasks, 0, 60, 1).Zh("实际分发短任务数(未注册,0=按设置)"));
+            _descriptors.Add(Int("compat.tasks.long", hJa, hEn, "配るロング数(登録オフ,0=設定)", "Long tasks dealt (unreg., 0=setting)", _compatLongTasks, 0, 60, 1).Zh("实际分发长任务数(未注册,0=按设置)"));
             _descriptors.Add(Int("vanilla.taskmax", hJa, hEn, "タスク数最大", "Task count max", _vanTaskMax, 1, 60, 1)
                 .Tip("共通・短い・長いタスク数の最大値。", "Highest common / short / long task count.", "普通、短、长任务数量的最大值。"));
 
@@ -1179,9 +1465,32 @@ namespace PocketRoles.Core
                 .Tip("ホスト以外のプレイヤーも /help などのコマンドを使えます。", "Lets non-host players use chat commands such as /help.", "允许非房主玩家使用 /help 等聊天命令。"));
             _descriptors.Add(Bool("chat.allcommands", cJa, cEn, "全コマンド", "All commands", _allCommands)
                 .Tip("オフにするとチャットコマンドを全て無効にします（/mod on のみ可）。", "Off disables every chat command (only /mod on still works).", "关闭后禁用所有聊天命令（仅 /mod on 可用）。"));
+            // v0.5.5 NG words (Chat.NgWords)
+            _descriptors.Add(Bool("ng", cJa, cEn, "NGワード（暴言に注意・退出）", "NG words (warn / remove)", _ngFilter)
+                .Tip("ほかの人のチャット（ロビーでも試合中でも、登録オン・オフどちらの部屋でも）をNGワードの一覧と照らします。決めた回数（既定 3）の前までは毎回全員に注意、その回数で退出です。ホスト・VIP・モデレーター・アドミンは対象外。一覧は組み込み（GitHubの定義ファイルで更新）と BepInEx\\PocketRoles\\NgWords.txt。/ng で状態の確認と編集。",
+                    "Checks the other players' chat (lobby and game, registered or not) against the NG word list: a public warning on each hit before the set count (default 3), removal at it. Host, VIPs, moderators and admins are exempt. List: built-in (updated from the GitHub definitions file) plus BepInEx\\PocketRoles\\NgWords.txt. /ng shows and edits it.",
+                    "用违禁词表检查其他玩家的聊天（大厅和对局中，注册与否都适用）：达到设定次数（默认 3）前每次公开警告，达到则移出。房主、VIP、版主、管理员除外。词表为内置（随 GitHub 定义文件更新）加上 BepInEx\\PocketRoles\\NgWords.txt。/ng 查看和编辑。"));
+            _descriptors.Add(Int("ng.kickat", cJa, cEn, "NGワード何回目で退出(0=しない)", "Remove at NG hit # (0 = never)", _ngKickAt, 0, 5, 1)
+                .Tip("同じ部屋でNGワードにこの回数当たったら退出させます（それまでは毎回、全員に見える注意。5秒以内の続けての発言は1回と数えます）。0 = 注意だけで退出させません。既定 3。",
+                    "Removes a player at this many NG-word hits in one room (each hit before that gets a public warning; lines within 5 s count once). 0 = warnings only, no removal. Default 3.",
+                    "同一房间内命中违禁词达到此次数即移出（在此之前每次都公开警告；5 秒内的连续发言算 1 次）。0 = 只警告不移出。默认 3。"));
+            _descriptors.Add(Bool("ng.ban", cJa, cEn, "NGワードの退出に部屋バン", "Room ban on NG removal", _ngBan)
+                .Tip("NGワードで退出させる時、この部屋に戻れないようにします（オフなら普通のキックで、入り直せます）。",
+                    "The NG-word removal also bans the player from this room (off = a plain kick; they can rejoin).",
+                    "因违禁词移出时同时禁止其回到本房间（关闭则为普通踢出，可以重新加入）。"));
+            _descriptors.Add(Bool("ng.announce", cJa, cEn, "NGワードの退出を全員に知らせる", "Announce NG removals", _ngAnnounce)
+                .Tip("NGワードで退出させた時、全員のチャットに1行出します。",
+                    "One public chat line when a player is removed for NG words.",
+                    "因违禁词移出玩家时，在所有人的聊天中显示一行。"));
             // v0.4b chat translation rows (the DeepL key is a file, never a row)
             _descriptors.Add(Bool("translate.enabled", cJa, cEn, "チャット翻訳", "Chat translation", _trEnabled)
-                .Tip("外国語のチャットを自動で翻訳します（文章は Google / DeepL に送られます）。", "Auto-translates foreign-language chat (text is sent to Google / DeepL).", "自动翻译外语聊天（文本会发送到 Google / DeepL）。"));
+                .Tip("既定はオフ（チャットはどこにも送られません）。オンにすると外国語のチャットを自動で翻訳します（文章が Google / DeepL に送られます）。/opt translate.enabled on でもオンにできます。",
+                    "Off by default (no chat text leaves this PC). When on, foreign-language chat is auto-translated (the text is sent to Google / DeepL). /opt translate.enabled on also turns it on.",
+                    "默认关闭（聊天内容不会发送到任何地方）。开启后自动翻译外语聊天（文本会发送到 Google / DeepL）。也可用 /opt translate.enabled on 开启。"));
+            _descriptors.Add(Bool("translate.notice", cJa, cEn, "オフの時のお知らせ", "\"Translation is off\" notice", _trOffNotice)
+                .Tip("翻訳がオフの間、ゲームを起動してから最初の部屋で 1 回だけ、自分の画面に「翻訳はオフです」の 1 行を出します（ほかの人には見えません）。翻訳を使わないならオフにしてください。/opt translate.notice off でも消せます。",
+                    "While translation is off, put one \"translation is off\" line on your own screen in the first lobby after the game starts (nobody else sees it). Turn it off if you never use translation. /opt translate.notice off also silences it.",
+                    "翻译关闭期间，在启动游戏后的第一个房间里，只在你自己的画面上显示一行“翻译已关闭”（其他人看不到）。不使用翻译的话请关闭。也可用 /opt translate.notice off 关闭。"));
             _descriptors.Add(Choice("translate.provider", cJa, cEn, "翻訳サービス", "Translation provider", _trProvider, TranslateProviderChoices)
                 .Tip("翻訳サービス。auto は deepl-key.txt にキーがあれば DeepL、なければ Google。", "Translation service; auto = DeepL when deepl-key.txt has a key, else Google.", "翻译服务；auto 表示 deepl-key.txt 有密钥时用 DeepL，否则用 Google。"));
             _descriptors.Add(new OptionDescriptor
@@ -1196,7 +1505,7 @@ namespace PocketRoles.Core
             _descriptors.Add(Bool("translate.broadcast", cJa, cEn, "翻訳を全員に送る", "Broadcast translation", _trBroadcastToAll)
                 .Tip("翻訳をチャットで全員に送ります。", "Sends the translation to everyone as a chat message.", "把翻译作为聊天消息发送给所有人。"));
             _descriptors.Add(Bool("translate.compat", cJa, cEn, "登録オフでも外国語へ翻訳", "Translate into foreign languages (unregistered)", _trForeignInCompat)
-                .Tip("登録オフの部屋で、外国語の人がいる時だけ、チャットをその人の言葉に訳して全員に流します(個別に送れないため)。", "In unregistered rooms, while a foreign-language player is here, chat is translated into their language and posted for everyone (no private messages there).", "在未登记房间中，只在有外语玩家时，把聊天翻译成其语言并发给所有人(无法私聊)。"));
+                .Tip("登録オフの部屋で、外国語の人がいる時だけ、チャットをその人の言葉に訳して全員に流します(個別に送れないため)。", "In unregistered rooms, while a foreign-language player is here, chat is translated into their language and posted for everyone (no private messages there).", "在未注册房间中，只在有外语玩家时，把聊天翻译成其语言并发给所有人(无法私聊)。"));
             _descriptors.Add(Bool("translate.players", cJa, cEn, "外国語の人へ翻訳", "Translate for players", _trForPlayers)
                 .Tip("外国語を選んだプレイヤーに、チャットをその言語に訳して個別に送ります。", "Privately sends chat translated into each foreign player's /lang language.", "把聊天翻译成外语玩家所选语言并私聊发送。"));
             _descriptors.Add(Bool("translate.autodetect", cJa, cEn, "言語の自動判定", "Auto-detect language", _trAutoDetect)
@@ -1310,13 +1619,13 @@ namespace PocketRoles.Core
         /// "lobby.autostart", "lobby.autostartplayers", "lobby.autostartcountdown", "lobby.timermode", "lobby.timerwarnat",
         /// "lobby.extenddelay", "lobby.autoregion", "lobby.dleks", "gm", "hotkeys", "hotkeys.haison", "hotkeys.endmeeting",
         /// "hotkeys.cancelstart", "chat.welcometext", "chat.welcomesettings", "chat.playercommands", "chat.allcommands",
-        /// "chat.rulesmode", "chat.rulestext", "cos.enabled", "cos.music", "cos.musicfile", "cos.musicvolume", "cos.lobbypaint",
+        /// "chat.rulesmode", "chat.rulestext", "ng", "ng.kickat", "ng.ban", "ng.announce" (v0.5.5), "cos.enabled", "cos.music", "cos.musicfile", "cos.musicvolume", "cos.lobbypaint",
         /// "cos.dropship", "cos.menubg", "cos.cursor", "credits.author", "credits.url", "credits.show",
-        /// "chat.welcomeall", "translate.enabled", "translate.provider", "translate.target", "translate.showhost", "translate.broadcast",
+        /// "chat.welcomeall", "translate.enabled", "translate.notice" (v0.5.5), "translate.provider", "translate.target", "translate.showhost", "translate.broadcast",
         /// "translate.players", "translate.autodetect", "translate.minchars", "translate.maxperminute", "perm.adminsettings",
         /// "perm.modkick", "perm.vipmarker", "vanilla.ranges", "vanilla.killmin", "vanilla.killmax", "vanilla.killstep",
         /// "vanilla.votemin", "vanilla.votemax", "vanilla.discussmax", "vanilla.emergencymax", "vanilla.taskmax",
-        /// "guide.overlay", "guide.code", "guide.autoreg" (v0.4e guide room).
+        /// "guide.overlay", "guide.code", "guide.autoreg" (v0.4e guide room), "upgrade" (v0.5.5 one-time opt-in check).
         /// The DeepL key has no key here on purpose (file BepInEx/PocketRoles/deepl-key.txt).
         /// </summary>
         public static bool TrySet(string key, string value, out string message)
@@ -1330,7 +1639,8 @@ namespace PocketRoles.Core
             switch (k)
             {
                 case "lang": case "language":
-                    if (!Lang.TryNormalize(value, out var lang)) { message = "lang: ja | zh | en"; return false; }
+                    if (LangCore.IsAuto(value)) { Language = LangCore.Auto; message = "lang = " + LanguageLabel; return true; }
+                    if (!Lang.TryNormalize(value, out var lang)) { message = "lang: auto | ja | zh | en"; return false; }
                     Language = lang; message = "lang = " + lang; return true;
                 case "enabled": case "mod": return SetBool(_enabled, value, "enabled", out message);
                 case "welcome": return SetBool(_welcome, value, "welcome", out message);
@@ -1340,6 +1650,28 @@ namespace PocketRoles.Core
                 case "anticheat.kick": case "kick": case "anticheatkick": return SetBool(_cheatAutoKick, value, "anticheat.kick", out message);   // v0.5.3: the old reserved toggle now means the real auto-kick
                 case "anticheat.callout": case "callout": return SetBool(_cheatCallout, value, "anticheat.callout", out message);
                 case "anticheat.announce": case "anticheatannounce": return SetBool(_cheatAnnounceKick, value, "anticheat.announce", out message);
+                case "anticheat.endgame": case "endgame": case "endgameoncheat": return SetBool(_cheatEndGame, value, "anticheat.endgame", out message);   // v0.5.5 AegisMatchStop (host only: not in Commands.IsAdminOptKey)
+                case "anticheat.remoterules": case "remoterules": return SetBool(_cheatRemoteRules, value, "anticheat.remoterules", out message);   // v0.5.5 AegisRules
+                case "anticheat.jitter": case "jitter": return SetInt(_cheatJitter, value, 0, Net.AegisRules.MaxJitterPercent, "anticheat.jitter", out message);   // v0.5.5 per-lobby variation (host only: not in Commands.IsAdminOptKey)
+                // v0.5.5 AegisBans (host only: not in Commands.IsAdminOptKey)
+                case "anticheat.sharedbans": case "sharedbans": return SetBool(_cheatSharedBans, value, "anticheat.sharedbans", out message);
+                // v0.5.5: turning this on from chat starts reporting other players to Innersloth, and a report cannot be
+                // taken back. The settings tab shows that in its tooltip; the chat reply has to say it too (README
+                // sends hosts to the chat command), so the "= on" line carries one warning line after it.
+                case "anticheat.autoreport": case "autoreport":
+                {
+                    bool set = SetBool(_cheatAutoReport, value, "anticheat.autoreport", out message);
+                    if (set && _cheatAutoReport != null && _cheatAutoReport.Value)
+                        message += "\n" + Lang.T("opt.warn.autoreport",
+                            "確実なチートの人を Among Us 公式に自動で通報します。通報は取り消せません。なりすましで無実の人を通報してしまうこともありえます。",
+                            "Players caught by a certain detection are reported to Among Us automatically. A report cannot be taken back, and a spoofing cheater could in theory get an innocent player reported.",
+                            "被“确定”等级检测到的玩家会自动举报给 Among Us 官方。举报无法撤回，理论上也可能因伪装而误报无辜的玩家。");
+                    return set;
+                }
+                case "anticheat.banladder": case "banladder": return SetBool(_cheatBanLadder, value, "anticheat.banladder", out message);
+                // v0.5.5: the one-time upgrade check of the two opt-in defaults (host only: not in Commands.IsAdminOptKey).
+                // off = turn off exactly what an older version's default left on, undo = put it back, keep = leave it.
+                case "upgrade": case "upgrade.defaults": return OptInUpgrade.TryCommand(value, out message);
                 case "general.ignoreversion": case "ignoreversion": return SetBool(_ignoreVersion, value, "general.ignoreversion", out message);
                 case "lobby.autorehost": case "autorehost": case "rehost": return SetBool(_autoRehost, value, "lobby.autorehost", out message);
                 case "lobby.autopublic": case "autopublic": return SetBool(_autoPublic, value, "lobby.autopublic", out message);
@@ -1392,8 +1724,25 @@ namespace PocketRoles.Core
                     return ok;
                 }
                 case "chat.welcomeall": case "chat.welcomealllanguages": case "welcomeall": return SetBool(_welcomeAllLanguages, value, "chat.welcomeall", out message);
+                // v0.5.5 NG words (/ng on|off does the same as "ng")
+                case "ng": case "chat.ngfilter": case "ngfilter": case "chat.ng": return SetBool(_ngFilter, value, "ng", out message);
+                case "ng.kickat": case "chat.ngkickat": case "ngkickat": return SetInt(_ngKickAt, value, 0, 5, "ng.kickat", out message);
+                case "ng.ban": case "chat.ngban": case "ngban": return SetBool(_ngBan, value, "ng.ban", out message);
+                case "ng.announce": case "chat.ngannounce": case "ngannounce": return SetBool(_ngAnnounce, value, "ng.announce", out message);
                 // v0.4b translation (the DeepL key is never settable here: it lives in BepInEx/PocketRoles/deepl-key.txt)
-                case "translate.enabled": case "translate": case "tr": return SetBool(_trEnabled, value, "translate.enabled", out message);
+                // v0.5.5: turning this on sends every chat line of the room to Google / DeepL. Same reason as
+                // anticheat.autoreport: the chat reply must say so, not only the settings-tab tooltip.
+                case "translate.enabled": case "translate": case "tr":
+                {
+                    bool set = SetBool(_trEnabled, value, "translate.enabled", out message);
+                    if (set && _trEnabled != null && _trEnabled.Value)
+                        message += "\n" + Lang.T("opt.warn.translate",
+                            "オンの間、部屋のチャットの文章が Google（または DeepL）に送られます。部屋の全員にもお知らせを出しました。",
+                            "While this is on, the chat text of the room is sent to Google (or DeepL). Everyone in the room has been told.",
+                            "开启期间，房间的聊天文本会发送到 Google（或 DeepL）。已经通知了房间里的所有人。");
+                    return set;
+                }
+                case "translate.notice": case "translate.offnotice": case "tr.notice": return SetBool(_trOffNotice, value, "translate.notice", out message);
                 case "translate.provider": case "tr.provider": return SetChoiceValue(_trProvider, TranslateProviderChoices, value, "translate.provider", out message);
                 case "translate.target": case "translate.targetlang": case "translate.lang": case "tr.target":
                     if (!Lang.TryNormalize(value, out var trLang)) { message = "translate.target: ja | zh | en"; return false; }
@@ -1618,7 +1967,7 @@ namespace PocketRoles.Core
             }
             if (!any) lines.Add(Lang.T("opt.none", "有効な役職はありません（/set <役職> <人数> で設定）", "No custom roles enabled (/set <role> <count>)"));
             lines.Add(Lang.TF("opt.general", "言語={0} MOD登録={1} 挨拶={2}", "lang={0} registration={1} welcome={2}",
-                Language, HostAuthorityMode ? "on" : "off", WelcomeMessage ? "on" : "off"));
+                LanguageLabel, HostAuthorityMode ? "on" : "off", WelcomeMessage ? "on" : "off"));
             if (AutoRehost || AutoPublic)
             {
                 string pub = AutoPublic ? Lang.TF("opt.lobby.public.on", "on({0}秒)", "on ({0}s)", AutoPublicDelay) : "off";
@@ -1634,7 +1983,7 @@ namespace PocketRoles.Core
             bool compat = false;
             try { compat = Net.Registration.CompatMode; } catch (Exception) { }
             if (compat)
-                lines.Add(Lang.TF("opt.compat", "互換モード（登録オフ・便利ホスト）: 役職={0}（バニラ進行）", "Compat mode (unregistered, 便利ホスト): roles={0} (vanilla game)", "off"));
+                lines.Add(Lang.TF("opt.compat", "互換モード（登録オフ・便利ホスト）: 追加役職={0}（本来の役職は設定どおり）", "Compat mode (unregistered, 便利ホスト): mod roles={0} (usual roles as set)", "off"));
             return lines;
         }
 

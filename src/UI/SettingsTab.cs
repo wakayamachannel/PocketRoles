@@ -337,7 +337,7 @@ namespace PocketRoles.UI
             string team = $"<color={Roles.TeamColor(r.Team)}>{Roles.TeamName(r.Team)}</color>";
             string head = Lang.IsEn ? $"{r.ColoredName} ({team})" : $"{r.ColoredName}（{team}）";
             string kill = Lang.T("ui.help.kill", "キル", "Kill", "击杀");
-            string vent = Lang.T("ui.help.vent", "ベント", "Vent", "跳管");
+            string vent = Lang.T("ui.help.vent", "ベント", "Vent", "通风口");
             string sab = Lang.T("ui.help.sabotage", "サボタージュ", "Sabotage", "破坏");
             string tasks = Lang.T("ui.help.tasks", "タスク", "Tasks", "任务");
             string sep = Lang.IsEn ? "  " : "　";
@@ -509,7 +509,7 @@ namespace PocketRoles.UI
         {
             return expanded
                 ? Lang.T("ui.tab.vanilla.expanded", "▼ バニラ設定", "▼ Vanilla settings", "▼ 原版设置")
-                : Lang.T("ui.tab.vanilla.collapsed", "▶ バニラ設定（ゲーム設定・プリセット・ロール）", "▶ Vanilla settings (game · presets · roles)", "▶ 原版设置（游戏・预设・职业）");
+                : Lang.T("ui.tab.vanilla.collapsed", "▶ バニラ設定（ゲーム設定・プリセット・ロール）", "▶ Vanilla settings (game · presets · roles)", "▶ 原版设置（游戏、预设、职业）");
         }
 
         /// <summary>
@@ -1033,7 +1033,7 @@ namespace PocketRoles.UI
             {
                 new HostAction { Label = () => Lang.T("ui.host.start", "今すぐ開始", "Start now", "立即开始"), Enabled = () => InLobbyNow() && !Lobby.AutoStart.CountdownRunning(), Run = HostStart },
                 new HostAction { Label = () => Lang.T("ui.host.cancel", "キャンセル", "Cancel", "取消"), Enabled = () => InLobbyNow() && Lobby.AutoStart.CountdownRunning(), Run = HostCancel },
-                new HostAction { Label = () => Lang.T("ui.host.haison", "廃村", "Haison", "废村"), Enabled = () => Core.Game.IsHostActive && (InLobbyNow() || GameStartedNow()) && !Core.Game.HaisonActive, Run = HostHaison },
+                new HostAction { Label = () => Lang.T("ui.host.haison", "廃村", "Haison", "废局"), Enabled = () => Core.Game.IsHostActive && (InLobbyNow() || GameStartedNow()) && !Core.Game.HaisonActive, Run = HostHaison },
                 new HostAction { Label = () => Lang.T("ui.host.endmeeting", "会議終了", "End meeting", "结束会议"), Enabled = () => Core.Game.IsHostActive && MeetingNow(), Run = HostEndMeeting },
                 new HostAction { Label = TestLabel, Enabled = () => true, Run = HostToggleTest },
                 new HostAction { Label = () => Lang.T("ui.host.show", "設定を表示", "Show settings", "显示设置"), Enabled = () => true, Run = HostShow },

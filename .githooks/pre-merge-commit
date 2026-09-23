@@ -1,0 +1,15 @@
+#!/bin/sh
+# PocketRoles: 合流（git merge）のコミットの前に、pre-commit と同じ見張りを動かします。
+#   git は合流のときだけ pre-commit ではなく この名前の仕掛けを呼びます。これが無いと
+#   `git merge --no-ff` は見張りを 1 文字も出さずに通ります（2026-09-23 に実測しました）。
+# git が呼ばないもの（この仕掛けでも受け止められないもの）:
+#   git cherry-pick / git revert / git rebase … どれもコミットの前の仕掛けを呼びません。
+#   そこは .githooks/pre-push が受け止めます。
+# 1 回だけ飛ばすとき: git merge --no-verify（事故のもとなので、ふだんは使わないでください）
+
+dir=$(dirname "$0")
+if [ ! -f "$dir/pre-commit" ]; then
+    echo "[秘密の見張り] .githooks/pre-commit が見つからないので、確かめられませんでした。" >&2
+    exit 1
+fi
+exec sh "$dir/pre-commit" "$@"

@@ -22,6 +22,7 @@
 | Q10 | 不具合の報告方法（報告 zip） |
 | Q11 | 規約違反にならないか / BAN されないか |
 | Q12 | Epic 版 / 家庭用機 / スマホで使えるか |
+| Q13 | 更新したら「はじめからオフになりました」と出た（`/opt upgrade`、README 6.4） |
 
 署名（各言語の最終行に必ず入れる）: `PocketRoles サポート（もみじちゃ）`
 
@@ -187,7 +188,7 @@ MOD を入れるのは部屋を作るホストだけです。参加者は PC / S
 - /cmd lang zh … 切换发给自己的语言（ja / zh / en）
 
 “/cmd …”只会发给房主，其他玩家看不到。
-※ 只能使用快捷聊天的平台（主机等）无法输入指令，但可以阅读说明。
+※ 只能使用快速聊天的平台（主机等）无法输入指令，但可以阅读说明。
 ```
 
 ### en
@@ -345,37 +346,37 @@ To customise the texts, edit BepInEx\PocketRoles\lang\ja.json / zh-CN.json / en.
 ### ja
 
 ```
-チャット翻訳は既定でオンです（併用モード）。外国語のチャットがホストの画面に翻訳されて表示され、参加者向けにも翻訳が届きます。
+チャット翻訳は既定でオフです。オンにすると併用モードで動き、外国語のチャットがホストの画面に翻訳されて表示され、参加者向けにも翻訳が届きます。
 
-1. 何もしなくても動きます（設定ファイルでは [Translate] Enabled = true）。オフにするなら設定タブ「会話」の「チャット翻訳」か /opt translate off。
+1. オンにする方法（どれでも同じです）: ロビーのチャットで /opt translate.enabled on、設定タブ「会話」の「チャット翻訳」、設定ファイルの [Translate] Enabled = true。止める時は /opt translate off。
 2. 翻訳エンジンは Google（キー不要。既定）か DeepL を選べます。
 3. DeepL を使う場合: DeepL API Free のキー（無料枠 月 50 万文字）を取得し、MOD 用フォルダの BepInEx\PocketRoles\deepl-key.txt にキーだけを 1 行で保存してから、翻訳エンジンを deepl にします。キーは誰にも送らないでください（報告 zip にも入りません）。
 
-注意: 翻訳のため、チャットの文章が Google または DeepL に送られます。オンにすると挨拶文に「翻訳あり」の案内が入ります。
+注意: オンの間だけ、翻訳のためにチャットの文章が Google または DeepL に送られます（オフの間はどこにも送られません）。オンにすると挨拶文に「翻訳あり」の案内が入ります。部屋に人がいる時にオンにした場合は、その場で同じ案内が部屋に流れます。
 ```
 
 ### zh-CN
 
 ```
-聊天翻译默认开启（并用模式）。外语聊天会翻译后显示在房主的画面上，也会把翻译发送给其他玩家。
+聊天翻译默认关闭。开启后以并用模式运行：外语聊天会翻译后显示在房主的画面上，也会把翻译发送给其他玩家。
 
-1. 不需要任何操作（设置文件中为 [Translate] Enabled = true）。要关闭的话，在设置标签页“聊天”分页的“聊天翻译”或用 /opt translate off。
+1. 开启方法（任选其一）：在房间聊天里输入 /opt translate.enabled on；在设置标签页“聊天”分页按“聊天翻译”；在设置文件中写 [Translate] Enabled = true。关闭用 /opt translate off。
 2. 翻译引擎可选 Google（无需密钥，默认）或 DeepL。
 3. 使用 DeepL 时: 申请 DeepL API Free 的密钥（免费额度每月 50 万字符），把密钥单独一行保存到 mod 文件夹的 BepInEx\PocketRoles\deepl-key.txt，然后把翻译引擎改为 deepl。请不要把密钥发给任何人（报告 zip 里也不会包含它）。
 
-注意: 为了翻译，聊天内容会发送给 Google 或 DeepL。开启后欢迎语里会加入“已开启翻译”的提示。
+注意: 只有在开启期间，为了翻译才会把聊天内容发送给 Google 或 DeepL（关闭期间不会发送到任何地方）。开启后欢迎语里会加入“已开启翻译”的提示。如果房间里已有玩家时开启，会立即把同样的提示发送到房间里。
 ```
 
 ### en
 
 ```
-Chat translation is on by default (combined mode). Foreign-language chat is shown translated on the host's screen, and translations are also sent to the players.
+Chat translation is off by default. Once you turn it on it runs in combined mode: foreign-language chat is shown translated on the host's screen, and translations are also sent to the players.
 
-1. Nothing to do (in the config file: [Translate] Enabled = true). To turn it off, use "Chat translation" on the Chat page of the settings tab or /opt translate off.
+1. To turn it on (any one of these): type /opt translate.enabled on in the lobby chat; press "Chat translation" on the Chat page of the settings tab; or set [Translate] Enabled = true in the config file. /opt translate off stops it again.
 2. The engine can be Google (no key needed, default) or DeepL.
 3. For DeepL: get a DeepL API Free key (free tier: 500,000 characters per month), save only the key on a single line in BepInEx\PocketRoles\deepl-key.txt inside the mod folder, then set the engine to deepl. Never send the key to anyone (it is not included in report zips).
 
-Note: chat text is sent to Google or DeepL for translation. When enabled, the welcome message tells players that translation is on.
+Note: only while it is on is chat text sent to Google or DeepL for translation (while it is off, nothing is sent anywhere). When enabled, the welcome message tells players that translation is on; if you enable it with players already in the room, the same notice is sent to the room right away.
 ```
 
 ---
@@ -521,4 +522,53 @@ PocketRoles is an unofficial mod not affiliated with Innersloth. Use it at your 
 Only the Steam version on Windows can host with the mod. PocketRoles cannot be installed on the Epic Games or Microsoft Store versions, on Switch / PlayStation / Xbox, or on mobile. Mac and Linux are not supported either.
 
 Joining works from any platform: ask someone with the Steam version on Windows to create the room and join with the room code.
+```
+
+---
+
+## Q13 — 更新したら「はじめからオフになりました」と出た / 升级后出现“现在默认关闭”的提示 / "Now starts off" appeared after updating
+
+### ja
+
+```
+v0.5.5 から、チャット翻訳と、Among Us 公式への自動通報は「はじめからオフ」になりました。ただし設定ファイルに書いてある値のほうが優先されるので、前の版から更新しただけの場合、チャット翻訳はオンのまま残っています。
+
+そのお知らせは、更新後にはじめて部屋を作った時に、ホストの画面にだけ 1 回出ます（ほかの人には見えません）。設定は勝手には変えていません。設定ファイルには「自分で選んだオン」と「前の版のままのオン」がまったく同じ形で書かれていて、見分けられないからです。
+
+- オフにする: ロビーのチャットで /opt upgrade off
+- 元に戻す: /opt upgrade undo
+- このままにする: /opt upgrade keep
+- 今の状態を見る: /opt upgrade
+
+自動通報のほうは v0.5.4 に無かった設定なので、更新するとオフで入ります（オンにするのは /opt anticheat.autoreport on です）。この確認は 1 回だけで、結果は BepInEx\PocketRoles\opt-defaults.txt に残ります。詳しくは README の 6.4 をご覧ください。
+```
+
+### zh-CN
+
+```
+从 v0.5.5 起，聊天翻译和向 Among Us 官方的自动举报默认是关闭的。但设置文件里已有的值优先于新的初始值，所以只是从旧版本升级的话，聊天翻译仍然是开启的。
+
+那条提示会在升级后第一次创建房间时，只在房主自己的画面上显示一次（其他人看不到）。我们没有擅自修改设置：在设置文件里，“自己选择的开启”和“旧版本沿用下来的开启”写法完全一样，无法分辨。
+
+- 关闭：在房间聊天里输入 /opt upgrade off
+- 恢复原样：/opt upgrade undo
+- 保持现状：/opt upgrade keep
+- 查看当前状态：/opt upgrade
+
+自动举报在 v0.5.4 里不存在，所以升级后是关闭的（开启用 /opt anticheat.autoreport on）。这个检查只做一次，结果保存在 BepInEx\PocketRoles\opt-defaults.txt。详情请看 README 的 6.4。
+```
+
+### en
+
+```
+From v0.5.5 on, chat translation and the automatic report to Among Us start off. A value already written in your config file wins over the new default, so after an update from an older version chat translation is still on.
+
+That notice appears once, on the host's own screen, in the first lobby created after the update (nobody else sees it). Nothing was changed for you: in the config file, an "on" you chose and an "on" left over from the older version look exactly the same, and they cannot be told apart.
+
+- Turn it off: type /opt upgrade off in the lobby chat
+- Put it back: /opt upgrade undo
+- Keep it as it is: /opt upgrade keep
+- See the current state: /opt upgrade
+
+AutoReport did not exist in v0.5.4, so it arrives off (turn it on with /opt anticheat.autoreport on). The check runs once and its result is kept in BepInEx\PocketRoles\opt-defaults.txt. Chapter 6.4 of the README has the details.
 ```

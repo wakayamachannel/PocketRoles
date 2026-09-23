@@ -1,0 +1,67 @@
+# pr-checks: the automatic checks of every pull request (CONTRIBUTING.md).
+#
+# What runs (PowerShell 7 on ubuntu-latest; the same scripts run on Windows PowerShell 5.1 on a PC):
+#   tools/check-lang.ps1   lang/*.json: valid JSON, the same keys in ja / en / zh-CN, the same {0} placeholders and
+#                          colour tags as ja.json, no empty texts, chat texts that must fit one message and chat pages
+#                          with a message cap (the mod's Chat.Split rules), and the length of every changed chat text
+#                          (before -> after, in the run's Summary)
+#   tools/check-files.ps1  files that must never be committed (game files, BepInEx, DLL / EXE, keys, .cfg, mail
+#                          settings, logs and records with players' names, archives), secret-looking text, large files,
+#                          and a warning for changed files the owner reads line by line (scripts, build settings,
+#                          .github, tools, aegis, src/Net, LICENSE / NOTICE)
+#
+# Not here yet: tools/check-terms.ps1 (the game's official words). When it is moved into tools/, add a step that calls
+# it with explicit arguments (for example ./tools/check-terms.ps1 -Glossary docs/GLOSSARY.tsv lang): without them it
+# looks for glossary.tsv next to itself (exit 2 when it is not there) and reads the whole repository.
+#
+# Safety: this workflow runs code from the pull request, also from forks. So it uses the pull_request event only,
+# gets a read-only token (permissions: contents: read) and no secrets. Do not change it to pull_request_target or
+# workflow_run, do not add secrets or write permissions, and do not add steps that publish or sign anything here:
+# release builds and signing get their own workflow later (docs/CODE-SIGNING.md).
+#
+# A green result is advice, not proof: with pull_request, GitHub runs the pull request's own copy of this workflow and
+# of tools/check-*.ps1, so a pull request that edits them can make its own check pass. The real gate is the owner's
+# review of every line and a re-run of the trusted scripts from the owner's branch on the owner's PC, before anything
+# of the pull request runs there.
+#
+# Not built here: the mod itself (PocketRoles.dll). Building it needs the Among Us game files and the BepInEx interop
+# DLLs made from them (docs/BUILDING.md). They belong to Innersloth and cannot be put on a public CI machine, so the
+# owner builds and tests every pull request on their own PC before merging it.
+
+name: pr-checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-checks:
+    name: pr-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0              # the base commit and every commit of the pull request
+          persist-credentials: false  # nothing here pushes
+
+      - name: Language files (tools/check-lang.ps1)
+        shell: pwsh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: ./tools/check-lang.ps1 -BaseRef $env:BASE_SHA
+
+      - name: Files that must never be committed (tools/check-files.ps1)
+        if: success() || failure()
+        shell: pwsh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./tools/check-files.ps1 -BaseRef $env:BASE_SHA -HeadRef $env:HEAD_SHA

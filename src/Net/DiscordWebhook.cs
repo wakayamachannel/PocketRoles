@@ -15,6 +15,8 @@ namespace PocketRoles.Net
     /// ("部屋コード ABCDEF — 3/15人 募集中"), edited in place when players join / leave, the game starts or ends, and
     /// the lobby closes. Every HTTP call runs on a thread-pool thread with data gathered on the main thread first;
     /// changes are coalesced (one edit per <see cref="MinInterval"/> seconds) so a full lobby never trips Discord's rate limit.
+    /// v0.5.5 (request 9/21 "ディスコのアプリのアイコンがないからそこも頼んだ"): a new message carries [Discord] AvatarUrl as
+    /// the webhook's avatar_url (the PocketRoles icon by default); edits keep the icon of the message. No name override.
     /// </summary>
     public static class DiscordWebhook
     {
@@ -211,14 +213,14 @@ namespace PocketRoles.Net
             int count = Lobby.AutoStart.PlayerCount();
             int max = 15;
             try { var gom = GameOptionsManager.Instance; if (gom != null && gom.CurrentGameOptions != null) max = gom.CurrentGameOptions.MaxPlayers; } catch (Exception) { }
-            // A lobby inherited by host migration (Registration.Hosting false) runs no roles either (review 2026-09-10).
+            // A lobby inherited by host migration (Registration.Hosting false) runs no mod roles either (review 2026-09-10).
             string kind = Registration.CompatMode || !Core.Game.IsHostActive
-                ? Lang.T("discord.kind.compat", "役職なし・登録オフ", "no roles (unregistered)", "无职业·未注册")
-                : Lang.T("discord.kind.roles", "役職あり", "with roles", "有职业");
+                ? Lang.T("discord.kind.compat", "本来の役職だけ・登録オフ", "usual roles only, unregistered", "仅原版职业·未注册")
+                : Lang.T("discord.kind.roles", "追加役職あり", "with mod roles", "有模组追加职业");
             string state = _inGame
                 ? Lang.T("discord.state.ingame", "ゲーム中（終わったら入れます）", "in game (join after this round)", "游戏中（本局结束后可加入）")
                 : (count >= max ? Lang.T("discord.state.full", "満員", "full", "已满") : Lang.T("discord.state.open", "募集中", "open", "招人中"));
-            string line = Lang.T("discord.line", "🔑 部屋コード **{0}** — {1}/{2}人 {3}（{4}）", "🔑 Lobby code **{0}** — {1}/{2} players, {3} ({4})", "🔑 房间码 **{0}** — {1}/{2}人 {3}（{4}）");
+            string line = Lang.T("discord.line", "🔑 部屋コード **{0}** — {1}/{2}人 {3}（{4}）", "🔑 Lobby code **{0}** — {1}/{2} players, {3} ({4})", "🔑 房间代码 **{0}** — {1}/{2}人 {3}（{4}）");
             string custom = Options.DiscordText;
             if (!string.IsNullOrEmpty(custom)) line = custom.Replace("\\n", "\n");
             return line.Replace("{0}", code).Replace("{1}", count.ToString()).Replace("{2}", max.ToString()).Replace("{3}", state).Replace("{4}", kind)
@@ -280,10 +282,13 @@ namespace PocketRoles.Net
             string id = _messageId;
             int gameId = _lobbyGameId;
             if (!edit) _posting = true;
-            string body = "{\"content\":\"" + Escape(content) + "\",\"allowed_mentions\":{\"parse\":[\"everyone\"]}}";
+            // v0.5.5 [Discord] AvatarUrl: only a new message (execute webhook, POST) carries the icon; an edit (PATCH) never does
+            string avatar = edit && id != null ? "" : AvatarJson();
+            bool withAvatar = avatar.Length > 0;
+            string body = "{\"content\":\"" + Escape(content) + "\"" + avatar + ",\"allowed_mentions\":{\"parse\":[\"everyone\"]}}";
             Task.Run(async () =>
             {
-                string newId = null; string error = null; float retryAfter = -1f;
+                string newId = null; string error = null; float retryAfter = -1f; int status = 0;
                 try
                 {
                     HttpResponseMessage resp;
@@ -297,6 +302,7 @@ namespace PocketRoles.Net
                         else resp = await Http.PostAsync(url + (url.Contains("?") ? "&" : "?") + "wait=true", payload).ConfigureAwait(false);
                     }
                     string text = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    status = (int)resp.StatusCode;
                     if (!resp.IsSuccessStatusCode) error = (int)resp.StatusCode + " " + Trim(text);
                     if ((int)resp.StatusCode == 429) { var m = RetryAfter.Match(text); if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double ra)) retryAfter = (float)ra; }
                     else if (!edit)
@@ -318,6 +324,12 @@ namespace PocketRoles.Net
                         if (error != null)
                         {
                             PocketRolesPlugin.Logger.LogWarning($"Discord: {(edit ? "edit" : "post")} failed: {error}");
+                            if (withAvatar && status == 400 && !_avatarRefused)
+                            {
+                                // a URL Discord does not accept must not keep the lobby line from being posted: the retry goes without it
+                                _avatarRefused = true;
+                                PocketRolesPlugin.Logger.LogWarning("Discord: the post was refused with [Discord] AvatarUrl; posting without an icon from now on (check the URL)");
+                            }
                             // retry the same line (bounded): otherwise the channel keeps a stale count / state for the whole game
                             _lastContent = null;
                             if (_retries < MaxRetries)
@@ -369,6 +381,24 @@ namespace PocketRoles.Net
             int q = url.IndexOf('?');
             if (q >= 0) { path = url.Substring(0, q); query = url.Substring(q); }
             return path.TrimEnd('/') + "/messages/" + id + query;
+        }
+
+        /// <summary>Set when Discord refused a post that carried [Discord] AvatarUrl (HTTP 400): no icon for the rest of the session.</summary>
+        private static volatile bool _avatarRefused;
+        private const int MaxAvatarUrl = 512;
+
+        /// <summary>
+        /// v0.5.5 [Discord] AvatarUrl as a JSON member (",\"avatar_url\":\"…\"") for a newly posted message; "" when the
+        /// setting is empty, not an absolute https:// URL, longer than 512 characters, or Discord refused it earlier.
+        /// </summary>
+        private static string AvatarJson()
+        {
+            if (_avatarRefused) return "";
+            string u = Options.DiscordAvatarUrl;
+            if (string.IsNullOrEmpty(u) || u.Length > MaxAvatarUrl || !u.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return "";
+            foreach (char c in u) if (c <= ' ' || c == '"' || c == '\\' || c == '<' || c == '>' || c == 0x7F) return "";
+            if (!Uri.TryCreate(u, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps || string.IsNullOrEmpty(uri.Host)) return "";
+            return ",\"avatar_url\":\"" + Escape(u) + "\"";
         }
 
         private static string Escape(string s)

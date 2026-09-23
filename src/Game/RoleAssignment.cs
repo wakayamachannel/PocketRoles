@@ -157,6 +157,59 @@ namespace PocketRoles.Game
             }
         }
 
+        /// <summary>
+        /// v0.5.5 (known bug of v0.5.4: a 3-player forced start in an unregistered lobby had no impostor and the crew won at
+        /// once). Vanilla's clamp gives 3 players no impostor role at all, so the impostor pass sends nothing, and with the
+        /// crew specials at high rates the crew pass hands every player a special. Then nobody is left without a SetRole and
+        /// FillImpostors, which in compat can only promote such players (2026.8.18 clients apply only the first SetRole they
+        /// receive), has no candidate. So in compat, while vanilla still owes impostor roles, a crew role is withheld when
+        /// fewer OTHER players than it owes are still without a role and may be made impostor: this player stays roleless,
+        /// the top-up makes it the impostor and the crew special is dropped (the same move as for a designee in
+        /// Designate.Intercept and for the wishing host in HostWish.OnEnd). The crew pass visits players in vanilla's random
+        /// order, so the impostor is whoever it reaches last. A designated crewmate or a host who wished to be crew is
+        /// withheld only when nobody else without a role is left at all (FillImpostors' own last resort: never a game without
+        /// an impostor). No change for registered lobbies (FillImpostors promotes crew specials there), for 4+ players and
+        /// for test mode (vanilla's impostor pass already sends the target: nothing owed), or below 3 players (FillImpostors
+        /// does nothing there). Called from the RpcSetRole prefix after HostWish and Designate declined the send; true = drop it.
+        /// </summary>
+        internal static bool WithholdForImpostorFill(PlayerControl pc, RoleTypes role)
+        {
+            try
+            {
+                if (!VanillaSelecting || !Registration.CompatMode || HostWish.Redirecting || pc == null || pc.Data == null) return false;
+                if (IsImpostorRole(role) || pc.roleAssigned || GameMasterHost(pc.PlayerId)) return false;
+                int owed = _selectTarget - _selectImpostorsSeen;
+                if (owed <= 0) return false;
+                int connected = 0, freeFill = 0, freeAny = 0;
+                foreach (var p in Core.Game.AllPlayers())
+                {
+                    if (p == null || p.Data == null || p.Data.Disconnected) continue;
+                    connected++;
+                    if (p.PlayerId == pc.PlayerId || p.roleAssigned || GameMasterHost(p.PlayerId) || HostMayTakeHeldRole(p.PlayerId)) continue;
+                    freeAny++;
+                    if (FillCandidate(p.PlayerId)) freeFill++;
+                }
+                if (connected < 3) return false;
+                bool candidate = FillCandidate(pc.PlayerId);
+                if (candidate ? freeFill >= owed : freeAny >= owed) return false;
+                PocketRolesPlugin.Logger.LogWarning($"RoleAssignment: {role} for #{pc.PlayerId} {Core.Game.NameOf(pc.PlayerId)} withheld{(candidate ? "" : " (designated crew / crew wish: nobody else is left)")} — vanilla owes {owed} impostor role(s) and only {freeFill} other player(s) the top-up may promote are still without a role (compat: it can promote only those)");
+                return true;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"RoleAssignment.WithholdForImpostorFill: {e}");
+                return false;
+            }
+        }
+
+        private static bool GameMasterHost(byte id) => Core.Game.GameMasterActive && Core.Game.IsHost(id);
+
+        /// <summary>A host with a crew or vanilla-role wish: HostWish may hand it a held role at the end of the selection.</summary>
+        private static bool HostMayTakeHeldRole(byte id) => Core.Game.IsHost(id) && HostWish.IsSet && HostWish.Wish != HostWish.Kind.Impostor;
+
+        /// <summary>A player the compat top-up should make an impostor first: not a designated crewmate (FillImpostors takes those last) and not a host who wished otherwise.</summary>
+        private static bool FillCandidate(byte id) => !Designate.FillAvoid.Contains(id) && !HostMayTakeHeldRole(id);
+
         /// <summary>SelectRoles postfix, first thing: vanilla is done; tell the host what was restored.</summary>
         internal static void EndVanillaSelection()
         {
@@ -401,6 +454,10 @@ namespace PocketRoles.Game
             }
 
             Core.Game.InProgress = true;
+            // v0.5.5 (review 2026-09-23): remember every player's role text NOW, 8 s before it is really sent, so that
+            // a "/cmd n" of those first seconds repeats the text of the role that was handed out instead of falling
+            // back to a description built from the role table at call time (a Worshipper convert of that window).
+            Chat.Chat.PrecacheRoleInfoAll();
             // Rebuild the task totals with the fresh role table (a recompute before SelectRoles used the previous game's roles).
             try { GameData.Instance?.RecomputeTaskCounts(); }
             catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"RoleAssignment: RecomputeTaskCounts failed: {e.Message}"); }
@@ -514,7 +571,7 @@ namespace PocketRoles.Game
                             Chat.Chat.Local(Chat.Chat.Title, Lang.T("assign.jackalfriends.nojackal",
                                 "ジャッカルフレンズはジャッカルが配られた試合だけ配られます（ジャッカルの人数が 0 です: /set jackal 1）。",
                                 "Jackal Friends are only assigned in games that have a Jackal (Jackal count is 0: /set jackal 1).",
-                                "只有本局分配了豺狼时才会分配豺狼之友（豺狼人数为 0：/set jackal 1）。"));
+                                "只有本局分配了豺狼时才会分配跟班（豺狼人数为 0：/set jackal 1）。"));
                     }
                     continue;
                 }
@@ -661,9 +718,9 @@ namespace PocketRoles.Game
                 {
                     PocketRolesPlugin.Logger.LogInfo("Assign: unregistered lobby (compat mode) — vanilla roles only, no custom roles and no per-client role views");
                     Chat.Chat.Local(Chat.Chat.Title, Lang.T("compat.roles.off",
-                        "登録オフ（便利ホスト）の部屋なので役職なしのバニラで進行します。役職ありは MOD 登録ありの部屋で。",
-                        "Unregistered (便利ホスト) lobby: this game runs vanilla without custom roles; roles need a registered lobby (mod-lobby registration on).",
-                        "未注册（便利房）的房间：本局按原版进行，没有自定义职业；职业需要已注册（开启 MOD 房间注册）的房间。"));
+                        "登録オフ（便利ホスト）の部屋なので MODの追加役職なしで進行します（本来の役職は部屋の設定どおり）。追加役職は MOD 登録ありの部屋で。",
+                        "Unregistered (便利ホスト) lobby: this game runs without mod roles (usual roles as set); mod roles need a registered lobby (mod-lobby registration on).",
+                        "未注册（简易房）的房间：本局没有模组追加职业（原版职业按房间设置）；模组职业需要已注册（开启 MOD 房间注册）的房间。"));
                     return;
                 }
                 Core.Game.AssigningRoles = true;
@@ -869,6 +926,8 @@ namespace PocketRoles.Game
                 if (RoleAssignment.VanillaSelecting && HostWish.Intercept(__instance, roleType, canOverrideRole)) return false;
                 // v0.5.2: "next game, <player> is …" — the designated players (Designate), after the host's own wish
                 if (RoleAssignment.VanillaSelecting && Designate.Intercept(__instance, roleType, canOverrideRole)) return false;
+                // v0.5.5: unregistered lobby, 3 players — keep a player without a role for the impostor top-up
+                if (RoleAssignment.WithholdForImpostorFill(__instance, roleType)) return false;
 
                 if (Core.Game.AssigningRoles)
                 {

@@ -7,7 +7,8 @@ using System.Text;
 namespace PocketRoles.Core
 {
     /// <summary>
-    /// Language system. Three languages: Japanese ("ja", default), Simplified Chinese ("zh") and English ("en").
+    /// Language system. Three languages: Japanese ("ja"), Simplified Chinese ("zh") and English ("en"); v0.5.5: the lobby
+    /// default follows the game's own language unless [General] Language names one (Options.Language, "auto").
     /// Texts are looked up by key in a JSON table (BepInEx/PocketRoles/lang/&lt;lang&gt;.json, user-editable; the embedded
     /// copies are the defaults) and fall back to the inline ja / en literals of each call site.
     /// <see cref="Scope"/> temporarily switches the language (per-player private messages); <see cref="PlayerLang"/> /
@@ -28,7 +29,7 @@ namespace PocketRoles.Core
 
         // ------------------------------------------------------------------ current language
 
-        /// <summary>Lobby default language from Options.Language ("ja" | "zh" | "en").</summary>
+        /// <summary>Lobby default language from Options.Language ("ja" | "zh" | "en"; "auto" is already resolved to the game's language there).</summary>
         public static string Default => Normalize(Options.Language);
 
         /// <summary>The language in effect: the innermost <see cref="Scope"/> override, else <see cref="Default"/>.</summary>
@@ -49,35 +50,16 @@ namespace PocketRoles.Core
         public static bool IsEn => Current == En;
 
         /// <summary>"ja" / "zh" / "en" (accepts aliases like "zh-CN", "jp", "english"); anything unknown → "ja".</summary>
-        public static string Normalize(string lang)
-        {
-            if (string.IsNullOrEmpty(lang)) return Ja;
-            string l = lang.Trim().ToLowerInvariant();
-            switch (l)
-            {
-                case "en": case "eng": case "english": case "英語": case "英文": return En;
-                case "zh": case "zh-cn": case "zh_cn": case "zhcn": case "cn": case "chs": case "chinese": case "中文": case "简体中文": case "中国語": return Zh;
-                case "ja": case "jp": case "jpn": case "japanese": case "日本語": case "日语": return Ja;
-            }
-            if (l.StartsWith("en")) return En;
-            if (l.StartsWith("zh")) return Zh;
-            return Ja;
-        }
+        public static string Normalize(string lang) => LangCore.Normalize(lang);
 
         /// <summary>True when <paramref name="lang"/> names a supported language (after aliases); sets the normalized code.</summary>
-        public static bool TryNormalize(string lang, out string code)
-        {
-            code = Ja;
-            if (string.IsNullOrWhiteSpace(lang)) return false;
-            string l = lang.Trim().ToLowerInvariant();
-            code = Normalize(l);
-            if (code != Ja) return true;
-            return l == "ja" || l == "jp" || l == "jpn" || l == "japanese" || l == "日本語" || l == "日语";
-        }
+        public static bool TryNormalize(string lang, out string code) => LangCore.TryNormalize(lang, out code);
 
-        /// <summary>Display name of a language code, in the current language.</summary>
+        /// <summary>Display name of a language code, in the current language ("auto": "Follow the game (English)").</summary>
         public static string DisplayName(string lang)
         {
+            if (LangCore.IsAuto(lang))
+                return string.Format(T("lang.name.auto", "ゲームに合わせる（{0}）", "Follow the game ({0})", "跟随游戏（{0}）"), DisplayName(LangCore.Resolve(LangCore.Auto, GameLanguage.Code)));
             switch (Normalize(lang))
             {
                 case En: return T("lang.name.en", "英語", "English", "英语");
@@ -192,14 +174,15 @@ namespace PocketRoles.Core
 
         /// <summary>
         /// Text for <paramref name="key"/> in the current language: the JSON table entry when present, else the inline
-        /// English when the language is "en" and <paramref name="en"/> is given, else the inline Japanese.
+        /// English when the language is "en" or "zh" (v0.5.5: a Chinese reader gets English, not Japanese, for a text
+        /// missing from the zh table) and <paramref name="en"/> is given, else the inline Japanese.
         /// </summary>
         public static string T(string key, string ja, string en = null)
         {
             string cur = Current;
             string v = Lookup(cur, key);
             if (v != null) return v;
-            if (cur == En && en != null) return en;
+            if (cur != Ja && en != null) return en;
             return ja;
         }
 
@@ -209,8 +192,8 @@ namespace PocketRoles.Core
             string cur = Current;
             string v = Lookup(cur, key);
             if (v != null) return v;
-            if (cur == En && en != null) return en;
             if (cur == Zh && zh != null) return zh;
+            if (cur != Ja && en != null) return en;
             return ja;
         }
 
@@ -228,7 +211,7 @@ namespace PocketRoles.Core
             catch (FormatException e)
             {
                 PocketRolesPlugin.Logger?.LogWarning($"Lang: bad format for '{key}' in {Current}: {e.Message}");
-                try { return string.Format(Current == En && en != null ? en : ja, args ?? Array.Empty<object>()); }
+                try { return string.Format(Current != Ja && en != null ? en : ja, args ?? Array.Empty<object>()); }
                 catch (FormatException) { return text; }
             }
         }
@@ -327,6 +310,10 @@ namespace PocketRoles.Core
                 Tables.Clear();
                 string dir = LangDir;
                 MigrateLegacyTables(dir);
+                // v0.5.5: texts we shipped before and the set each user file last got (see UpdateOldTexts)
+                var history = LangCore.DefaultsHistory.Parse(ReadEmbedded(HistoryFile));
+                var applied = ReadApplied(dir);
+                bool appliedChanged = false;
                 foreach (var lang in Supported)
                 {
                     string file = FileNameOf(lang);
@@ -347,6 +334,8 @@ namespace PocketRoles.Core
                             {
                                 Directory.CreateDirectory(dir);
                                 File.WriteAllText(path, embedded, new UTF8Encoding(false));
+                                // a fresh copy holds the current texts: nothing older to update later
+                                if (history.Generation > 0) { applied[file] = history.Generation; appliedChanged = true; }
                             }
                         }
                     }
@@ -356,15 +345,35 @@ namespace PocketRoles.Core
                     }
                     if (json == null) json = embedded;
                     if (json == null) continue;
+                    bool userFile = source != "embedded" && embedded != null;
+                    string onDisk = json;
+                    int generation = 0;
+                    List<string> updatedKeys = null;
+                    if (userFile)
+                        json = UpdateOldTexts(file, json, embedded, history, applied, out generation, out updatedKeys);
                     try
                     {
                         var table = ParseFlatJson(json);
-                        // verify finding #16: a user file from an older version lacks the keys added since; add them
-                        // (the user's own entries win, nothing is overwritten or removed).
-                        if (source != "embedded" && embedded != null)
+                        if (userFile)
                         {
-                            int added = MergeMissingKeys(source, json, embedded, table);
-                            if (added > 0) PocketRolesPlugin.Logger?.LogInfo($"Lang: added {added} keys to {file}");
+                            // verify finding #16: a user file from an older version lacks the keys added since; add them
+                            // (the user's own entries win, nothing is overwritten or removed).
+                            string merged = MergeMissingKeys(file, json, embedded, table, out int added);
+                            // v0.5.5: the updated texts and the added keys reach the file in ONE write (a temp file swapped
+                            // in), so a crash never leaves a half-written table that would fall back to the embedded one
+                            bool saved = merged == onDisk || WriteFileAtomic(source, merged);
+                            if (saved)
+                            {
+                                if (updatedKeys != null && updatedKeys.Count > 0)
+                                    PocketRolesPlugin.Logger?.LogInfo($"Lang: updated {updatedKeys.Count} built-in text(s) of {file} that you had not changed: {string.Join(", ", updatedKeys)}");
+                                if (added > 0) PocketRolesPlugin.Logger?.LogInfo($"Lang: added {added} keys to {file}");
+                                // recorded only once the file holds the new texts: on a write error the next start tries again
+                                if (generation > 0) { applied[file] = generation; appliedChanged = true; }
+                            }
+                            else if (merged != onDisk)
+                            {
+                                PocketRolesPlugin.Logger?.LogWarning($"Lang: {file} not updated; {(updatedKeys == null ? 0 : updatedKeys.Count)} new text(s) and {added} new key(s) are used in memory only");
+                            }
                         }
                         Tables[lang] = table;
                         PocketRolesPlugin.Logger?.LogInfo($"Lang: {lang} table loaded ({table.Count} keys, {source})");
@@ -378,25 +387,98 @@ namespace PocketRoles.Core
                         }
                     }
                 }
+                if (appliedChanged) WriteApplied(dir, applied);
+            }
+        }
+
+        /// <summary>Embedded list of the texts earlier versions shipped, PR #1's zh-CN.json too (tools/LangTool history makes it from git).</summary>
+        private const string HistoryFile = "defaults-history.tsv";
+        /// <summary>BepInEx/PocketRoles/lang/defaults-applied.txt: the history generation each user file last got.</summary>
+        private const string AppliedFile = "defaults-applied.txt";
+
+        private static Dictionary<string, int> ReadApplied(string dir)
+        {
+            try
+            {
+                if (dir != null)
+                {
+                    string path = Path.Combine(dir, AppliedFile);
+                    if (File.Exists(path)) return LangCore.ParseApplied(File.ReadAllText(path, Encoding.UTF8));
+                }
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger?.LogWarning($"Lang: cannot read {AppliedFile}: {e.Message}");
+            }
+            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void WriteApplied(string dir, Dictionary<string, int> applied)
+        {
+            if (dir == null) return;
+            try
+            {
+                Directory.CreateDirectory(dir);
+                File.WriteAllText(Path.Combine(dir, AppliedFile), LangCore.FormatApplied(applied), new UTF8Encoding(false));
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger?.LogWarning($"Lang: cannot write {AppliedFile}: {e.Message}");
             }
         }
 
         /// <summary>
-        /// Adds every key of the embedded default table that <paramref name="table"/> (the parsed user file) lacks, both to
-        /// the in-memory table and to the file at <paramref name="path"/>: the missing entries are appended right before the
-        /// closing brace so the user's text, order and edits stay untouched. Returns the number of keys added (0 when
-        /// nothing was missing or the file could not be written).
+        /// v0.5.5: MergeMissingKeys only adds keys, so a corrected default (e.g. the official Chinese 伪装者) never reached a
+        /// host who already had BepInEx/PocketRoles/lang/*.json. Here every text of the user file that is still exactly a
+        /// default we shipped before (lang/defaults-history.tsv, hashes) gets the new default, once per new history
+        /// generation; a text the host wrote is never touched (an older default the host had put back by hand counts as
+        /// ours until this file has recorded a generation). Returns the (possibly) updated text, in memory only: Load
+        /// writes it together with the missing keys, and records <paramref name="generation"/> (0 = nothing to record)
+        /// once the file holds it.
         /// </summary>
-        internal static int MergeMissingKeys(string path, string userJson, string embeddedJson, Dictionary<string, string> table)
+        private static string UpdateOldTexts(string file, string json, string embedded, LangCore.DefaultsHistory history,
+            Dictionary<string, int> applied, out int generation, out List<string> keys)
         {
+            generation = 0;
+            keys = null;
+            if (history == null || history.Generation <= 0) return json;
+            applied.TryGetValue(file, out int done);
+            if (done >= history.Generation) return json;
+            // an empty file checked nothing: never record it (a table put back later still gets its update)
+            if (string.IsNullOrWhiteSpace(json)) return json;
+            string updated;
+            try
+            {
+                updated = LangCore.UpdateOldDefaults(json, file, LangCore.ParseFlatJson(embedded), history, done, out keys);
+            }
+            catch (Exception e)
+            {
+                // not valid JSON: Load() reports it and falls back to the embedded table; nothing to update or record
+                PocketRolesPlugin.Logger?.LogWarning($"Lang: {file}: texts not checked for updates ({e.Message})");
+                keys = null;
+                return json;
+            }
+            generation = history.Generation;
+            return updated;
+        }
+
+        /// <summary>
+        /// Adds every key of the embedded default table that <paramref name="table"/> (the parsed user file) lacks to the
+        /// in-memory table, and returns the file text with the missing entries appended right before the closing brace, so
+        /// the user's text, order and edits stay untouched (the same text when nothing was missing or it has no closing
+        /// brace; Load writes it). <paramref name="added"/> = keys added to the table.
+        /// </summary>
+        internal static string MergeMissingKeys(string file, string userJson, string embeddedJson, Dictionary<string, string> table, out int added)
+        {
+            added = 0;
             try
             {
                 Dictionary<string, string> defaults;
                 try { defaults = ParseFlatJson(embeddedJson); }
                 catch (Exception e)
                 {
-                    PocketRolesPlugin.Logger?.LogWarning($"Lang: embedded table for {Path.GetFileName(path)} is not valid JSON: {e.Message}");
-                    return 0;
+                    PocketRolesPlugin.Logger?.LogWarning($"Lang: embedded table for {file} is not valid JSON: {e.Message}");
+                    return userJson;
                 }
                 var missing = new List<string>();
                 foreach (var kv in defaults)
@@ -404,63 +486,50 @@ namespace PocketRoles.Core
                     if (table.ContainsKey(kv.Key)) continue;
                     missing.Add(kv.Key);
                 }
-                if (missing.Count == 0) return 0;
+                if (missing.Count == 0) return userJson;
                 missing.Sort(StringComparer.Ordinal);
                 foreach (var k in missing) table[k] = defaults[k];
+                added = missing.Count;
 
                 string merged = AppendEntries(userJson, missing, defaults);
                 if (merged == null)
                 {
-                    PocketRolesPlugin.Logger?.LogWarning($"Lang: {Path.GetFileName(path)} has no closing brace; {missing.Count} new keys are used in memory only");
-                    return missing.Count;
+                    PocketRolesPlugin.Logger?.LogWarning($"Lang: {file} has no closing brace; {missing.Count} new keys are used in memory only");
+                    return userJson;
                 }
-                try
-                {
-                    File.WriteAllText(path, merged, new UTF8Encoding(false));
-                }
-                catch (Exception e)
-                {
-                    PocketRolesPlugin.Logger?.LogWarning($"Lang: cannot update {Path.GetFileName(path)} ({e.Message}); {missing.Count} new keys are used in memory only");
-                }
-                return missing.Count;
+                return merged;
             }
             catch (Exception e)
             {
-                PocketRolesPlugin.Logger?.LogError($"Lang.MergeMissingKeys({path}): {e}");
-                return 0;
+                PocketRolesPlugin.Logger?.LogError($"Lang.MergeMissingKeys({file}): {e}");
+                return userJson;
+            }
+        }
+
+        /// <summary>
+        /// v0.5.5: writes <paramref name="text"/> (UTF-8, no BOM) to a temp file next to <paramref name="path"/> and swaps it
+        /// in, so the table is always the whole old or the whole new file. False (logged) on an error.
+        /// </summary>
+        private static bool WriteFileAtomic(string path, string text)
+        {
+            string tmp = path + ".tmp";
+            try
+            {
+                File.WriteAllText(tmp, text, new UTF8Encoding(false));
+                try { File.Replace(tmp, path, null); }
+                catch (PlatformNotSupportedException) { File.Copy(tmp, path, true); File.Delete(tmp); }
+                return true;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger?.LogWarning($"Lang: cannot write {Path.GetFileName(path)} ({e.Message})");
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch (Exception) { }
+                return false;
             }
         }
 
         /// <summary>Inserts <c>"key": "value"</c> lines for <paramref name="keys"/> before the last '}' of a flat JSON object text.</summary>
-        private static string AppendEntries(string json, List<string> keys, Dictionary<string, string> values)
-        {
-            int close = json.LastIndexOf('}');
-            if (close < 0) return null;
-            string head = json.Substring(0, close);
-            string tail = json.Substring(close);
-            // Does the object already hold at least one entry? (then the new block starts with a comma)
-            bool hasEntries = false;
-            for (int i = head.Length - 1; i >= 0; i--)
-            {
-                char c = head[i];
-                if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
-                if (c == '{') break;
-                if (c == ',') { head = head.Substring(0, i); } // a trailing comma is not valid JSON; take it over
-                hasEntries = true;
-                break;
-            }
-            string nl = json.IndexOf("\r\n", StringComparison.Ordinal) >= 0 ? "\r\n" : "\n";
-            var sb = new StringBuilder(head.TrimEnd(' ', '\t', '\r', '\n'));
-            bool first = true;
-            foreach (var k in keys)
-            {
-                if (hasEntries || !first) sb.Append(',');
-                sb.Append(nl).Append("  \"").Append(JsonEscape(k)).Append("\": \"").Append(JsonEscape(values[k])).Append('"');
-                first = false;
-            }
-            sb.Append(nl).Append(tail);
-            return sb.ToString();
-        }
+        private static string AppendEntries(string json, List<string> keys, Dictionary<string, string> values) => LangCore.AppendEntries(json, keys, values);
 
         private static string ReadEmbedded(string fileName)
         {
@@ -485,132 +554,13 @@ namespace PocketRoles.Core
             return null;
         }
 
-        // ------------------------------------------------------------------ minimal JSON (flat object of strings)
+        // ------------------------------------------------------------------ minimal JSON (flat object of strings): LangCore
 
         /// <summary>Parses <c>{ "key": "text", … }</c>. Non-string values are skipped; comments are not allowed.</summary>
-        internal static Dictionary<string, string> ParseFlatJson(string json)
-        {
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            int i = 0;
-            SkipWs(json, ref i);
-            if (i >= json.Length || json[i] != '{') throw new FormatException("expected '{'");
-            i++;
-            while (true)
-            {
-                SkipWs(json, ref i);
-                if (i >= json.Length) throw new FormatException("unexpected end");
-                if (json[i] == '}') { i++; break; }
-                if (json[i] == ',') { i++; continue; }
-                if (json[i] != '"') throw new FormatException($"expected '\"' at {i}");
-                string key = ReadString(json, ref i);
-                SkipWs(json, ref i);
-                if (i >= json.Length || json[i] != ':') throw new FormatException($"expected ':' at {i}");
-                i++;
-                SkipWs(json, ref i);
-                if (i >= json.Length) throw new FormatException("unexpected end");
-                if (json[i] == '"')
-                {
-                    result[key] = ReadString(json, ref i);
-                }
-                else
-                {
-                    SkipValue(json, ref i);
-                }
-            }
-            return result;
-        }
-
-        private static void SkipWs(string s, ref int i)
-        {
-            while (i < s.Length)
-            {
-                char c = s[i];
-                if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\uFEFF') i++;
-                else break;
-            }
-        }
-
-        private static string ReadString(string s, ref int i)
-        {
-            // s[i] == '"'
-            i++;
-            var sb = new StringBuilder();
-            while (i < s.Length)
-            {
-                char c = s[i++];
-                if (c == '"') return sb.ToString();
-                if (c != '\\') { sb.Append(c); continue; }
-                if (i >= s.Length) break;
-                char e = s[i++];
-                switch (e)
-                {
-                    case '"': sb.Append('"'); break;
-                    case '\\': sb.Append('\\'); break;
-                    case '/': sb.Append('/'); break;
-                    case 'b': sb.Append('\b'); break;
-                    case 'f': sb.Append('\f'); break;
-                    case 'n': sb.Append('\n'); break;
-                    case 'r': sb.Append('\r'); break;
-                    case 't': sb.Append('\t'); break;
-                    case 'u':
-                        if (i + 4 > s.Length) throw new FormatException("bad \\u escape");
-                        sb.Append((char)Convert.ToInt32(s.Substring(i, 4), 16));
-                        i += 4;
-                        break;
-                    default: sb.Append(e); break;
-                }
-            }
-            throw new FormatException("unterminated string");
-        }
-
-        /// <summary>Skips a non-string JSON value (number, literal, nested object/array).</summary>
-        private static void SkipValue(string s, ref int i)
-        {
-            int depth = 0;
-            bool inStr = false;
-            while (i < s.Length)
-            {
-                char c = s[i];
-                if (inStr)
-                {
-                    if (c == '\\') { i += 2; continue; }
-                    if (c == '"') inStr = false;
-                    i++;
-                    continue;
-                }
-                if (c == '"') { inStr = true; i++; continue; }
-                if (c == '{' || c == '[') { depth++; i++; continue; }
-                if (c == '}' || c == ']')
-                {
-                    if (depth == 0) return;
-                    depth--; i++; continue;
-                }
-                if (depth == 0 && c == ',') return;
-                i++;
-            }
-        }
+        internal static Dictionary<string, string> ParseFlatJson(string json) => LangCore.ParseFlatJson(json);
 
         /// <summary>Escapes a string for a JSON literal (used when writing tables).</summary>
-        internal static string JsonEscape(string s)
-        {
-            var sb = new StringBuilder(s.Length + 8);
-            foreach (char c in s)
-            {
-                switch (c)
-                {
-                    case '"': sb.Append("\\\""); break;
-                    case '\\': sb.Append("\\\\"); break;
-                    case '\n': sb.Append("\\n"); break;
-                    case '\r': sb.Append("\\r"); break;
-                    case '\t': sb.Append("\\t"); break;
-                    default:
-                        if (c < 0x20) sb.Append("\\u").Append(((int)c).ToString("x4"));
-                        else sb.Append(c);
-                        break;
-                }
-            }
-            return sb.ToString();
-        }
+        internal static string JsonEscape(string s) => LangCore.JsonEscape(s);
 
         // ------------------------------------------------------------------ text helpers
 

@@ -2,7 +2,7 @@
 rem PocketRoles: 報告専用メール（pocketroles.report@gmail.com）から不具合報告・要望の zip と質問メールを取り込みます。
 rem   不具合 = 添付 zip / ログ付き、要望 = +request 宛て、質問 = +help / +question 宛てか「質問」「教えて」「how to」などを含み zip の無いメール
 rem 取り込み先: このフォルダの reports\bugs\ 、reports\requests\ 、reports\questions\（質問には返信用 reply.txt の雛形も作られます）
-rem 質問への返信は support\REPLY-GUIDE.md の手順で下書きを作り、reply-mail.cmd で送ります（送信はユーザーの承認後だけ）。
+rem 質問への返信は support\REPLY-GUIDE.md の手順で下書きを作り、reply-mail.cmd で Gmail の「下書き」に入れます（送信はしません。ユーザーが内容を確かめて、ブラウザの Gmail から送ります）。
 setlocal
 cd /d "%~dp0"
 set "DOTNET_ROOT=%USERPROFILE%\.dotnet"

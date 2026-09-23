@@ -23,6 +23,11 @@ namespace PocketRoles.Lobby
     ///    countdown cancels it.
     /// 2. Lobby time left ≤ TimerWarnAt → start (enough players) or, per TimerMode, warn and after ExtendNoticeDelay
     ///    seconds extend the lobby (server offer) with 廃村 as the fallback, or 廃村 directly, or only notify.
+    ///    v0.5.5: rule 2 never forces a start below the vanilla minimum (<see cref="VanillaMinPlayers"/>): a 1-player
+    ///    start is not a vanilla start flow and a joiner was kicked for "hacking" after one (2026-09-22). Below it the
+    ///    haison mode waits for the extension like the extend mode; without one the lobby is re-created when the host is
+    ///    alone (<see cref="Rehost.RecreateNow"/>, at most RehostMaxAttempts times in a row with nobody joining), else it
+    ///    is left to close. Explicit host requests (/start, /haison, F7, the settings buttons, test mode) are unchanged.
     /// </para>
     /// </summary>
     public static class AutoStart
@@ -42,9 +47,16 @@ namespace PocketRoles.Lobby
         private static float _nextTick;
         private static bool _warnedThisLobby;
         private static bool _rearmBelow;     // after a cancel with enough players: wait until the count drops below N
+        private static bool _holdForRestricted; // v0.5.5: a start was cancelled because a restricted joiner stayed: no auto start until none is in the room
         private static bool _forcing;        // a countdown we started (MinPlayers = 1 until the lobby resets)
         private static GameObject _cancelButton;
         private static IntPtr _buttonFor = IntPtr.Zero;
+
+        // v0.5.5 rule 2 below the vanilla minimum
+        private static string _timerMode = "extend";   // action of the current warning ("haison" below the minimum runs as "extend")
+        private static int _timerRecreates;             // re-creations in a row while alone; survives only the lobby it re-created (ResetTimerRecreates)
+        private const string RecreateTag = "autostart.recreate";
+        private const float RecreateDelay = 1.5f;       // let the host read the chat line before the lobby goes away
 
         /// <summary>Rule 2 already sent its warning for the current lobby time (LobbyTimer skips its own 60-s notice).</summary>
         public static bool WarnedThisLobby => _warnedThisLobby;
@@ -134,6 +146,28 @@ namespace PocketRoles.Lobby
             }
         }
 
+        /// <summary>
+        /// v0.5.5 AegisBans.HoldStartForWaiters: the start is cancelled because of a restricted joiner.
+        /// <paramref name="stillHere"/> (one who would not leave): auto-start waits until no restricted joiner is in the room,
+        /// instead of starting again at once in a loop (the usual latch, "until the count drops", would never open: the count
+        /// already leaves them out). Otherwise (too few players after the removal) the usual latch of a cancelled countdown.
+        /// </summary>
+        internal static void CancelStartForRestricted(bool stillHere)
+        {
+            var gsm = Gsm();
+            if (!CancelStart() && gsm != null)
+            {
+                try { gsm.ResetStartState(); } catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"AutoStart: ResetStartState failed: {e.Message}"); }
+                _forcing = false;
+                _phase = Phase.Idle;
+            }
+            if (stillHere)
+            {
+                _rearmBelow = false;   // CancelStart set it for an auto countdown
+                _holdForRestricted = true;
+            }
+        }
+
         private static bool _lastAutoStart;
 
         /// <summary>Turns auto-start on/off (saved to the config).</summary>
@@ -200,6 +234,11 @@ namespace PocketRoles.Lobby
         internal static bool OnFinallyBegin(GameStartManager gsm)
         {
             if (gsm == null) return true;
+            // v0.5.5: nobody restricted (Aegis bans) enters a game: they are kicked and the start is held (1 s each) until they
+            // are gone, else cancelled; a start below the vanilla minimum after such a kick is cancelled too
+            var hold = Net.AegisBans.HoldStartForWaiters();
+            if (hold == Net.AegisBans.StartHold.Hold) { gsm.countDownTimer = 1f; return false; }
+            if (hold == Net.AegisBans.StartHold.Cancelled) return false;
             if (AllPlayersSerialized(out byte waitingFor))
             {
                 _serializeRetries = 0;
@@ -248,6 +287,16 @@ namespace PocketRoles.Lobby
             var gd = GameData.Instance;
             if (gd != null) return gd.PlayerCount;
             return Core.Game.AllPlayers().Count;
+        }
+
+        /// <summary>
+        /// v0.5.5: the vanilla minimum player count for a start (GameStartManager.MinPlayers before the mod lowers it;
+        /// 4 when unknown). Rule 2 (lobby timer) never forces a start below it.
+        /// </summary>
+        public static int VanillaMinPlayers()
+        {
+            int v = PocketRoles.Game.TestMode_GameStartUpdatePatch.OriginalMinPlayers;
+            return v >= 2 ? v : 4;
         }
 
         // ------------------------------------------------------------------ internals
@@ -318,6 +367,7 @@ namespace PocketRoles.Lobby
             _phase = Phase.Idle;
             _warnedThisLobby = false;
             _rearmBelow = false;
+            _holdForRestricted = false;
             _forcing = false;
             _serializeRetries = 0;
             _nextTick = 0f;
@@ -330,6 +380,7 @@ namespace PocketRoles.Lobby
             _phase = Phase.Idle;
             _warnedThisLobby = false;
             _rearmBelow = false;
+            _holdForRestricted = false;
             _forcing = false;
             _serializeRetries = 0;
             _cancelButton = null;
@@ -405,8 +456,16 @@ namespace PocketRoles.Lobby
             if (state == GameStartManager.StartingStates.NotStarting && _forcing && _phase != Phase.Haison) _forcing = false;
             if (Haison.Pending) return;
 
-            int count = PlayerCount();
+            // v0.5.5: restricted joiners waiting for their removal (AegisBans) are not counted (rules 1 and 2)
+            int waiters = Net.AegisBans.WaitersInRoom();
+            int count = Math.Max(0, PlayerCount() - waiters);
             int need = Options.AutoStartPlayers;
+            if (_holdForRestricted && waiters == 0)
+            {
+                _holdForRestricted = false;
+                PocketRolesPlugin.Logger.LogInfo("AutoStart: no restricted joiner left in the room; auto start may start again");
+            }
+            if (count > 1) ResetTimerRecreates("somebody joined"); // the lobby is in use again: the next lonely expiry starts a new series
 
             // ---- rule 1: enough players → countdown; a player leaving during it → cancel
             if (Options.AutoStart)
@@ -432,6 +491,7 @@ namespace PocketRoles.Lobby
                     {
                         if (count < need) _rearmBelow = false;
                     }
+                    else if (_holdForRestricted) { }   // v0.5.5: a restricted joiner who would not leave is still here
                     else if (count >= need && AllPlayersSerialized(out _)) // the N-th player is usually unserialized on the tick it appears: retry next tick
                     {
                         int seconds = Options.AutoStartCountdown;
@@ -471,7 +531,7 @@ namespace PocketRoles.Lobby
                     if (remaining > warnAt) break;
                     if (state != GameStartManager.StartingStates.NotStarting) break; // a start is under way anyway
                     // A countdown the host just cancelled (_rearmBelow) is not re-forced: fall through to extend / haison / notify.
-                    if (Options.AutoStart && count >= need && !_rearmBelow)
+                    if (Options.AutoStart && count >= need && count >= VanillaMinPlayers() && !_rearmBelow && !_holdForRestricted)
                     {
                         if (!AllPlayersSerialized(out _)) break; // retry next tick (the warning is not sent yet)
                         _warnedThisLobby = true;
@@ -490,6 +550,14 @@ namespace PocketRoles.Lobby
                         break;
                     }
                     int delay = Options.ExtendNoticeDelay;
+                    int min = VanillaMinPlayers();
+                    if (mode == "haison" && count < min)
+                    {
+                        // No haison below the vanilla minimum: take the server's extension instead (re-create / close without one).
+                        mode = "extend";
+                        PocketRolesPlugin.Logger.LogInfo($"AutoStart: haison mode but {count} < {min} players → extension first, no forced start");
+                    }
+                    _timerMode = mode;
                     if (mode == "haison")
                     {
                         Chat.Chat.All(Chat.Chat.Title, () => Lang.TF("timer.warn.haison",
@@ -504,7 +572,7 @@ namespace PocketRoles.Lobby
                     }
                     _phase = Phase.Warned;
                     _phaseAt = now;
-                    PocketRolesPlugin.Logger.LogInfo($"AutoStart: timer warning at {remaining}s (mode={mode}, delay={delay}s)");
+                    PocketRolesPlugin.Logger.LogInfo($"AutoStart: timer warning at {remaining}s (mode={mode}, delay={delay}s, players={count}, vanilla min={min}, offer={(LobbyTimer.OfferPending ? "yes" : "no")})");
                     break;
 
                 case Phase.Warned:
@@ -523,23 +591,24 @@ namespace PocketRoles.Lobby
                         _phase = Phase.Idle; // the host started a game meanwhile
                         break;
                     }
-                    if (Options.TimerMode == "extend")
+                    bool few = count < VanillaMinPlayers();
+                    if (_timerMode == "extend" || few)
                     {
                         // The server offers the extension (RPC 60) at an unknown moment near the end: accept it as soon
-                        // as it is here, keep waiting while there is time, and only fall back to a haison near the floor.
+                        // as it is here, keep waiting while there is time, and only fall back near the floor.
                         if (LobbyTimer.OfferPending && LobbyTimer.Extend())
                         {
                             _phase = Phase.Extending;
                             _phaseAt = now;
+                            PocketRolesPlugin.Logger.LogInfo($"AutoStart: extension offer accepted at {remaining}s (players={count}), waiting for the server's answer");
                             Chat.Chat.All(Chat.Chat.Title, () => Lang.T("timer.extending",
                                 "ロビーの時間を延長します（部屋はそのままです）", "Extending the lobby time (the room stays the same)", "将延长房间时间（房间保持不变）"));
                             break;
                         }
                         if (remaining > HaisonFloor) break; // no offer yet: re-check on the next tick
-                        PocketRolesPlugin.Logger.LogInfo($"AutoStart: no extension offer from the server at {remaining}s → haison");
+                        PocketRolesPlugin.Logger.LogInfo($"AutoStart: no extension offer from the server at {remaining}s (players={count}) → fallback");
                     }
-                    _phase = Phase.Haison;
-                    Haison.Run();
+                    ExpiryFallback(count, remaining);
                     break;
 
                 case Phase.Extending:
@@ -547,12 +616,17 @@ namespace PocketRoles.Lobby
                     {
                         _phase = Phase.Idle; // confirmed (RPC 61 echo, or the server reported a much larger remaining time)
                         _warnedThisLobby = false; // the grant length is unknown: rule 2 fires again as soon as remaining <= TimerWarnAt
+                        PocketRolesPlugin.Logger.LogInfo($"AutoStart: extension confirmed, remaining≈{remaining}s");
+                    }
+                    else if (LobbyTimer.LastExtendFailedAt >= _phaseAt)
+                    {
+                        PocketRolesPlugin.Logger.LogWarning($"AutoStart: the server refused the extension at {remaining}s → fallback");
+                        ExpiryFallback(count, remaining);
                     }
                     else if (remaining <= HaisonFloor)
                     {
-                        PocketRolesPlugin.Logger.LogWarning("AutoStart: extension not confirmed by the server → haison");
-                        _phase = Phase.Haison;
-                        Haison.Run();
+                        PocketRolesPlugin.Logger.LogWarning($"AutoStart: extension not confirmed by the server at {remaining}s → fallback");
+                        ExpiryFallback(count, remaining);
                     }
                     break;
 
@@ -560,6 +634,99 @@ namespace PocketRoles.Lobby
                     if (!Haison.Pending) _phase = Phase.Idle;
                     break;
             }
+        }
+
+        /// <summary>
+        /// Rule 2's last step when the lobby is about to expire without an extension: 廃村 with at least the vanilla
+        /// minimum of players (unchanged); below it never a forced start — alone → re-create the lobby, otherwise the
+        /// lobby is left to close. _warnedThisLobby stays set, so rule 2 does not fire again for this expiry.
+        /// </summary>
+        private static void ExpiryFallback(int count, int remaining)
+        {
+            int min = VanillaMinPlayers();
+            if (count >= min)
+            {
+                PocketRolesPlugin.Logger.LogInfo($"AutoStart: lobby expiring at {remaining}s with {count} >= {min} players → haison");
+                _phase = Phase.Haison;
+                Haison.Run();
+                return;
+            }
+            _phase = Phase.Idle;
+            if (count <= 1 && TryRecreateForTimer(remaining)) return;
+            PocketRolesPlugin.Logger.LogWarning($"AutoStart: lobby expiring at {remaining}s with {count} < {min} players: no forced start below the vanilla minimum, no re-creation → the lobby is left to close");
+            if (count > 1)
+            {
+                Chat.Chat.All(Chat.Chat.Title, () => TF3("timer.close.few",
+                    "ロビーの時間を延長できなかったので、まもなく部屋が閉じます（{0}人未満では廃村しません）。",
+                    "The lobby time could not be extended, so the room closes soon (no haison with fewer than {0} players).",
+                    "无法延长房间时间，房间即将关闭（少于 {0} 人时不进行废局）。", min));
+            }
+        }
+
+        /// <summary>
+        /// The host is alone and the lobby is about to expire: re-create it through <see cref="Rehost.RecreateNow"/>
+        /// (same game mode / public state; RecreateNow refuses when somebody joined or a start is under way). At most
+        /// RehostMaxAttempts re-creations in a row while nobody joins, so an unattended host does not cycle lobbies
+        /// forever (each lobby lived its full ~10 minutes, so these are not short-lived "deliberate disconnects").
+        /// </summary>
+        private static bool TryRecreateForTimer(int remaining)
+        {
+            int cap = Options.RehostMaxAttempts;
+            if (_timerRecreates >= cap)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"AutoStart: lobby already re-created {_timerRecreates} times in a row with nobody joining (cap {cap}) → the lobby is left to close");
+                Chat.Chat.Local(Chat.Chat.Title, TF3("timer.recreate.limit",
+                    "誰も入らないまま部屋を{0}回作り直したので、この部屋はそのまま閉じます。",
+                    "The lobby was already re-created {0} times in a row with nobody joining, so this lobby is left to close.",
+                    "已连续重建房间 {0} 次且无人加入，此房间将直接关闭。", _timerRecreates));
+                return false;
+            }
+            if (Rehost.Pending || Scheduler.HasTag(RecreateTag))
+            {
+                PocketRolesPlugin.Logger.LogInfo("AutoStart: a lobby re-creation is already pending");
+                return true;
+            }
+            int n = _timerRecreates + 1;
+            PocketRolesPlugin.Logger.LogInfo($"AutoStart: lobby expiring at {remaining}s and the host is alone → re-creating the lobby instead of a 1-player haison ({n}/{cap})");
+            Chat.Chat.Local(Chat.Chat.Title, Lang.T("timer.recreate",
+                "ロビーの時間が切れるので、部屋を作り直します（1人のときは廃村しません）。部屋コードが変わります。",
+                "The lobby time is running out: re-creating the lobby (no haison while you are alone). The room code changes.",
+                "房间时间即将结束，将重新创建房间（只有你一人时不进行废局）。房间代码会改变。"));
+            Scheduler.After(RecreateDelay, () =>
+            {
+                if (Rehost.RecreateNow($"lobby timer, host alone ({n}/{cap})", false, true))
+                {
+                    _timerRecreates = n;
+                    return;
+                }
+                PocketRolesPlugin.Logger.LogWarning("AutoStart: lobby re-creation not possible now (somebody joined, a start began or a re-host is running) → the lobby is left to close");
+                Chat.Chat.Local(Chat.Chat.Title, Lang.T("timer.recreate.failed",
+                    "部屋を作り直せなかったので、この部屋はまもなく閉じます。",
+                    "The lobby could not be re-created, so it closes soon.",
+                    "无法重新创建房间，房间即将关闭。"));
+            }, RecreateTag);
+            return true;
+        }
+
+        /// <summary>
+        /// v0.5.5: ends the series of lobby re-creations in a row (<see cref="TryRecreateForTimer"/>): somebody joined, or
+        /// a lobby that is not a timer re-creation was joined (<see cref="Rehost.OnGameJoined"/>: created / joined by hand,
+        /// a re-host after a loss, a ping re-creation, /move, the haison return), so its expiry is not refused because of
+        /// an earlier lobby's series.
+        /// </summary>
+        internal static void ResetTimerRecreates(string why)
+        {
+            if (_timerRecreates == 0) return;
+            PocketRolesPlugin.Logger.LogInfo($"AutoStart: lobby re-creation series reset (was {_timerRecreates}, {why})");
+            _timerRecreates = 0;
+        }
+
+        /// <summary>Lang.T with an inline zh fallback, then string.Format (Lang.TF has no zh overload).</summary>
+        private static string TF3(string key, string ja, string en, string zh, params object[] args)
+        {
+            string text = Lang.T(key, ja, en, zh);
+            try { return string.Format(text, args ?? Array.Empty<object>()); }
+            catch (FormatException) { try { return string.Format(ja, args ?? Array.Empty<object>()); } catch (FormatException) { return text; } }
         }
     }
 
@@ -672,7 +839,7 @@ namespace PocketRoles.Lobby
                 if (Scheduler.HasTag("haison.end")) return false; // already requested (hotkey + command in the same moment): one notice, one end
                 Core.Game.HaisonActive = true; // WinConditions / RoleAssignment stay out of this end
                 Chat.Chat.All(Chat.Chat.Title, () => Lang.T("haison.endgame",
-                    "ホストが試合を終了しました（廃村）", "The host ended the game (haison)", "房主结束了本局游戏（废村）"));
+                    "ホストが試合を終了しました（廃村）", "The host ended the game (haison)", "房主结束了本局游戏（废局）"));
                 // Chat.All paces one client per ChunkSpacing; the EndGame echo clears the scheduler (RoleAssignment.Cleanup),
                 // so the end must wait until the last client's notice has left.
                 float hold = 1.0f + Chat.Chat.ChunkSpacing * Math.Max(0, AutoStart.PlayerCount() - 1);
@@ -684,6 +851,35 @@ namespace PocketRoles.Lobby
             {
                 PocketRolesPlugin.Logger.LogError($"Haison.EndCurrentGame: {e}");
                 if (!Pending) Core.Game.HaisonActive = false;
+                return false;
+            }
+        }
+
+        /// <summary>v0.5.5 AegisMatchStop: an end already went out or is scheduled (F7, /haison, an earlier stop).</summary>
+        internal static bool EndUnderWay => _ended || Scheduler.HasTag("haison.end");
+
+        /// <summary>
+        /// v0.5.5 AegisMatchStop: ends the running game NOW with the same vanilla end as F7 (ImpostorDisconnect; the host
+        /// returns by itself through HaisonReturn; no summary) but without the public "host ended the game" line and its chat
+        /// hold (the players are told in the lobby). False: no game / not the host / an end already under way or sent (never
+        /// a second EndGame) / nothing sent.
+        /// </summary>
+        internal static bool EndForAegis(string why)
+        {
+            try
+            {
+                var client = AmongUsClient.Instance;
+                if (client == null || !client.AmHost || !client.IsGameStarted) return false;
+                if (EndUnderWay || Core.Game.HaisonActive || Core.Game.Ending) return false;
+                if (Net.AegisMatchStop.EndSeenThisMatch) return false;   // a vanilla / win-check end already went out
+                Core.Game.HaisonActive = true;   // WinConditions / vanilla end checks stay out of this end (as EndCurrentGame)
+                EndNow(why);                     // clears HaisonActive itself when nothing could be sent
+                return _ended;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Haison.EndForAegis: {e}");
+                if (!Pending && !_ended) Core.Game.HaisonActive = false;
                 return false;
             }
         }
@@ -715,9 +911,17 @@ namespace PocketRoles.Lobby
             }
             catch (Exception e)
             {
+                // v0.5.5 review: the end checks and the ship were already turned off for this end; with no end the game must
+                // go on (with the end checks down vanilla also refuses meetings and reports) — F7 and AegisMatchStop alike
+                bool tookGame = _ended;
                 _ended = false;
                 if (!Pending) Core.Game.HaisonActive = false;
-                PocketRolesPlugin.Logger.LogError($"Haison.EndNow({why}): end failed, HaisonActive cleared: {e}");
+                if (tookGame)
+                {
+                    try { var gm = GameManager.Instance; if (gm != null) gm.ShouldCheckForGameEnd = true; } catch (Exception) { }
+                    try { if (ShipStatus.Instance != null) ShipStatus.Instance.enabled = true; } catch (Exception) { }
+                }
+                PocketRolesPlugin.Logger.LogError($"Haison.EndNow({why}): end failed, HaisonActive cleared{(tookGame ? ", end checks and ship given back" : "")}: {e}");
             }
         }
 
@@ -735,7 +939,7 @@ namespace PocketRoles.Lobby
         {
             if (!Pending) return;
             PocketRolesPlugin.Logger.LogInfo("Haison: cancelled with the countdown");
-            Chat.Chat.All(Chat.Chat.Title, () => Lang.T("haison.cancelled", "廃村を取り消しました。そのまま続けます。", "Haison cancelled; the lobby continues.", "废村已取消，房间继续。"));
+            Chat.Chat.All(Chat.Chat.Title, () => Lang.T("haison.cancelled", "廃村を取り消しました。そのまま続けます。", "Haison cancelled; the lobby continues.", "废局已取消，房间继续。"));
             Abort();
         }
 
@@ -767,7 +971,59 @@ namespace PocketRoles.Lobby
                         "ロビーを更新しました。そのまま遊べます。", "The lobby was refreshed. You can keep playing.", "房间已刷新，可以继续游戏。"));
                 }, "haison.done");
             }
+            Scheduler.Cancel(ResetStartTag);
+            Scheduler.After(ResetStartDelay, () => ResetStartAfterReturn(0), ResetStartTag);
             PocketRolesPlugin.Logger.LogInfo($"Haison: back in the lobby (notice={(wasPending ? "yes" : "no")})");
+        }
+
+        private const string ResetStartTag = "haison.resetstart";
+        private const float ResetStartDelay = 1.5f;
+        private const int ResetStartTries = 5;
+
+        /// <summary>
+        /// v0.5.5: once after a haison return, while the host is still alone, run vanilla <c>ResetStartState</c> (native
+        /// code: startState = NotStarting, start button shown for the host, <c>LocalPlayer.RpcSetStartCounter(-1)</c>) —
+        /// exactly what vanilla runs when a player joins. The host's new PlayerControl then no longer sends its first
+        /// SetStartCounter (sequence 0) to the first joiner (candidate A of the 2026-09-22 "hacking" kick after a
+        /// 1-player haison). Skipped when somebody is already in (vanilla sent it on their join) or a start is under way;
+        /// waits until the host's PlayerControl is spawned and serialized (an RPC before its spawn would be invalid).
+        /// </summary>
+        private static void ResetStartAfterReturn(int tries)
+        {
+            try
+            {
+                var client = AmongUsClient.Instance;
+                if (client == null || !client.AmHost || !AutoStart.InLobby()) return;
+                var gsm = AutoStart.Gsm();
+                if (gsm == null) return;
+                int clients = -1;
+                try { var all = client.allClients; if (all != null) clients = all.Count; } catch (Exception) { }
+                if (AutoStart.PlayerCount() > 1 || clients > 1)
+                {
+                    PocketRolesPlugin.Logger.LogInfo($"Haison: ResetStartState after the return skipped (players={AutoStart.PlayerCount()}, clients={clients}: vanilla sent it on the join)");
+                    return;
+                }
+                if (gsm.startState != GameStartManager.StartingStates.NotStarting || Pending || AutoStart.Forcing)
+                {
+                    PocketRolesPlugin.Logger.LogInfo($"Haison: ResetStartState after the return skipped (a start is under way: {gsm.startState})");
+                    return;
+                }
+                var lp = PlayerControl.LocalPlayer;
+                if (lp == null || !lp.hasBeenSerialized)
+                {
+                    if (tries < ResetStartTries)
+                        Scheduler.After(1f, () => ResetStartAfterReturn(tries + 1), ResetStartTag);
+                    else
+                        PocketRolesPlugin.Logger.LogInfo("Haison: ResetStartState after the return skipped (host PlayerControl not ready)");
+                    return;
+                }
+                gsm.ResetStartState();
+                PocketRolesPlugin.Logger.LogInfo("Haison: vanilla ResetStartState once after the return (alone; SetStartCounter(-1) sent before any join)");
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"Haison.ResetStartAfterReturn: {e.Message}");
+            }
         }
 
         /// <summary>Live haison state back to idle (Game.ResetForNewLobby); the "last game was a haison" latch is kept.</summary>

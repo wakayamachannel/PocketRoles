@@ -35,7 +35,7 @@ namespace PocketRoles.Game
         /// <summary>Vanilla roles a guess may name besides plain Crewmate / Impostor (enum name or the vrole.* text in any language).</summary>
         private static readonly (RoleTypes Role, string Key, string Ja, string En)[] VanillaSpecials =
         {
-            (RoleTypes.Scientist, "vrole.sci", "サイエンティスト", "Scientist"),
+            (RoleTypes.Scientist, "vrole.sci", "科学者", "Scientist"),
             (RoleTypes.Engineer, "vrole.eng", "エンジニア", "Engineer"),
             (RoleTypes.Noisemaker, "vrole.nm", "ノイズメーカー", "Noisemaker"),
             (RoleTypes.Tracker, "vrole.tr", "トラッカー", "Tracker"),
@@ -43,7 +43,21 @@ namespace PocketRoles.Game
             (RoleTypes.Judge, "vrole.judge", "ジャッジ", "Judge"),
             (RoleTypes.Shapeshifter, "vrole.ss", "シェイプシフター", "Shapeshifter"),
             (RoleTypes.Phantom, "vrole.ph", "ファントム", "Phantom"),
-            (RoleTypes.Viper, "vrole.vp", "ヴァイパー", "Viper"),
+            (RoleTypes.Viper, "vrole.vp", "バイパー", "Viper"),
+        };
+
+        /// <summary>
+        /// v0.5.5: the vrole.* texts now use the game's official names (科学者 / バイパー, 幻象师 / 侦察员 / 大嗓门 / 法官);
+        /// the names of the older texts still count as a guess, and so do the official Traditional Chinese names (a TChinese
+        /// game shows them; our zh table is Simplified). terms-ok
+        /// </summary>
+        private static readonly Dictionary<string, RoleTypes> OlderVanillaNames = new Dictionary<string, RoleTypes>
+        {
+            { "サイエンティスト", RoleTypes.Scientist }, { "ヴァイパー", RoleTypes.Viper },   // terms-ok
+            { "幻影", RoleTypes.Phantom }, { "追踪者", RoleTypes.Tracker }, { "噪音制造者", RoleTypes.Noisemaker }, { "审判官", RoleTypes.Judge },   // terms-ok
+            { "工程師", RoleTypes.Engineer }, { "科學家", RoleTypes.Scientist }, { "警示者", RoleTypes.Noisemaker }, { "追蹤者", RoleTypes.Tracker },   // terms-ok: zh-TW
+            { "偵探", RoleTypes.Detective }, { "變形者", RoleTypes.Shapeshifter }, { "魅影", RoleTypes.Phantom },   // terms-ok: zh-TW
+            { "幻术师", RoleTypes.Phantom },   // terms-ok: PR #1's name for the Phantom (the game says 幻象师)
         };
 
         // ------------------------------------------------------------------ command
@@ -230,8 +244,8 @@ namespace PocketRoles.Game
 
         /// <summary>
         /// Role text of a guess → a custom role (label = its localized name) or a vanilla RoleTypes (label =
-        /// Chat.VanillaRoleName). Keywords first, then the vanilla specials, then Roles.TryParse: the zh prefix match
-        /// of Roles.TryParse would otherwise turn "内鬼" (Impostor) into Madmate.
+        /// Chat.VanillaRoleName). Keywords first, then the vanilla specials, then Roles.TryParse (whose prefix match never
+        /// takes a vanilla word since v0.5.5: "伪装者" is the start of the Madmate's former name 伪装者狂粉, RoleWords).
         /// </summary>
         internal static bool TryParseGuess(string text, out CustomRole custom, out RoleTypes vanilla, out string label)
         {
@@ -244,11 +258,11 @@ namespace PocketRoles.Game
 
             switch (lower)
             {
-                case "crew": case "crewmate": case "c": case "クルー": case "クルーメイト": case "船员":
+                case "crew": case "crewmate": case "c": case "クルー": case "クルーメイト": case "船员": case "船員":   // terms-ok: older name, zh-TW still accepted
                     vanilla = RoleTypes.Crewmate;
                     label = HrChat.VanillaRoleName(vanilla);
                     return true;
-                case "imp": case "impostor": case "i": case "インポスター": case "内鬼":
+                case "imp": case "impostor": case "i": case "インポスター": case "伪装者": case "偽裝者": case "内鬼":   // terms-ok: players still type 内鬼; 偽裝者 = zh-TW
                     vanilla = RoleTypes.Impostor;
                     label = HrChat.VanillaRoleName(vanilla);
                     return true;
@@ -258,7 +272,8 @@ namespace PocketRoles.Game
 
             foreach (var v in VanillaSpecials)
             {
-                if (lower == v.Role.ToString().ToLowerInvariant() || MatchesVanillaText(t, lower, v.Key, v.Ja, v.En))
+                if (lower == v.Role.ToString().ToLowerInvariant() || MatchesVanillaText(t, lower, v.Key, v.Ja, v.En)
+                    || (OlderVanillaNames.TryGetValue(t, out var older) && older == v.Role))
                 {
                     vanilla = v.Role;
                     label = HrChat.VanillaRoleName(v.Role);

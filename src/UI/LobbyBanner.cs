@@ -165,10 +165,11 @@ namespace PocketRoles.UI
     }
 
     /// <summary>
-    /// Vanilla path while the lobby computer is open: LobbyBehaviour.HandleLobbyTimerExtensionRequest (RPC 60 near the
-    /// end of the lobby) calls HudManager.ShowLobbyTimer and would bring the banner back over the settings tabs.
+    /// Vanilla path while the lobby computer is open: LobbyBehaviour.HandleRpc (RPC 60 near the end of the lobby, handled
+    /// inline on 2026.8.18) calls HudManager.ShowLobbyTimer and would bring the banner back over the settings tabs.
     /// Skipped while <see cref="LobbyBanner.HiddenBySettings"/> (host, online lobby); the estimate itself is still
-    /// updated by LobbyTimer's own RPC 60 postfix and Restore shows the current value when the menu closes.
+    /// updated by LobbyTimer's HandleRpc prefix (LobbyTimer_HandleRpcPatch) and Restore shows the current value when the
+    /// menu closes.
     /// </summary>
     [HarmonyPatch(typeof(HudManager), nameof(HudManager.ShowLobbyTimer))]
     internal static class LobbyBanner_ShowLobbyTimerPatch

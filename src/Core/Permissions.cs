@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using HarmonyLib;
 using InnerNet;
 using PocketRoles.Net;
@@ -290,6 +291,26 @@ namespace PocketRoles.Core
             return PermLevel.Player;
         }
 
+        /// <summary>
+        /// v0.5.5 AegisBans: the level of a joining client by its identity (no PlayerControl, so no player id yet): Admin,
+        /// Moderator, VIP or Player. Never Host (the host never joins its own lobby as a remote client).
+        /// </summary>
+        internal static PermLevel LevelOfIdentity(string puid, string friendCode)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(puid) && string.IsNullOrEmpty(friendCode)) return PermLevel.Player;
+                if (Contains(ListKind.Admin, puid, friendCode)) return PermLevel.Admin;
+                if (Contains(ListKind.Moderator, puid, friendCode)) return PermLevel.Moderator;
+                if (Contains(ListKind.Vip, puid, friendCode)) return PermLevel.Vip;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger?.LogWarning($"Permissions.LevelOfIdentity: {e.Message}");
+            }
+            return PermLevel.Player;
+        }
+
         /// <summary>Admins may run the host commands (file entry + [Permissions] AdminsCanChangeSettings).</summary>
         public static bool CanUseHostCommands(PlayerControl pc)
         {
@@ -383,13 +404,13 @@ namespace PocketRoles.Core
                     f.Entries[key] = line;
                     Save(f);
                 }
-                PocketRolesPlugin.Logger.LogInfo($"Permissions: {kind} + {display ?? "?"} ({key})");
+                PocketRolesPlugin.Logger.LogInfo($"Permissions: {kind} + {(display != null ? LogText(display) : "?")} ({LogId(key)})");   // v0.5.5 review: a name shaped like a friend code is masked too
                 message = Lang.TF("perm.added", "{0} を{1}に追加しました（{2}）。", "{0} added to {1} ({2}).", display ?? key, ListName(kind), Get(kind).FileName);
                 return true;
             }
             catch (Exception e)
             {
-                PocketRolesPlugin.Logger.LogError($"Permissions.Add({kind}, {nameOrIdOrCode}): {e}");
+                PocketRolesPlugin.Logger.LogError($"Permissions.Add({kind}, {LogText(nameOrIdOrCode)}): {e}");
                 message = "error: " + e.Message;
                 return false;
             }
@@ -402,7 +423,7 @@ namespace PocketRoles.Core
             try
             {
                 var keys = new List<string>();
-                string display = null;
+                string display = null, logId = null;
                 var pc = FindPlayer(nameOrIdOrCode);
                 if (pc != null)
                 {
@@ -410,6 +431,7 @@ namespace PocketRoles.Core
                     if (!string.IsNullOrEmpty(puid)) keys.Add(Normalize(puid));
                     if (!string.IsNullOrEmpty(fc)) keys.Add(Normalize(fc));
                     display = Game.NameOf(pc.PlayerId);
+                    logId = LogId(!string.IsNullOrEmpty(puid) ? puid : fc);
                 }
                 if (!string.IsNullOrWhiteSpace(nameOrIdOrCode)) keys.Add(Normalize(nameOrIdOrCode));
                 int removed = 0;
@@ -442,15 +464,148 @@ namespace PocketRoles.Core
                     message = Lang.TF("perm.notlisted", "{0} は{1}に登録されていません。", "{0} is not listed ({1}).", display ?? nameOrIdOrCode ?? "", ListName(kind));
                     return false;
                 }
-                PocketRolesPlugin.Logger.LogInfo($"Permissions: {kind} - {display ?? nameOrIdOrCode}");
+                // v0.5.5: the log names the player and a tag, never the PUID / friend code (a code typed by the host included)
+                string logWho = display != null ? LogText(display) + (logId != null ? " (" + logId + ")" : "")
+                    : LooksLikeIdentity(nameOrIdOrCode) ? "? (" + LogId(nameOrIdOrCode) + ")" : LogText(nameOrIdOrCode);
+                PocketRolesPlugin.Logger.LogInfo($"Permissions: {kind} - {logWho}");
                 message = Lang.TF("perm.removed", "{0} を{1}から削除しました。", "{0} removed from {1}.", display ?? nameOrIdOrCode, ListName(kind));
                 return true;
             }
             catch (Exception e)
             {
-                PocketRolesPlugin.Logger.LogError($"Permissions.Remove({kind}, {nameOrIdOrCode}): {e}");
+                PocketRolesPlugin.Logger.LogError($"Permissions.Remove({kind}, {LogText(nameOrIdOrCode)}): {e}");
                 message = "error: " + e.Message;
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// v0.5.5 AegisBans: removes the Banlist.txt lines whose identity, hashed like the Aegis ban file
+        /// (<see cref="AegisBans.HashOf"/>), satisfies <paramref name="matchHash"/> (an Aegis unban lifts a permanent /ban too).
+        /// Returns how many lines were removed.
+        /// </summary>
+        internal static int RemoveBansWhere(Func<string, bool> matchHash)
+        {
+            if (matchHash == null) return 0;
+            lock (Sync)
+            {
+                var f = Get(ListKind.Ban);
+                EnsureLoaded(f);
+                var hit = new List<string>();
+                foreach (var k in f.Entries.Keys) if (matchHash(AegisBans.HashOf(k))) hit.Add(k);
+                foreach (var k in hit) f.Entries.Remove(k);
+                if (hit.Count > 0) Save(f);
+                return hit.Count;
+            }
+        }
+
+        /// <summary>
+        /// v0.5.5 privacy housekeeping (AegisBans.Housekeep): every Banlist.txt identity hashed like the Aegis ban file
+        /// (<see cref="AegisBans.HashOf"/>). Read only: the host's lists are never changed by the housekeeping (only an appeal
+        /// the author accepted removes the Banlist.txt lines of the bans it lifts), and a missing Banlist.txt is not created here.
+        /// </summary>
+        internal static HashSet<string> BanlistHashes()
+        {
+            var set = new HashSet<string>(StringComparer.Ordinal);
+            try
+            {
+                string path = PathOf(ListKind.Ban);
+                if (path == null || !File.Exists(path)) return set;
+                lock (Sync)
+                {
+                    var f = Get(ListKind.Ban);
+                    EnsureLoaded(f);
+                    foreach (var k in f.Entries.Keys)
+                    {
+                        string h = AegisBans.HashOf(k);
+                        if (h.Length > 0) set.Add(h);
+                    }
+                }
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger?.LogWarning($"Permissions.BanlistHashes: {e.Message}"); }
+            return set;
+        }
+
+        /// <summary>
+        /// v0.5.5 AegisBans: the date of the player's Banlist.txt line (the "yyyy-MM-dd" of its "// name date" comment, local
+        /// time, the latest when both identities have a line); null when neither line has one.
+        /// </summary>
+        internal static DateTime? BanLineDate(string puid, string friendCode)
+        {
+            DateTime? best = null;
+            lock (Sync)
+            {
+                var f = Get(ListKind.Ban);
+                EnsureLoaded(f);
+                foreach (var id in new[] { puid, friendCode })
+                {
+                    if (string.IsNullOrEmpty(id) || !f.Entries.TryGetValue(Normalize(id), out var line) || line == null) continue;
+                    var d = DateOfLine(line);
+                    if (d.HasValue && (best == null || d.Value > best.Value)) best = d;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>v0.5.5: the latest "yyyy-MM-dd" of a list line's "// name date" comment (the host's local day); null when it has none.</summary>
+        internal static DateTime? DateOfLine(string line)
+        {
+            if (string.IsNullOrEmpty(line)) return null;
+            int c = line.IndexOf("//", StringComparison.Ordinal);
+            if (c < 0) return null;
+            DateTime? best = null;
+            foreach (var tok in line.Substring(c + 2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                if (DateTime.TryParseExact(tok, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) && (best == null || d > best.Value)) best = d;
+            return best;
+        }
+
+        /// <summary>v0.5.5: the name in a list line's "// name date" comment ("" when none, or "-").</summary>
+        internal static string NameOfLine(string line)
+        {
+            if (string.IsNullOrEmpty(line)) return "";
+            int c = line.IndexOf("//", StringComparison.Ordinal);
+            if (c < 0) return "";
+            var words = new List<string>();
+            foreach (var tok in line.Substring(c + 2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                if (!DateTime.TryParseExact(tok, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)) words.Add(tok);
+            string n = string.Join(" ", words);
+            return n == "-" ? "" : n;
+        }
+
+        /// <summary>
+        /// v0.5.5 central unban (AegisBans): every Banlist.txt line as (normalized key, the line). Read only; a missing
+        /// Banlist.txt is not created here.
+        /// </summary>
+        internal static List<KeyValuePair<string, string>> BanlistLines()
+        {
+            var o = new List<KeyValuePair<string, string>>();
+            try
+            {
+                string path = PathOf(ListKind.Ban);
+                if (path == null || !File.Exists(path)) return o;
+                lock (Sync)
+                {
+                    var f = Get(ListKind.Ban);
+                    EnsureLoaded(f);
+                    foreach (var kv in f.Entries) o.Add(new KeyValuePair<string, string>(kv.Key, kv.Value));
+                }
+            }
+            catch (Exception e) { PocketRolesPlugin.Logger?.LogWarning($"Permissions.BanlistLines: {e.Message}"); }
+            return o;
+        }
+
+        /// <summary>v0.5.5 central unban (AegisBans): removes these Banlist.txt keys (the author lifted those bans on appeal). Returns how many lines went.</summary>
+        internal static int RemoveBanKeys(ICollection<string> keys)
+        {
+            if (keys == null || keys.Count == 0) return 0;
+            lock (Sync)
+            {
+                var f = Get(ListKind.Ban);
+                EnsureLoaded(f);
+                int n = 0;
+                foreach (var k in keys) if (f.Entries.Remove(Normalize(k))) n++;
+                if (n > 0) Save(f);
+                return n;
             }
         }
 
@@ -547,14 +702,70 @@ namespace PocketRoles.Core
             return true;
         }
 
+        // ------------------------------------------------------------------ log text
+
+        /// <summary>
+        /// v0.5.5 (privacy): how the log names an identity (a PUID or friend code of a list line, a player, or typed by the
+        /// host): <see cref="AegisBans.LogTag"/> of a PUID ("puid-hash 1a2b3c4d"), or just "friend code" (a friend code is a
+        /// word + 4 digits, so even its hash could be guessed back). The logs go into the report zip; the list files keep
+        /// the identity itself (they need it).
+        /// </summary>
+        private static string LogId(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return "-";
+            string s = id.Trim();
+            int hash = s.IndexOfAny(new[] { '#', '＃' });
+            if (hash > 0) return "friend code";
+            return AegisBans.LogTag(AegisBans.HashOf(s));
+        }
+
+        private static readonly Regex LogWord = new Regex(@"\S+", RegexOptions.CultureInvariant);
+        /// <summary>A friend code's tail inside a word: "#" or "＃" and 4 digits (also full-width).</summary>
+        private static readonly Regex CodeTail = new Regex(@"[#＃]\d{4}", RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// v0.5.5 (privacy): a text for a log line with every word that looks like a PUID or a friend code (what the host may
+        /// type after /ban, /vip …) replaced by "&lt;<see cref="LogId"/>&gt;"; other words stay as they are.
+        /// v0.5.5 review: punctuation around a word ("name#1234," "(0123…cdef)") is looked through, so it no longer hides one.
+        /// </summary>
+        internal static string LogText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text ?? "";
+            try
+            {
+                return LogWord.Replace(text, m =>
+                {
+                    string w = m.Value;
+                    int a = 0, b = w.Length;
+                    while (a < b && !IsWordChar(w[a])) a++;
+                    while (b > a && !IsWordChar(w[b - 1])) b--;
+                    string core = w.Substring(a, b - a);
+                    if (core.Length == 0) return w;
+                    int hash = core.IndexOfAny(new[] { '#', '＃' });
+                    bool code = hash > 0 && CodeTail.IsMatch(core, hash);
+                    return code || LooksLikeIdentity(core) ? w.Substring(0, a) + "<" + LogId(core) + ">" + w.Substring(b) : w;
+                });
+            }
+            catch (Exception) { return "?"; }
+        }
+
+        private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '#' || c == '＃';
+
         // ------------------------------------------------------------------ kick / ban
 
         /// <summary>
         /// Kicks a player (and with <paramref name="ban"/> also puts them on Banlist.txt and asks the server to ban).
         /// <paramref name="actor"/> may only remove players below their own level (a moderator cannot kick an admin,
         /// nobody kicks the host). Returns false with a message otherwise.
+        /// v0.5.5: a ban is also recorded in the Aegis ban file (AegisBans: evidence record, offence count, /aegis bans);
+        /// with <paramref name="days"/> &gt; 0 ("/ban name 30") it lasts that many days and Banlist.txt (no expiry) is not used.
         /// </summary>
-        public static bool Kick(PlayerControl actor, string nameOrId, bool ban, out string message)
+        public static bool Kick(PlayerControl actor, string nameOrId, bool ban, out string message) => Kick(actor, nameOrId, ban, 0, out message);
+
+        public static bool Kick(PlayerControl actor, string nameOrId, bool ban, int days, out string message) => Kick(actor, nameOrId, ban, days, false, out message);
+
+        /// <param name="confirmed">v0.5.5 central unban: the host added "confirm" (a ban of a player the author cleared on appeal less than 30 days ago; see AegisBans.AppealBanGate)</param>
+        public static bool Kick(PlayerControl actor, string nameOrId, bool ban, int days, bool confirmed, out string message)
         {
             message = null;
             try
@@ -565,10 +776,14 @@ namespace PocketRoles.Core
                     message = Lang.T("perm.kick.nohost", "ホストのみ実行できます。", "Only the host can do that.");
                     return false;
                 }
-                var target = FindPlayer(nameOrId);
+                // v0.5.5: a ban with days ("/ban Taro 7") needs the exact name, #id or code: the number may have been split off
+                // a name ("Player 2" who just left), and a part of a name would then hit someone else
+                var target = FindPlayer(nameOrId, !(ban && days > 0));
                 if (target == null)
                 {
                     message = Lang.TF("perm.noplayer", "プレイヤー「{0}」が見つかりません（名前、番号、フレンドコード name#1234 が使えます）。", "Player \"{0}\" not found (use a name, an id, or a friend code name#1234).", nameOrId ?? "");
+                    if (ban && days > 0 && FindPlayer(nameOrId) != null)
+                        message = Lang.T("perm.ban.exact", "日数付きの BAN は、名前を完全に書くか #番号で指定してください（名前の一部では実行しません）。", "A ban with days needs the full name or the #id (part of a name is not enough).", "带天数的限制进入请写完整的名字或用 #编号 指定（不按名字的一部分执行）。");
                     return false;
                 }
                 string name = Game.NameOf(target.PlayerId);
@@ -594,40 +809,85 @@ namespace PocketRoles.Core
                     return false;
                 }
                 string extra = "";
+                string by = actor == null ? "?" : (actor.AmOwner ? "host" : Game.NameOf(actor.PlayerId));
+                AegisBans.Entry aegis = null;
+                bool reban = false;
+                if (ban)
+                {
+                    // v0.5.5 central unban: a player the author cleared on appeal less than 30 days ago leaves with a ban for
+                    // this room only until the host confirms a lasting one (the question is on the host's screen only)
+                    string gate = AegisBans.AppealBanGate(actor, target, clientId, days, confirmed, out bool proceed, out reban);
+                    if (!proceed)
+                    {
+                        PocketRolesPlugin.Logger.LogInfo($"Permissions: ban #{target.PlayerId} {name} (client {clientId}) by {(actor == null ? "?" : Game.NameOf(actor.PlayerId))}: a room ban only (cleared on appeal)");
+                        message = gate;
+                        return true;
+                    }
+                }
                 if (ban)
                 {
                     IdentityOf(target.PlayerId, out var puid, out var fc);
                     string id = !string.IsNullOrEmpty(puid) ? puid : fc;
                     if (!string.IsNullOrEmpty(id))
                     {
-                        Add(ListKind.Ban, id, out _);
+                        if (days <= 0) Add(ListKind.Ban, id, out _);
+                        aegis = AegisBans.RecordManual(target, days, by, reban);   // v0.5.5: evidence record + offence count (never throws)
                     }
                     else
                     {
                         extra = "\n" + Lang.T("perm.ban.noidentity", "（識別情報がないため Banlist.txt には登録できませんでした。サーバー側の一時BANのみ）", "(no identity known: not written to Banlist.txt, server-side temporary ban only)");
                     }
                 }
-                PocketRolesPlugin.Logger.LogInfo($"Permissions: {(ban ? "ban" : "kick")} #{target.PlayerId} {name} (client {clientId}) by {(actor == null ? "?" : Game.NameOf(actor.PlayerId))}");
+                PocketRolesPlugin.Logger.LogInfo($"Permissions: {(ban ? "ban" : "kick")} #{target.PlayerId} {name} (client {clientId}) by {(actor == null ? "?" : Game.NameOf(actor.PlayerId))}{(ban && days > 0 ? $" for {days} day(s)" : "")}");
                 client.KickPlayer(clientId, ban);
-                message = (ban
-                    ? Lang.TF("perm.ban.done", "{0} をBANしました（Banlist.txt に追加。次回参加時もキックされます）。", "{0} banned (added to Banlist.txt; kicked again on rejoin).", name)
-                    : Lang.TF("perm.kick.done", "{0} をキックしました。", "{0} kicked.", name)) + extra;
+                if (ban && days > 0 && aegis == null && extra.Length == 0)
+                {
+                    // nothing was written anywhere (a ban with days never goes to Banlist.txt): say so, not "added to Banlist.txt"
+                    string t = Lang.T("perm.ban.norecord", "{0} をこの部屋から BAN しました。ただし {1} 日間の BAN を記録できませんでした（くわしくはログ）。次に入ってきた時は止められません。", "{0} was banned from this room, but the {1}-day ban could not be recorded (see the log): a next join is not stopped.", "已限制 {0} 进入本房间，但无法记录 {1} 天的限制进入（详见日志），下次加入时无法阻止。");
+                    try { message = string.Format(t, name, days); }
+                    catch (FormatException) { message = name + ": " + days + " d, not recorded"; }
+                }
+                else if (ban && days > 0 && aegis != null)
+                {
+                    // the length that applies: a longer ban still running is never shortened (AegisBans.AddBan)
+                    bool longer = aegis.Expires == null || aegis.Days != days;
+                    string t = longer
+                        ? Lang.T("perm.ban.longer", "{0} を BAN しました。もっと長い BAN が続いているので、期間は {1} のままです（{2}。一覧は /aegis bans）。", "{0} banned. A longer ban is still running, so it stays {1} ({2}; list: /aegis bans).", "已对 {0} 限制进入。更长的限制仍在生效，期限保持为 {1}（{2}；列表: /aegis bans）。")
+                        : Lang.T("perm.ban.days", "{0} を{1}日間 BAN しました（{2}。一覧は /aegis bans）。", "{0} banned for {1} days ({2}; list: /aegis bans).", "已对 {0} 限制进入 {1} 天（{2}；列表: /aegis bans）。");
+                    object length = longer ? (object)AegisBans.LengthText(aegis.Expires == null ? 0 : aegis.Days) : aegis.Days;
+                    try { message = string.Format(t, name, length, aegis.Evidence) + extra; }
+                    catch (FormatException) { message = name + ": " + length + ", " + aegis.Evidence + extra; }
+                }
+                else
+                    message = (ban
+                        ? Lang.TF("perm.ban.done", "{0} をBANしました（Banlist.txt に追加。次回参加時もキックされます）。", "{0} banned (added to Banlist.txt; kicked again on rejoin).", name)
+                        : Lang.TF("perm.kick.done", "{0} をキックしました。", "{0} kicked.", name)) + extra;
+                // v0.5.5 review: a moderator's or admin's reply is public in an unregistered lobby: one neutral line for every
+                // ban (a player the author cleared on appeal gets the same, AegisBans.AppealBanGate); the details go to the host
+                if (ban && actor != null && !actor.AmOwner && Registration.CompatMode && !string.IsNullOrEmpty(message))
+                {
+                    CheatDetector.NoticeUnattributed("[" + AegisBans.SafeName(by) + "] " + message);
+                    message = AegisBans.ModBanReply(AegisBans.SafeName(name));
+                }
                 return true;
             }
             catch (Exception e)
             {
-                PocketRolesPlugin.Logger.LogError($"Permissions.Kick({nameOrId}, ban={ban}): {e}");
+                PocketRolesPlugin.Logger.LogError($"Permissions.Kick({LogText(nameOrId)}, ban={ban}): {e}");
                 message = "error: " + e.Message;
                 return false;
             }
         }
 
-        /// <summary>A joining client is on Banlist.txt: kick it (called from the OnPlayerJoined postfix).</summary>
-        internal static void CheckJoin(AmongUsClient client, ClientData data)
+        /// <summary>
+        /// A joining client is on Banlist.txt: kick it (called from the OnPlayerJoined postfix). True when it was kicked
+        /// (the Aegis ban check then skips it).
+        /// </summary>
+        internal static bool CheckJoin(AmongUsClient client, ClientData data)
         {
-            if (client == null || data == null || !client.AmHost) return;
+            if (client == null || data == null || !client.AmHost) return false;
             int clientId = data.Id;
-            if (Rpc.IsLocal(clientId)) return;
+            if (Rpc.IsLocal(clientId)) return false;
             string puid = null, fc = null, name = null;
             try
             {
@@ -639,7 +899,17 @@ namespace PocketRoles.Core
             {
                 PocketRolesPlugin.Logger.LogWarning($"Permissions.CheckJoin: {e.Message}");
             }
-            if (!IsBanned(puid, fc)) return;
+            if (!IsBanned(puid, fc)) return false;
+            // v0.5.5: the person's latest ban in the Aegis ban file is over — lifted (the Aegis console app, /aegis unban) or
+            // expired (a /ban whose length the console changed) — and the Banlist.txt line (a permanent /ban, no end date of
+            // its own) is not newer than it: the line goes too instead of kicking
+            if (AegisBans.BanlistLineStale(puid, fc, BanLineDate(puid, fc)))
+            {
+                string hp = AegisBans.HashOf(puid), hf = AegisBans.HashOf(fc);
+                int n = RemoveBansWhere(h => (hp.Length > 0 && h == hp) || (hf.Length > 0 && h == hf));
+                PocketRolesPlugin.Logger.LogInfo($"Permissions: client {clientId} is on Banlist.txt but the ban in the Aegis ban file was lifted or has ended since; {n} Banlist.txt line(s) removed, not kicked");
+                return false;
+            }
             PocketRolesPlugin.Logger.LogInfo($"Permissions: banned player joined ({name}, client {clientId}) - banned");
             // Right away (EHR / TOHE kick inside the OnPlayerJoined postfix too) so the auto-start count and the
             // welcome pacing never see the player, and with the server-side ban flag so the same client cannot
@@ -652,6 +922,7 @@ namespace PocketRoles.Core
             {
                 PocketRolesPlugin.Logger.LogError($"Permissions: ban kick of client {clientId}: {e}");
             }
+            return true;
         }
 
         // ------------------------------------------------------------------ lookup
@@ -665,7 +936,10 @@ namespace PocketRoles.Core
         /// "#3" / "3" → player id; a friend code / Puid → the player with that identity; otherwise exact name
         /// (case-insensitive), then a unique substring. Disconnected players are ignored.
         /// </summary>
-        public static PlayerControl FindPlayer(string text)
+        public static PlayerControl FindPlayer(string text) => FindPlayer(text, true);
+
+        /// <summary>v0.5.5: <paramref name="allowPartial"/> false = no unique-substring fallback (a ban with days, /ban remove's Aegis lookup).</summary>
+        public static PlayerControl FindPlayer(string text, bool allowPartial)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
             string t = NormName(text);
@@ -695,7 +969,7 @@ namespace PocketRoles.Core
                     if (exact == null) exact = pc;
                     continue;
                 }
-                if (name.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (allowPartial && name.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     partial = pc;
                     partialCount++;
@@ -719,7 +993,8 @@ namespace PocketRoles.Core
                 if (!Game.IsHostActive) return;
                 if (__instance == null || data == null) return;
                 if (__instance.GameState != InnerNetClient.GameStates.Joined) return;
-                Permissions.CheckJoin(__instance, data);
+                AegisBans.ApplyUnbanAtJoin(__instance, data);   // v0.5.5 central unban: an appeal the author accepted first (once per client; never throws)
+                if (!Permissions.CheckJoin(__instance, data)) AegisBans.CheckJoin(__instance, data);   // v0.5.5: local and shared Aegis bans
             }
             catch (Exception e)
             {

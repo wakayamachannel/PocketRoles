@@ -47,11 +47,17 @@ namespace PocketRoles.Game
         private static readonly Dictionary<string, RoleTypes> JaNames = new Dictionary<string, RoleTypes>
         {
             { "シフター", RoleTypes.Shapeshifter }, { "シェイプシフター", RoleTypes.Shapeshifter }, { "変身", RoleTypes.Shapeshifter },
-            { "ファントム", RoleTypes.Phantom }, { "ヴァイパー", RoleTypes.Viper }, { "バイパー", RoleTypes.Viper },
-            { "サイエンティスト", RoleTypes.Scientist }, { "科学者", RoleTypes.Scientist }, { "エンジニア", RoleTypes.Engineer },
+            { "ファントム", RoleTypes.Phantom }, { "ヴァイパー", RoleTypes.Viper }, { "バイパー", RoleTypes.Viper },   // terms-ok: older names still accepted
+            { "サイエンティスト", RoleTypes.Scientist }, { "科学者", RoleTypes.Scientist }, { "エンジニア", RoleTypes.Engineer },   // terms-ok
             { "トラッカー", RoleTypes.Tracker }, { "ノイズメーカー", RoleTypes.Noisemaker }, { "探偵", RoleTypes.Detective }, { "ジャッジ", RoleTypes.Judge },
-            { "变形者", RoleTypes.Shapeshifter }, { "幻影", RoleTypes.Phantom }, { "毒蛇", RoleTypes.Viper }, { "科学家", RoleTypes.Scientist },
-            { "工程师", RoleTypes.Engineer }, { "追踪者", RoleTypes.Tracker }, { "噪音制造者", RoleTypes.Noisemaker }, { "侦探", RoleTypes.Detective }, { "审判官", RoleTypes.Judge },
+            { "变形者", RoleTypes.Shapeshifter }, { "幻象师", RoleTypes.Phantom }, { "毒蛇", RoleTypes.Viper }, { "科学家", RoleTypes.Scientist },
+            { "工程师", RoleTypes.Engineer }, { "侦察员", RoleTypes.Tracker }, { "大嗓门", RoleTypes.Noisemaker }, { "侦探", RoleTypes.Detective }, { "法官", RoleTypes.Judge },
+            // v0.5.5: the texts use the official Simplified Chinese names now; the older names keep working. terms-ok
+            { "幻影", RoleTypes.Phantom }, { "追踪者", RoleTypes.Tracker }, { "噪音制造者", RoleTypes.Noisemaker }, { "审判官", RoleTypes.Judge },   // terms-ok
+            // ... and the official Traditional Chinese names (a TChinese game shows them). terms-ok
+            { "變形者", RoleTypes.Shapeshifter }, { "魅影", RoleTypes.Phantom }, { "科學家", RoleTypes.Scientist }, { "工程師", RoleTypes.Engineer },   // terms-ok
+            { "追蹤者", RoleTypes.Tracker }, { "警示者", RoleTypes.Noisemaker }, { "偵探", RoleTypes.Detective },   // terms-ok
+            { "幻术师", RoleTypes.Phantom },   // terms-ok: PR #1's name for the Phantom (the game says 幻象师)
         };
 
         public static bool IsSet => Wish != Kind.None;
@@ -66,7 +72,7 @@ namespace PocketRoles.Game
         {
             switch (Wish)
             {
-                case Kind.Impostor: return Lang.T("me.name.impostor", "インポスター", "Impostor", "内鬼");
+                case Kind.Impostor: return Lang.T("me.name.impostor", "インポスター", "Impostor", "伪装者");
                 case Kind.Crewmate: return Lang.T("me.name.crew", "クルー", "Crewmate", "船员");
                 case Kind.Vanilla: return VanillaName(VanillaRole);
                 default: return Lang.T("me.name.auto", "おまかせ", "random", "随机");
@@ -110,9 +116,9 @@ namespace PocketRoles.Game
             string l = t.ToLowerInvariant().Replace(" ", "").Replace("_", "").Replace("-", "");
             switch (l)
             {
-                case "impostor": case "imp": case "impostors": case "インポ": case "インポスター": case "内鬼": case "狼":
+                case "impostor": case "imp": case "impostors": case "インポ": case "インポスター": case "伪装者": case "偽裝者": case "内鬼": case "狼":   // terms-ok: players still type 内鬼; 偽裝者 = zh-TW
                     kind = Kind.Impostor; return true;
-                case "crew": case "crewmate": case "crewmates": case "クルー": case "クルーメイト": case "船员": case "村":
+                case "crew": case "crewmate": case "crewmates": case "クルー": case "クルーメイト": case "船员": case "船員": case "村":   // terms-ok: older name, zh-TW still accepted
                     kind = Kind.Crewmate; return true;
                 case "auto": case "none": case "off": case "clear": case "random": case "おまかせ": case "解除": case "なし": case "随机": case "取消":
                     kind = Kind.None; return true;
@@ -425,7 +431,7 @@ namespace PocketRoles.Game
                 string role = RoleText();
                 if (_fillPending)
                 {
-                    Chat.Chat.Local(Chat.Chat.Title, Lang.TF("me.result.fill", "本体は自分を選ばなかったので、補充で {0} になります。", "Vanilla did not pick me; the top-up makes me {0}.", role));
+                    Chat.Chat.Local(Chat.Chat.Title, string.Format(Lang.T("me.result.fill", "本体は自分を選ばなかったので、補充で {0} になります。", "Vanilla did not pick me; the top-up makes me {0}.", "原版没有选中我，由补充程序设为 {0}。"), role));
                 }
                 else if (ok)
                 {

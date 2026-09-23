@@ -217,8 +217,9 @@ namespace PocketRoles.Game
         }
 
         /// <summary>
-        /// Multi-line host report for /diag: lobby start button state (MinPlayers / LastPlayerCount / startState /
-        /// countDownTimer / button), test mode, haison, game flags and the same snapshot as the watchdog.
+        /// Multi-line host report for /diag: game server (v0.5.5: address, region, lobby, wire RTT, near / far), lobby
+        /// start button state (MinPlayers / LastPlayerCount / startState / countDownTimer / button), test mode, haison,
+        /// game flags, the same snapshot as the watchdog and (v0.5.5) the self-scan state (<see cref="Net.SelfScan.DiagText"/>).
         /// </summary>
         public static string Describe()
         {
@@ -231,6 +232,8 @@ namespace PocketRoles.Game
                   .Append(" hostActive=").Append(Core.Game.IsHostActive)
                   .Append(" modEnabled=").Append(Options.ModEnabled)
                   .Append(" inLobby=").Append(Lobby.AutoStart.InLobby());
+                // v0.5.5: game server address, wire RTT and near / far (Net.LagLog)
+                sb.Append("\nserver: ").Append(Net.LagLog.DiagLine());
                 var gsm = Lobby.AutoStart.Gsm();
                 if (gsm != null)
                 {
@@ -277,6 +280,9 @@ namespace PocketRoles.Game
                 sb.Append("\nsnapshot: ").Append(StateLine());
                 if (_startedAt >= 0f && !_introDone)
                     sb.Append("\nstart trace running for ").Append((Time.realtimeSinceStartup - _startedAt).ToString("0")).Append("s, watchdog lines=").Append(_watchdogLines);
+                // v0.5.5: in-mod self-scan (state, last scan, one line per finding). Last, so a long finding list is what
+                // the chat cap cuts (the log keeps the whole text).
+                sb.Append('\n').Append(Net.SelfScan.DiagText());
             }
             catch (Exception e)
             {

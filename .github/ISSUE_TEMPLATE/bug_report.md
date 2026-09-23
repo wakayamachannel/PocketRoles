@@ -19,7 +19,7 @@ labels: bug
 
 - PocketRoles 版 / 版本 / version:
 - Among Us 版 / 版本 / version（Steam / 2026.x.x）:
-- 登録モード / 注册模式 / registration: on（役職部屋） / off（便利ホスト・役職なし / 便利房 / vanilla room）
+- 登録モード / 注册模式 / registration: on（追加役職部屋） / off（便利ホスト・MODの追加役職なし / 简易房 / vanilla room）
 - 人の集め方 / 招人方式 / how players joined: コード直接 / 案内部屋 / 引导房 / guide room / other
 - 参加者 / 玩家 / players: バニラ / vanilla / modded
 

@@ -20,7 +20,7 @@ namespace PocketRoles
     {
         public const string Id = "jp.pocketroles.mod";
         public const string Name = "PocketRoles";
-        public const string Version = "0.5.4";
+        public const string Version = "0.5.5";
         public const string SupportedGameVersion = "2026.8.18";
 
         public static ManualLogSource Logger;
@@ -33,6 +33,7 @@ namespace PocketRoles
         {
             Instance = this;
             Logger = Log;
+            GameLanguage.MarkMainThread();   // v0.5.5: [General] Language = auto reads the game's language on this thread only
             try
             {
                 Options.Init(Config);
@@ -58,6 +59,16 @@ namespace PocketRoles
             {
                 Log.LogError($"Cosmetics.EnsureFolders failed: {e}");
             }
+            try
+            {
+                // v0.5.5 privacy: records past their time (evidence 90 days, the rest 30) and the erase list of the cached definitions file, before Harmony
+                // (so it runs even when patching fails)
+                AegisPrivacy.RunAtStart();
+            }
+            catch (Exception e)
+            {
+                Log.LogError($"AegisPrivacy.RunAtStart failed: {e}");
+            }
             string gameVersion = CheckGameVersion();
             try
             {
@@ -70,9 +81,18 @@ namespace PocketRoles
                 Log.LogError($"PatchAll failed, disabling {Name} (game {gameVersion}, supported {SupportedGameVersion}): {e}");
                 try { Harmony.UnpatchSelf(); } catch (Exception ue) { Log.LogError($"UnpatchSelf failed: {ue}"); }
                 PatchFailed = true; // runtime only: do not persist Enabled=false into the config file
+                AegisPrivacy.OnPatchFailed(); // v0.5.5: the erase list is still fetched and cached for the next start (never throws)
                 return;
             }
-            Log.LogInfo($"{Name} v{Version} loaded (for Among Us {SupportedGameVersion}, running {gameVersion}). Host-only mod; enabled={Options.ModEnabled}, register(+25)={Options.HostAuthorityMode}, lang={Options.Language}");
+            try
+            {
+                AegisRules.Init(); // v0.5.5: Aegis thresholds / levels (cache now, GitHub in the background; never throws or waits)
+            }
+            catch (Exception e)
+            {
+                Log.LogError($"AegisRules.Init failed: {e}");
+            }
+            Log.LogInfo($"{Name} v{Version} loaded (for Among Us {SupportedGameVersion}, running {gameVersion}). Host-only mod; enabled={Options.ModEnabled}, register(+25)={Options.HostAuthorityMode}, lang={Options.LanguageLabel}");
         }
 
         /// <summary>Last game version read from Application.version ("?" when unavailable).</summary>
@@ -272,6 +292,8 @@ namespace PocketRoles
                     tag += " <color=#ff4040>(version mismatch)</color>";
                 else if (Rpc.SafeMode)
                     tag += " <color=#ffff40>(unregistered)</color>";
+                if (Net.UpdateFloor.Blocking)
+                    tag += " <color=#ff4040>(update required)</color>";   // v0.5.5: below the signed file's minimum version (no new room)
                 if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost && (Game.HostWish.IsSet || Game.Designate.IsSet))
                     tag += " <color=#ff80ff>" + (Game.HostWish.Tag() + " " + Game.Designate.Tag()).Trim() + "</color>";   // v0.5.1: next-game role wish; v0.5.2: designated players
                 string region = Region();

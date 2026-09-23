@@ -40,7 +40,7 @@ namespace PocketRoles.UI
 
         // ------------------------------------------------------------------ texts
 
-        /// <summary>"役職部屋 ABCDEF" for a registered lobby, "便利ホスト ABCDEF" (+ "役職→CODE" when known) for an unregistered one.</summary>
+        /// <summary>"追加役職部屋 ABCDEF" for a registered lobby, "便利ホスト ABCDEF" (+ "役職→CODE" when known) for an unregistered one.</summary>
         internal static string Label()
         {
             string code = Rehost.CurrentRoomCode();
@@ -48,7 +48,7 @@ namespace PocketRoles.UI
             bool registered = false;
             try { registered = Registration.Hosting && Registration.Registered; } catch (Exception) { }
             if (registered)
-                return Lang.TF("guide.overlay.role", "役職部屋 {0}", "Role room {0}", code);
+                return Lang.TF("guide.overlay.role", "追加役職部屋 {0}", "Mod-roles room {0}", code);
             string s = Lang.TF("guide.overlay.compat", "便利ホスト {0}", "Vanilla room {0}", code);
             string role = Options.RoleRoomCode;
             if (role.Length > 0) s += "\n<size=70%>" + Lang.TF("guide.overlay.rolecode", "役職→{0}", "Roles→{0}", role) + "</size>";

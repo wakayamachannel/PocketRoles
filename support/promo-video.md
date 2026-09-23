@@ -36,7 +36,7 @@ Innersloth の MOD ポリシー（2026-07-30）に従い、公式サーバーで
 PocketRoles 是只需房主安装的 Among Us 职业 MOD。其他玩家什么都不用装（Steam / 手机 / Switch 原版，输入房间代码即可加入）。
 ・13 种职业（警长、市长、告密者、豺狼、小丑等），通过名字标签和聊天只告诉本人
 ・在大厅电脑里设置，职业说明支持 日本語 / 中文 / English
-・聊天自动翻译（Google / DeepL）、进房欢迎语、大厅剩余时间显示与自动延长、自动开始、废村 F7、结束会议 F8
+・聊天自动翻译（Google / DeepL）、进房欢迎语、大厅剩余时间显示与自动延长、自动开始、废局 F7、结束会议 F8
 ・招人方法：把房间代码贴到 Discord・微信・QQ 群即可（/announce 复制）。想招路人的话，用副手机开一个名字为“职业→代码”的原版公开房（引导房）
 下载 / 说明书: https://github.com/wakayamachannel/PocketRoles
 提问: pocketroles.report+help@gmail.com　问题报告: pocketroles.report@gmail.com

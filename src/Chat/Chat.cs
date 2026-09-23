@@ -81,8 +81,15 @@ namespace PocketRoles.Chat
         /// Host-screen line as soon as the local player and the HUD exist (retries once per second for up to 10 s).
         /// Right after a scene load (LobbyBehaviour.Start, OnGameJoined) the local PlayerControl may not exist yet and a
         /// plain <see cref="Local"/> would be dropped silently. The text is built when it is actually shown.
+        ///
+        /// <para><paramref name="onShown"/> runs ONLY when the line really reached the screen, and is the one place a
+        /// caller may record "the host has been told". <paramref name="text"/> itself must have no side effects: it is
+        /// called at most once, and when the 10 s run out the line is dropped WITHOUT calling it at all (v0.5.5 review:
+        /// the upgrade notice recorded "shown" inside its own text builder, and the dropped-line log below called that
+        /// builder just to print it — so a host whose chat was not ready in time had the notice marked as given, for
+        /// ever, while it had only gone to the log file).</para>
         /// </summary>
-        public static void LocalWhenReady(Func<string> text, int tries = 0)
+        public static void LocalWhenReady(Func<string> text, Action onShown = null, int tries = 0)
         {
             try
             {
@@ -90,11 +97,13 @@ namespace PocketRoles.Chat
                 var hud = HudManager.Instance;
                 if (PlayerControl.LocalPlayer == null || hud == null || hud.Chat == null)
                 {
-                    if (tries < 10) Scheduler.After(1f, () => LocalWhenReady(text, tries + 1));
-                    else PocketRolesPlugin.Logger.LogWarning("Chat.LocalWhenReady: no local player after 10 s, dropped: " + Lang.StripTags(text()));
+                    if (tries < 10) Scheduler.After(1f, () => LocalWhenReady(text, onShown, tries + 1));
+                    // the text is NOT built here: building it belongs to the caller and may record something
+                    else PocketRolesPlugin.Logger.LogWarning("Chat.LocalWhenReady: no local player after 10 s, the host line was dropped");
                     return;
                 }
                 Local(Title, text());
+                if (onShown != null) onShown();
             }
             catch (Exception e)
             {
@@ -228,6 +237,61 @@ namespace PocketRoles.Chat
             }
         }
 
+        // ------------------------------------------------------------------ v0.5.5: the last role text per player
+
+        /// <summary>
+        /// playerId → the role text this player was LAST sent in the running game (game start, a meeting reminder, a
+        /// Worshipper conversion). "/cmd n" from a living player outside a meeting answers with it unchanged
+        /// (design review §5.5, <see cref="RoleCmdCore"/>). Cleared with the per-game state (Game.Reset /
+        /// Game.ResetForNewLobby) because player ids are reused.
+        /// </summary>
+        private static readonly Dictionary<byte, string> LastRoleTexts = new Dictionary<byte, string>();
+
+        /// <summary>The role text <paramref name="playerId"/> was last sent in this game, or null.</summary>
+        internal static string LastRoleInfo(byte playerId)
+        {
+            return LastRoleTexts.TryGetValue(playerId, out var text) ? text : null;
+        }
+
+        /// <summary>New game / new lobby: nothing was sent yet.</summary>
+        internal static void ClearLastRoleInfo()
+        {
+            LastRoleTexts.Clear();
+        }
+
+        private static void RememberRoleInfo(byte playerId, string text)
+        {
+            if (!string.IsNullOrEmpty(text)) LastRoleTexts[playerId] = text;
+        }
+
+        /// <summary>
+        /// Roles were just handed out (RoleAssignment, before the 8-second delay of the real send): remember the role
+        /// text everybody is ABOUT to receive. Review 2026-09-23: without this the first seconds of a game answered
+        /// "/cmd n" through the StaticOnly fallback, which resolves the role at call time — a Worshipper convert of
+        /// those seconds would have been told its NEW role at the instant of the conversion. With the cache filled at
+        /// assignment there is no window left: every living player has a text from the moment the round starts, and a
+        /// convert keeps reading its old text until the host really sends the new one. Never sends anything.
+        /// </summary>
+        internal static void PrecacheRoleInfoAll()
+        {
+            try
+            {
+                if (Registration.CompatMode) return;   // no custom roles in an unregistered lobby
+                foreach (var pc in Core.Game.AllPlayers())
+                {
+                    if (pc == null || pc.Data == null || pc.Data.Disconnected) continue;
+                    byte id = pc.PlayerId;
+                    string text;
+                    using (Lang.Scope(Lang.PlayerLang(id))) text = RoleInfoText(id, false);
+                    RememberRoleInfo(id, text);
+                }
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Chat.PrecacheRoleInfoAll: {e}");
+            }
+        }
+
         /// <summary>"&lt;role&gt; — description" to that player (in that player's language). Vanilla-role players get a short hint at game start only.</summary>
         public static void SendRoleInfo(byte playerId, bool meeting)
         {
@@ -236,6 +300,7 @@ namespace PocketRoles.Chat
                 string text;
                 using (Lang.Scope(Lang.PlayerLang(playerId))) text = RoleInfoText(playerId, meeting);
                 if (string.IsNullOrEmpty(text)) return;
+                RememberRoleInfo(playerId, text);   // v0.5.5: what "/cmd n" repeats during the round
                 To(playerId, Title, text);
             }
             catch (Exception e)
@@ -266,6 +331,7 @@ namespace PocketRoles.Chat
                     string text;
                     using (Lang.Scope(Lang.PlayerLang(id))) text = RoleInfoText(id, meeting);
                     if (string.IsNullOrEmpty(text)) continue;
+                    RememberRoleInfo(id, text);   // v0.5.5: what "/cmd n" repeats during the round
                     var chunks = Split(text);
                     if (chunks.Count == 0) continue;
                     float d = delay;
@@ -327,17 +393,24 @@ namespace PocketRoles.Chat
 
         /// <summary>
         /// The whole welcome of the unregistered (便利ホスト) lobby: one public line in the lobby's language telling the
-        /// joiner there are no roles here and where the role lobby is announced (≤ 86 chars + "[PocketRoles] " = 100).
+        /// joiner there are no mod roles here (the game's own roles work as the lobby settings say) and where the help is
+        /// (≤ 86 chars + "[PocketRoles] " = 100).
         /// </summary>
         internal static string CompatWelcomeLine()
         {
             // [Chat] CompatWelcomeText replaces the built-in line (one public message; Rpc.SanitizeForVanillaChat trims it to typeable characters).
             string custom = Options.CompatWelcomeText;
             if (!string.IsNullOrWhiteSpace(custom)) return custom.Replace("\\n", " ").Trim();
+            // v0.5.5: chat translation is off unless the host turned it on, so the line only promises it while it runs.
+            if (!TranslationActive)
+                return Lang.T("compat.welcome.notr",
+                    "ようこそ! 普通のAmong Usです。本来の役職は部屋の設定どおり、MODの追加役職はなし。何も入れなくてOK。Aegisアンチチートあり。困ったら /cmd h",
+                    "Welcome! Normal Among Us: usual roles as set, no mod roles. Aegis anti-cheat. /cmd h",
+                    "欢迎! 普通的Among Us：原版职业按房间设置，没有模组追加职业。无需安装。已启用Aegis反作弊。说明 /cmd about，帮助 /cmd h");
             return Lang.T("compat.welcome",
-                "ようこそ! 普通のAmong Us(役職なし)です。何も入れなくてOK。Aegisアンチチートを導入しています。翻訳あり。説明 /cmd about、困ったら /cmd h",
-                "Welcome! Normal Among Us (no roles). Aegis anti-cheat is running. Chat is translated. /cmd about",
-                "欢迎! 普通的Among Us(无职业)，无需安装。已启用Aegis反作弊，聊天有翻译。说明 /cmd about，帮助 /cmd h");
+                "ようこそ! 普通のAmong Usです。本来の役職は部屋の設定どおり、MODの追加役職はなし。何も入れなくてOK。Aegisアンチチート・翻訳あり。困ったら /cmd h",
+                "Welcome! Normal Among Us: usual roles as set, no mod roles. Aegis anti-cheat. /cmd h",
+                "欢迎! 普通的Among Us：原版职业按房间设置，没有模组追加职业。无需安装。已启用Aegis反作弊，聊天有翻译。说明 /cmd about，帮助 /cmd h");
         }
 
         /// <summary>
@@ -541,6 +614,39 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>
+        /// [Translate] Enabled was changed (/opt translate.enabled, the settings tab, /reload, /restore).
+        ///
+        /// v0.5.5 turned the default OFF, which makes "switch it on with the room already full" the normal way in.
+        /// <see cref="TranslationNotice"/> only rides along with the welcome (<see cref="WelcomeExtras"/>), and the
+        /// welcome is sent from the join hook alone, so nobody who is already in the room would ever be told that
+        /// their chat text is now going to Google / DeepL. README chapter 13 and the FAQ promise the room IS told,
+        /// so the notice goes out here: one public line in an unregistered lobby, one private copy per player in a
+        /// registered one (<see cref="All(string, Func{string})"/> does exactly that split).
+        ///
+        /// Turning it off again re-arms the host-screen "translation is off" notice, so a host who tried it and
+        /// switched it off still sees the reminder in the next lobby.
+        /// </summary>
+        internal static void OnTranslationEnabledChanged()
+        {
+            try
+            {
+                if (!Options.TranslateEnabled)
+                {
+                    UI.ClientUI_TranslateNoticePatch.ResetNotice();   // switched off: remind the host once more
+                    return;
+                }
+                // On, but not hosting (main menu, or a lobby someone else hosts): the next welcome carries the notice.
+                if (!TranslationActive) return;
+                if (AmongUsClient.Instance == null || PlayerControl.LocalPlayer == null) return;
+                All(Title, () => TranslationNotice());
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"Chat.OnTranslationEnabledChanged: {e.Message}");
+            }
+        }
+
+        /// <summary>
         /// The compact trilingual language-switch line ("English: /cmd lang en ｜ 中文: … ｜ 日本語: …"), or null when
         /// players cannot use commands. The command prefix follows the lobby (private /cmd in a registered lobby).
         /// </summary>
@@ -715,12 +821,25 @@ namespace PocketRoles.Chat
             return string.Join(Lang.ListSep, names);
         }
 
-        /// <summary>Role description for one player, or null if nothing should be sent.</summary>
-        internal static string RoleInfoText(byte playerId, bool meeting)
+        /// <summary>
+        /// Role description for one player, or null if nothing should be sent.
+        /// <para>
+        /// Every line under the head goes through <see cref="RoleCmdCore.Extra"/>, which records whether the line
+        /// reads the RUNNING game (<see cref="RoleCmdCore.LiveState"/>) or was settled when the roles were handed out
+        /// (<see cref="RoleCmdCore.Settled"/>), and <see cref="RoleCmdCore.Compose"/> is the single place that drops
+        /// the former. <paramref name="live"/> = false (v0.5.5, only the "/cmd n" fallback of
+        /// <see cref="RoleCmdCore.Answer.StaticOnly"/>) therefore leaves out the living Jackals, the kills the
+        /// Stuntman can still survive and the Worshipper's uses and converts; the lover's name, the Serial Killer's
+        /// limit, the Samurai's numbers and the Nekomata note stay. The Witch's cursed list is a meeting-only line,
+        /// so a StaticOnly answer never carried it in the first place — it is still marked LiveState because it does
+        /// read the running game (review 2026-09-23: the flag belongs to the line, not to the path that uses it).
+        /// </para>
+        /// </summary>
+        internal static string RoleInfoText(byte playerId, bool meeting, bool live = true)
         {
             // The Game Master host has no role on purpose: never tell it that it is "a regular Crewmate".
             if (Core.Game.GameMasterActive && Core.Game.IsHost(playerId))
-                return meeting ? null : Lang.T("gm.roleinfo", "あなたはゲームマスター（観戦・進行役）です。", "You are the Game Master (spectator / moderator).", "你是游戏主持人（观战·主持）。");
+                return meeting ? null : Lang.T("gm.roleinfo", "あなたはゲームマスター（観戦・進行役）です。", "You are the Game Master (spectator / moderator).", "你是 GM（只观战，不参与游戏）。");
             var role = Core.Game.RoleOf(playerId);
             if (role == CustomRole.None)
             {
@@ -752,47 +871,50 @@ namespace PocketRoles.Chat
             }
             else result = head + "\n" + (desync != null ? desync + "\n" : "") + info.Desc;
 
-            // v0.4.1 extras (skipped in the SafeMode meeting branch above: one message only there)
+            // Every extra below is tagged Settled (stays in a StaticOnly answer) or LiveState (dropped there);
+            // Compose is the only place that looks at the tag. Skipped in the SafeMode meeting branch above.
+            var extras = new List<RoleCmdCore.Extra>();
+            // v0.4.1 extras
             if (role == CustomRole.Lovers)
             {
-                byte partner = Core.Game.PartnerOf(playerId);
-                if (partner != 255) result += "\n" + Lang.TF("roleinfo.lovers.partner", "あなたの恋人: {0}", "Your lover: {0}", Core.Game.NameOf(partner));
+                byte partner = Core.Game.PartnerOf(playerId);   // settled when the roles were handed out
+                if (partner != 255) extras.Add(RoleCmdCore.Settled(Lang.TF("roleinfo.lovers.partner", "あなたの恋人: {0}", "Your lover: {0}", Core.Game.NameOf(partner))));
             }
             if (role == CustomRole.Witch && meeting)
             {
                 string spelled = Game.Witch.SpelledNamesFor(playerId);
-                if (!string.IsNullOrEmpty(spelled)) result += "\n" + Lang.TF("roleinfo.witch.spelled", "呪い中: {0}", "Cursed: {0}", spelled);
+                if (!string.IsNullOrEmpty(spelled)) extras.Add(RoleCmdCore.LiveState(Lang.TF("roleinfo.witch.spelled", "呪い中: {0}", "Cursed: {0}", spelled)));
             }
-            // ---- v0.5.0 extras (skipped automatically in the SafeMode meeting branch above)
-            // the Stuntman always knows how many kills it can still survive (start + every meeting reminder + /cmd n); with NotifyStuntman off this is its only feedback
+            // ---- v0.5.0 extras
+            // the Stuntman always knows how many kills it can still survive (start + every meeting reminder); with NotifyStuntman off this is its only feedback
             if (role == CustomRole.MadStuntman)
-                result += "\n" + Lang.TF("roleinfo.madstuntman.lives", "耐えられるキル: 残り {0} 回", "Kills you can still survive: {0}", Game.MadStuntman.Remaining(playerId));
+                extras.Add(RoleCmdCore.LiveState(Lang.TF("roleinfo.madstuntman.lives", "耐えられるキル: 残り {0} 回", "Kills you can still survive: {0}", Game.MadStuntman.Remaining(playerId))));
             // worships left (start + every meeting) and who was converted (dead converts stay listed: still Madmates)
             if (role == CustomRole.Worshipper)
             {
-                result += "\n" + Lang.TF("roleinfo.worshipper.uses", "崇拝の残り回数: {0}", "Worships left: {0}", Game.Worshipper.Remaining(playerId));
+                extras.Add(RoleCmdCore.LiveState(Lang.TF("roleinfo.worshipper.uses", "崇拝の残り回数: {0}", "Worships left: {0}", Game.Worshipper.Remaining(playerId))));
                 string converted = Game.Worshipper.ConvertedNamesFor(playerId);
-                if (!string.IsNullOrEmpty(converted)) result += "\n" + Lang.TF("roleinfo.worshipper.converted", "崇拝した相手: {0}", "Worshipped: {0}", converted);
+                if (!string.IsNullOrEmpty(converted)) extras.Add(RoleCmdCore.LiveState(Lang.TF("roleinfo.worshipper.converted", "崇拝した相手: {0}", "Worshipped: {0}", converted)));
             }
             // Jackal Friends learns its Jackal(s) by name (game start and every meeting reminder; alive ones only)
             if (role == CustomRole.JackalFriends)
             {
                 string jackals = Game.JackalFriends.JackalNames();
-                result += "\n" + (jackals.Length > 0
+                extras.Add(RoleCmdCore.LiveState(jackals.Length > 0
                     ? Lang.TF("roleinfo.jackalfriends.jackal", "ジャッカル: {0}", "Jackal: {0}", jackals)
-                    : Lang.T("roleinfo.jackalfriends.nojackal", "生きているジャッカルがいません。", "No Jackal is alive.", "没有存活的豺狼。"));
+                    : Lang.T("roleinfo.jackalfriends.nojackal", "生きているジャッカルがいません。", "No Jackal is alive.", "没有存活的豺狼。")));
             }
-            // the Nekomata's description assumes the default voter rule; say so when the lobby drags anyone
+            // the Nekomata's description assumes the default voter rule; say so when the lobby drags anyone (a lobby setting)
             if (role == CustomRole.EvilNekomata && !meeting && !Options.EvilNekomataVotersOnly)
-                result += "\n" + Lang.T("roleinfo.evilnekomata.anyone", "※この部屋の設定では、道連れは生存者全員からランダムに選ばれます。", "Note: in this lobby the drag picks any living player, not only your voters.");
-            // the Serial Killer's concrete limit (start and every meeting reminder)
+                extras.Add(RoleCmdCore.Settled(Lang.T("roleinfo.evilnekomata.anyone", "※この部屋の設定では、道連れは生存者全員からランダムに選ばれます。", "Note: in this lobby the drag picks any living player, not only your voters.")));
+            // the Serial Killer's concrete limit (a lobby setting; start and every meeting reminder)
             if (role == CustomRole.SerialKiller)
-                result += "\n" + Lang.TF("roleinfo.serialkiller.limit", "制限時間: {0:0.#}秒（キルするたびにリセット。会議中は停止）", "Time limit: {0:0.#} s (restarts with every kill, paused during meetings)", Game.SerialKiller.Limit());
-            // the samurai cannot see its slash radius on screen → tell it the numbers once at game start
+                extras.Add(RoleCmdCore.Settled(Lang.TF("roleinfo.serialkiller.limit", "制限時間: {0:0.#}秒（キルするたびにリセット。会議中は停止）", "Time limit: {0:0.#} s (restarts with every kill, paused during meetings)", Game.SerialKiller.Limit())));
+            // the samurai cannot see its slash radius on screen → tell it the numbers once at game start (lobby settings)
             if (role == CustomRole.Samurai && !meeting)
-                result += "\n" + Lang.TF("roleinfo.samurai", "斬撃の範囲: 半径 {0:0.#}、味方のインポスターも斬る: {1}", "Slash radius {0:0.#}; hits fellow Impostors: {1}",
-                    Options.SamuraiRange, Options.SamuraiHitTeammates ? Lang.T("cmd.on", "オン", "on") : Lang.T("cmd.off", "オフ", "off"));
-            return result;
+                extras.Add(RoleCmdCore.Settled(Lang.TF("roleinfo.samurai", "斬撃の範囲: 半径 {0:0.#}、味方のインポスターも斬る: {1}", "Slash radius {0:0.#}; hits fellow Impostors: {1}",
+                    Options.SamuraiRange, Options.SamuraiHitTeammates ? Lang.T("cmd.on", "オン", "on") : Lang.T("cmd.off", "オフ", "off"))));
+            return RoleCmdCore.Compose(result, extras, live);
         }
 
         /// <summary>
@@ -838,9 +960,9 @@ namespace PocketRoles.Chat
             }
             string[] labels =
             {
-                anyCustom ? Lang.T("summary.side.imp", "インポスター陣営", "Impostor side", "内鬼阵营") : Lang.T("summary.side.imp.vanilla", "インポスター", "Impostors", "内鬼"),
+                anyCustom ? Lang.T("summary.side.imp", "インポスター陣営", "Impostor side", "伪装者阵营") : Lang.T("summary.side.imp.vanilla", "インポスター", "Impostors", "伪装者"),
                 Lang.T("summary.side.crew", "クルー", "Crew", "船员"),
-                Lang.T("summary.side.neutral", "第三陣営", "Neutral", "中立"),
+                Lang.T("summary.side.neutral", "第三陣営", "Neutral", "独立"),
             };
             int limit = MessageChars; // compat mode: 86 (the "[PocketRoles] " prefix travels inside the text)
             for (int i = 0; i < sides.Length; i++)
@@ -910,7 +1032,7 @@ namespace PocketRoles.Chat
             {
                 case RoleTypes.Crewmate: case RoleTypes.CrewmateGhost: return Lang.T("vrole.crew", "クルー", "Crewmate");
                 case RoleTypes.Impostor: case RoleTypes.ImpostorGhost: return Lang.T("vrole.imp", "インポスター", "Impostor");
-                case RoleTypes.Scientist: return Lang.T("vrole.sci", "サイエンティスト", "Scientist");
+                case RoleTypes.Scientist: return Lang.T("vrole.sci", "科学者", "Scientist");
                 case RoleTypes.Engineer: return Lang.T("vrole.eng", "エンジニア", "Engineer");
                 case RoleTypes.GuardianAngel: return Lang.T("vrole.ga", "守護天使", "Guardian Angel");
                 case RoleTypes.Shapeshifter: return Lang.T("vrole.ss", "シェイプシフター", "Shapeshifter");
@@ -918,7 +1040,7 @@ namespace PocketRoles.Chat
                 case RoleTypes.Phantom: return Lang.T("vrole.ph", "ファントム", "Phantom");
                 case RoleTypes.Tracker: return Lang.T("vrole.tr", "トラッカー", "Tracker");
                 case RoleTypes.Detective: return Lang.T("vrole.det", "探偵", "Detective");
-                case RoleTypes.Viper: return Lang.T("vrole.vp", "ヴァイパー", "Viper");
+                case RoleTypes.Viper: return Lang.T("vrole.vp", "バイパー", "Viper");
                 case RoleTypes.Judge: return Lang.T("vrole.judge", "ジャッジ", "Judge");
                 default: return r.ToString();
             }
@@ -1111,6 +1233,33 @@ namespace PocketRoles.Chat
         }
 
         /// <summary>
+        /// v0.5.5: one message of the public channel (compat). <see cref="StillWanted"/> is asked right before it leaves
+        /// (false: it is not sent); <see cref="Sent"/> runs after it left.
+        /// </summary>
+        private sealed class PublicMsg
+        {
+            public string Title, Text;
+            public Func<bool> StillWanted;
+            public Action Sent;
+        }
+
+        /// <summary>
+        /// v0.5.5: a pending send of the public channel. It sends the message it holds when it fires, so a message put in
+        /// front (<see cref="SendPublicFirst"/>) can take it while the held messages move back one send each: the send
+        /// times never change and the channel keeps its spacing.
+        /// </summary>
+        private sealed class PublicSlot
+        {
+            public float At;
+            public string Tag;
+            public PublicMsg Msg;
+        }
+
+        /// <summary>The public sends still to come (a fired one takes itself off; Scheduler.Clear drops some without firing: see <see cref="SendPublicFirst"/>).</summary>
+        private static readonly List<PublicSlot> PublicSlots = new List<PublicSlot>();
+        private static int _publicSlotSeq;
+
+        /// <summary>
         /// Compat mode delivery: every chunk is ONE public host broadcast (<see cref="Rpc.SendChatAll"/>, which also
         /// shows it on the host's screen), spaced by <see cref="ChunkSpacing"/> across independent calls (welcome,
         /// command replies, translations, notices share the single public channel).
@@ -1121,26 +1270,94 @@ namespace PocketRoles.Chat
             {
                 if (chunks == null || chunks.Count == 0) return;
                 if (AmongUsClient.Instance == null) { foreach (var c in chunks) AddLocalDirect(title, c); return; }
-                float now = UnityEngine.Time.time;
-                float start = Math.Max(0f, startDelay);
-                if (NextSendAt.TryGetValue(PublicKey, out var next) && next - now > start) start = next - now;
-                NextSendAt[PublicKey] = now + start + ChunkSpacing * chunks.Count;
-                for (int i = 0; i < chunks.Count; i++)
-                {
-                    string chunk = chunks[i];
-                    float delay = start + ChunkSpacing * i;
-                    if (delay <= 0f) Rpc.SendChatAll(title, chunk);
-                    else Scheduler.After(delay, () =>
-                    {
-                        if (AmongUsClient.Instance == null) return;
-                        Rpc.SendChatAll(title, chunk);
-                    });
-                }
+                var msgs = new List<PublicMsg>(chunks.Count);
+                foreach (var c in chunks) msgs.Add(new PublicMsg { Title = title, Text = c });
+                QueuePublic(msgs, startDelay);
             }
             catch (Exception e)
             {
                 PocketRolesPlugin.Logger.LogError($"Chat.SendPublicChunks: {e}");
             }
+        }
+
+        /// <summary>
+        /// v0.5.5 (owner 2026-09-22): a restricted joiner's /cmd id answer in an unregistered lobby, which must leave before
+        /// their removal: these chunks go in FRONT of everything still waiting on the public channel (translations, other
+        /// replies, notices). They take the next pending sends, the waiting messages move back as many sends and as many new
+        /// sends are added at the tail (<see cref="AegisPrivacyCore.FrontSlotTimes"/>): no send time changes, the spacing
+        /// stays, nothing is dropped. <paramref name="stillWanted"/> is asked right before each chunk leaves (false: not
+        /// sent: the player left or is being removed); <paramref name="sent"/> runs once, after the first chunk left.
+        /// Returns the time the last chunk leaves (Time.time), -1 when nothing was queued.
+        /// </summary>
+        internal static float SendPublicFirst(string title, List<string> chunks, Func<bool> stillWanted, Action sent)
+        {
+            try
+            {
+                if (chunks == null || chunks.Count == 0 || AmongUsClient.Instance == null) return -1f;
+                float now = UnityEngine.Time.time;
+                var front = new List<PublicMsg>(chunks.Count);
+                for (int i = 0; i < chunks.Count; i++)
+                    front.Add(new PublicMsg { Title = title, Text = chunks[i], StillWanted = stillWanted, Sent = i == 0 ? sent : null });
+                // the sends still to come, in time order: only those the Scheduler still holds (a game end's Scheduler.Clear
+                // drops them without firing); one already due fires on the next tick
+                PublicSlots.RemoveAll(s => s.At < now - 5f);
+                var live = new List<PublicSlot>();
+                foreach (var s in PublicSlots) if (Scheduler.HasTag(s.Tag)) live.Add(s);
+                live.Sort((a, b) => a.At.CompareTo(b.At));
+                var pending = new List<float>(live.Count);
+                foreach (var s in live) pending.Add(s.At);
+                float freeAt = NextSendAt.TryGetValue(PublicKey, out var next) ? next : now;
+                float[] at = AegisPrivacyCore.FrontSlotTimes(pending, now, freeAt, ChunkSpacing, front.Count);
+                var order = new List<PublicMsg>(front);
+                foreach (var s in live) order.Add(s.Msg);
+                for (int i = 0; i < live.Count; i++) live[i].Msg = order[i];
+                if (order.Count > live.Count) QueuePublic(order.GetRange(live.Count, order.Count - live.Count), 0f);
+                return at[at.Length - 1];
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"Chat.SendPublicFirst: {e}");
+                return -1f;
+            }
+        }
+
+        /// <summary>The messages at the tail of the public channel: the first after <paramref name="startDelay"/> s (later while the channel is busy), then one per <see cref="ChunkSpacing"/>.</summary>
+        private static void QueuePublic(List<PublicMsg> msgs, float startDelay)
+        {
+            float now = UnityEngine.Time.time;
+            float start = Math.Max(0f, startDelay);
+            if (NextSendAt.TryGetValue(PublicKey, out var next) && next - now > start) start = next - now;
+            NextSendAt[PublicKey] = now + start + ChunkSpacing * msgs.Count;
+            if (PublicSlots.Count > 64) PublicSlots.RemoveAll(s => s.At < now - 5f);   // dropped by a Scheduler.Clear: never fire
+            for (int i = 0; i < msgs.Count; i++)
+            {
+                float delay = start + ChunkSpacing * i;
+                if (delay <= 0f) { SendPublicMsg(msgs[i]); continue; }
+                var slot = new PublicSlot { At = now + delay, Tag = "chat.public." + (++_publicSlotSeq), Msg = msgs[i] };
+                PublicSlots.Add(slot);
+                Scheduler.After(delay, () =>
+                {
+                    PublicSlots.Remove(slot);
+                    if (AmongUsClient.Instance == null) return;
+                    SendPublicMsg(slot.Msg);
+                }, slot.Tag);
+            }
+        }
+
+        private static void SendPublicMsg(PublicMsg m)
+        {
+            if (m == null) return;
+            if (m.StillWanted != null)
+            {
+                bool wanted = false;
+                try { wanted = m.StillWanted(); }
+                catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Chat: a public message was not sent (its check failed: {e.Message})"); }
+                if (!wanted) return;
+            }
+            Rpc.SendChatAll(m.Title, m.Text);
+            if (m.Sent == null) return;
+            try { m.Sent(); }
+            catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Chat: after a public message: {e}"); }
         }
 
         /// <summary>
@@ -1273,13 +1490,19 @@ namespace PocketRoles.Chat
                 if (!Core.Game.IsHostActive) return true;
                 if (sourcePlayer == null || sourcePlayer.AmOwner) return true;
                 if (string.IsNullOrEmpty(chatText)) return true;
+                // v0.5.5: a restricted joiner waiting for their removal goes at once on a chat flood ([AntiCheat] does not matter)
+                try { Net.AegisBans.OnChatLine(sourcePlayer, chatText); } catch (Exception) { }
                 // v0.5.3 CalloutWatch: other players' meeting lines, typed or quick chat (rendered into text by vanilla)
                 try { Net.CalloutWatch.OnAddChat(sourcePlayer, chatText); }
                 catch (Exception ce) { PocketRolesPlugin.Logger.LogWarning($"Chat_AddChatPatch callout: {ce.Message}"); }
                 Lobby.AfkKick.Touch(sourcePlayer.PlayerId); // v0.4.6: chatting counts as lobby activity
                 string trimmed = chatText.Trim();
-                if (!trimmed.StartsWith("/")) return true;
-                return !Commands.Handle(sourcePlayer, trimmed);
+                bool command = trimmed.StartsWith("/") && Commands.Handle(sourcePlayer, trimmed);   // a command: handled, not shown here
+                // v0.5.5 NG words: every typed line, commands too — hiding a command line works on the host's screen only,
+                // every other player still sees "/cmd …" (quick chat and the exempt levels are skipped inside)
+                try { NgWords.OnAddChat(sourcePlayer, chatText); }
+                catch (Exception ne) { PocketRolesPlugin.Logger.LogWarning($"Chat_AddChatPatch ng: {ne.GetType().Name}"); }
+                return !command;
             }
             catch (Exception e)
             {
@@ -1331,8 +1554,11 @@ namespace PocketRoles.Chat
                 if (__instance.GameState != InnerNetClient.GameStates.Joined) return;
                 int clientId = data.Id;
                 if (Rpc.IsLocal(clientId)) return;
+                // v0.5.5 central unban: an appeal the author accepted is applied before the ban check below, whichever of the two
+                // OnPlayerJoined postfixes runs first (once per client; never throws)
+                AegisBans.ApplyUnbanAtJoin(__instance, data);
                 // A banned joiner is kicked by Permissions.CheckJoin: no welcome and no welcome slot for it.
-                try { if (Permissions.IsBanned(data.ProductUserId, data.FriendCode)) return; }
+                try { if (Permissions.IsBanned(data.ProductUserId, data.FriendCode) || AegisBans.IsRestricted(data)) return; }   // v0.5.5: Aegis bans too
                 catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"Chat_OnPlayerJoinedPatch: ban check: {e.Message}"); }
                 float now = UnityEngine.Time.time;
                 float startAt = Math.Max(now + WelcomeDelay, _nextWelcomeAt);

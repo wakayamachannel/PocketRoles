@@ -208,6 +208,8 @@ namespace PocketRoles.Core
             OriginalNames.Clear();
             Bites.Clear();
             KillCounts.Clear();
+            PocketRoles.Chat.Chat.ClearLastRoleInfo();   // v0.5.5: "/cmd n" repeats the last role text OF THIS GAME
+            PocketRoles.Chat.Commands.ClearRoleAskLimiter();   // ... and nobody starts a game already inside the 10 s limit
             Rpc.HostCooldownOverrideEndsAt = -1f;   // a host cooldown override never outlives the game
             ResetRoleState();
             ExtraWinners.Clear();
@@ -281,6 +283,8 @@ namespace PocketRoles.Core
                 Ending = false;
                 AssigningRoles = false;
                 Bites.Clear();
+                PocketRoles.Chat.Chat.ClearLastRoleInfo();   // v0.5.5: the last role texts belong to the game that ended
+                PocketRoles.Chat.Commands.ClearRoleAskLimiter();   // ... and so does the 10 s /cmd n limit
                 ResetRoleState();
                 SoloWinner = CustomRole.None;
                 SoloWinnerId = 255;

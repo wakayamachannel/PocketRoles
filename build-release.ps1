@@ -1,12 +1,16 @@
 ﻿# PocketRoles: リリース用 zip を作ります (GitHub Releases に添付するもの)
 #   dist\PocketRoles-<ver>.zip        … mod 本体 (BepInEx\plugins\PocketRoles.dll, BepInEx\PocketRoles\lang\*.json, README*, LICENSE)
 #   dist\PocketRoles-Setup-<ver>.zip  … 友達用ランチャー (PocketRolesLauncher.ps1, PocketRoles Launcher.cmd, assets\PocketRoles.ico, はじめに.txt)
-# 使い方: powershell -NoProfile -ExecutionPolicy Bypass -File build-release.ps1 [-SkipBuild] [-OutDir <dir>]
+#   dist\SHA256SUMS.txt               … 上の 2 つの zip の SHA-256 (リリースに一緒に添付します)
+#   dist\SHA256SUMS.txt.sig           … その一覧へのオーナーの署名 (v0.5.5。リリースに一緒に添付します)
+# 使い方: powershell -NoProfile -ExecutionPolicy Bypass -File build-release.ps1 [-SkipBuild] [-OutDir <dir>] [-NoSign]
 #   バージョンは PocketRoles.csproj の <Version> から。ビルドは %USERPROFILE%\.dotnet の dotnet を使い、
 #   ゲームフォルダには何もコピーしません (-p:NoCopy=true)。
+#   最後に SHA256SUMS.txt への署名で、鍵のパスワードを 1 回聞きます (-NoSign で省けますが、その dist は公開できません)。
 param(
     [switch]$SkipBuild,
-    [string]$OutDir = ''
+    [string]$OutDir = '',
+    [switch]$NoSign
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
@@ -22,6 +26,30 @@ $ver = [string]$ver
 $dist = if ($OutDir) { $OutDir } else { Join-Path $root 'dist' }
 if (-not (Test-Path $dist)) { [void][IO.Directory]::CreateDirectory($dist) }
 Write-Host "PocketRoles $ver -> $dist"
+
+# ---- v0.5.5: the rollback floor of the mod = the definitions version released with it ----
+#   src\Net\AegisRules.cs の MinDefinitionsVersion（MOD が受け付ける最低の定義ファイルの版）は、一緒に出す
+#   aegis\definitions.txt の version= と同じにします（古い署名済みファイルを配り直されても MOD が使わないように）。
+$defsFile = Join-Path $root 'aegis\definitions.txt'
+$defsVer = 0
+foreach ($line in ([IO.File]::ReadAllText($defsFile, [Text.Encoding]::UTF8) -split "`n")) {
+    if ($line.Trim() -cmatch '^version=([0-9]{1,9})$') { $defsVer = [int]$Matches[1]; break }
+}
+if ($defsVer -le 0) { throw 'aegis\definitions.txt に version=N の行がありません' }
+$floorMatch = [regex]::Match([IO.File]::ReadAllText((Join-Path $root 'src\Net\AegisRules.cs'), [Text.Encoding]::UTF8), 'const int MinDefinitionsVersion\s*=\s*(\d+)\s*;')
+if (-not $floorMatch.Success) { throw 'src\Net\AegisRules.cs に MinDefinitionsVersion がありません' }
+if ([int]$floorMatch.Groups[1].Value -ne $defsVer) {
+    throw ('src\Net\AegisRules.cs の MinDefinitionsVersion (' + $floorMatch.Groups[1].Value + ') を aegis\definitions.txt の version= (' + $defsVer + ') と同じにしてからリリースしてください（古い署名済み定義ファイルの使い回しを防ぐ下限）')
+}
+
+# ---- v0.5.5: no secret material in what git would publish (tracked, staged, or new and not ignored) ----
+#   秘密鍵だけでなく Webhook のアドレスと API キーの「形」も探します。中身は tools\check-secrets.ps1 にまとめてあり、
+#   同じものが .githooks\pre-commit からコミットの前にも動きます（入れ方はそのファイルの先頭に書いてあります）。
+$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$secretsTool = Join-Path $root 'tools\check-secrets.ps1'
+if (-not (Test-Path $secretsTool)) { throw "見つかりません: $secretsTool" }
+& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $secretsTool -Root $root
+if ($LASTEXITCODE -ne 0) { throw '公開してはいけないもの（秘密鍵・Webhook のアドレス・API キー）が混ざっている可能性があります。上に出たファイルを直してから、もう一度実行してください' }
 
 # ---- build ----
 $dll = Join-Path $root 'bin\PocketRoles.dll'
@@ -39,7 +67,76 @@ if (-not $SkipBuild) {
 }
 if (-not (Test-Path $dll)) { throw "PocketRoles.dll がありません: $dll" }
 $dllVer = [Diagnostics.FileVersionInfo]::GetVersionInfo($dll).ProductVersion
-if ($dllVer -and (($dllVer -split '\+')[0] -ne $ver)) { Write-Warning "DLL のバージョン ($dllVer) と csproj の <Version> ($ver) が違います" }
+# v0.5.5 required update: the launcher and the tray app compare the DLL's ProductVersion with the definitions' minmod, the mod
+# its own version: all three must be the same, or a host could be told "up to date" by one and "update needed" by the other
+$constMatch = [regex]::Match([IO.File]::ReadAllText((Join-Path $root 'src\PocketRolesPlugin.cs'), [Text.Encoding]::UTF8), 'const string Version\s*=\s*"([^"]+)"')
+if (-not $constMatch.Success) { throw 'src\PocketRolesPlugin.cs に const string Version がありません' }
+if ($constMatch.Groups[1].Value -ne $ver) { throw ('src\PocketRolesPlugin.cs の Version (' + $constMatch.Groups[1].Value + ') を PocketRoles.csproj の <Version> (' + $ver + ') と同じにしてからリリースしてください（必要な最低の版を MOD とランチャーが同じに比べるため）') }
+if (-not $dllVer -or (($dllVer -split '\+')[0] -ne $ver)) { throw ('DLL のバージョン (' + $dllVer + ') と csproj の <Version> (' + $ver + ') が違います。ビルドし直してからリリースしてください') }
+
+# ---- v0.5.5: Aegis の定義ファイルの署名 (tools\sign-definitions.ps1) ----
+#   このスクリプトは署名しません (確かめるだけ。秘密鍵もパスワードも使いません)。署名はデスクトップの「PocketRoles 署名の鍵」の
+#   定義ファイルに署名する.cmd で、本人がパスワードを入れて行います (決定事項「リリースの署名は本人が行う」)。
+#   src\Net\AegisRules.cs・aegis\Aegis.ps1・aegis\AegisBan.ps1 の信頼する公開鍵の一覧で確かめ (3 つの一覧が同じかも確かめます)、
+#   合わなければリリースしません (MOD もトレイアプリも署名の合わない定義ファイルは使わないため)。
+#   パスワードなしの署名の鍵 (-Init のまま) がこの PC に残っている間は止めます: 鍵を守る前にこのスクリプトを動かすと、
+#   本人の操作なしに署名できてしまう状態だからです。先に 鍵を守る.cmd で鍵をパスワードで守ってください。
+#   署名が変わったら aegis\definitions.txt と definitions.txt.sig をコミットして main に push してください。
+$signTool = Join-Path $root 'tools\sign-definitions.ps1'
+if (Test-Path (Join-Path $env:APPDATA 'PocketRoles\signing\definitions-private.xml')) {
+    throw 'パスワードなしの署名の鍵がこの PC に残っています (%APPDATA%\PocketRoles\signing\definitions-private.xml)。先にデスクトップの「PocketRoles 署名の鍵」の 鍵を守る.cmd で鍵をパスワードで守り、定義ファイルに署名する.cmd で署名してから、もう一度実行してください'
+}
+& $ps51 -NoProfile -ExecutionPolicy Bypass -File $signTool -Verify
+if ($LASTEXITCODE -ne 0) { throw 'aegis\definitions.txt の署名が合いません。デスクトップの「PocketRoles 署名の鍵」の 定義ファイルに署名する.cmd で署名してから、もう一度実行してください' }
+
+# ---- v0.5.5 hidden lists: the tray's embedded AegisHash must match src\Net\AegisHash.cs, and the shared hash vectors must hold ----
+#   MOD・トレイ・署名の道具が同じハッシュを出すための確認。埋め込みコピーがずれていたり、ベクトルが合わなければリリースしません。
+$hashSrc = Join-Path $root 'src\Net\AegisHash.cs'
+$trayPs1 = Join-Path $root 'aegis\Aegis.ps1'
+$conPs1 = Join-Path $root 'aegis\AegisBan.ps1'
+function Get-SharedRegion([string]$path) {
+    $t = [IO.File]::ReadAllText($path, [Text.Encoding]::UTF8) -replace "`r`n", "`n"
+    $m = [regex]::Match($t, '(?s)AEGISHASH-SHARED-BEGIN[^\n]*\n(.*?)\n[^\n]*AEGISHASH-SHARED-END')
+    if (-not $m.Success) { return $null }
+    return $m.Groups[1].Value.Trim()
+}
+if (Test-Path $hashSrc) {
+    $rSrc = Get-SharedRegion $hashSrc
+    $rTray = Get-SharedRegion $trayPs1
+    $rCon = Get-SharedRegion $conPs1
+    if (-not $rSrc) { throw 'src\Net\AegisHash.cs に AEGISHASH-SHARED マーカーがありません' }
+    if (-not $rTray) { throw 'aegis\Aegis.ps1 に AegisHash の埋め込み（AEGISHASH-SHARED マーカー）がありません' }
+    if (-not $rCon) { throw 'aegis\AegisBan.ps1 に AegisHash の埋め込み（AEGISHASH-SHARED マーカー）がありません' }
+    # review 9/23: -cne (case sensitive). PowerShell's -ne ignores case, so a copy differing only in upper / lower case passed
+    if ($rSrc -cne $rTray) { throw 'aegis\Aegis.ps1 に埋め込んだ AegisHash が src\Net\AegisHash.cs と違います。src の中身をそのまま埋め込み直してください' }
+    if ($rSrc -cne $rCon) { throw 'aegis\AegisBan.ps1 に埋め込んだ AegisHash が src\Net\AegisHash.cs と違います。src の中身をそのまま埋め込み直してください' }
+    Add-Type -TypeDefinition ([IO.File]::ReadAllText($hashSrc, [Text.Encoding]::UTF8)) -Language CSharp
+    $H = [PocketRoles.Net.AegisHash]
+    $vec = Join-Path $root 'tests\aegis-hash-vectors.txt'
+    if (Test-Path $vec) {
+        $u8v = New-Object Text.UTF8Encoding($false); $salt = $null; $bad = 0
+        foreach ($raw in [IO.File]::ReadAllLines($vec, $u8v)) {
+            if ($raw.Length -eq 0 -or $raw[0] -eq '#') { continue }
+            $f = $raw.Split("`t")
+            $v = if ($f.Length -gt 2) { $f[2] } else { '' }
+            switch ($f[0]) {
+                # review 9/23: -cne / -cor case sensitive (a hash or a normalized key differing only in case must fail)
+                'salt' { $salt = $H::ParseSalt($f[1]); if ($null -eq $salt) { $bad++ } }
+                'saltok' { if (([bool]$H::ParseSalt($f[1])) -ne ($f[2] -eq '1')) { $bad++ } }
+                'hash' { if ($H::Hash($salt, $f[1], [int]$f[2]) -cne $f[3]) { $bad++ } }
+                'tool' { $k = $H::NormalizeToolKey($f[1]); if ($k -cne $f[2] -or $H::Hash($salt, $k, 10) -cne $f[3]) { $bad++ } }
+                'dll' { $k = $H::NormalizeDllName($f[1]); if ($k -cne $f[2] -or $H::Hash($salt, $k, 10) -cne $f[3]) { $bad++ } }
+                'ngnorm' { if ($H::NgCompact($f[1]) -cne $v) { $bad++ } }
+                'ngword' { if ($H::NgWordLine($salt, $f[1]) -cne $v) { $bad++ } }
+                'ngallow' { if ($H::NgAllowLine($salt, $f[1]) -cne $v) { $bad++ } }
+            }
+        }
+        if ($bad -gt 0) { throw ('tests\aegis-hash-vectors.txt が src\Net\AegisHash.cs と合いません (' + $bad + ' 件)。rc-hashvec で作り直してください') }
+        Write-Host 'AegisHash: 埋め込みコピー一致（トレイ・コンソール）・共有ハッシュ/NG ベクトル OK'
+    }
+}
+# review #13 / E: 上げるときは先にリリースを公開する、の注意
+Write-Host ('メモ: [update] の minmod を上げるときは、先に PocketRoles-' + $ver + '.zip を GitHub のリリースに添付して公開してください（署名の道具が最新リリースを確かめます）') -ForegroundColor DarkGray
 
 # ---- helpers ----
 function Copy-Into([string]$src, [string]$dstDir) {
@@ -85,8 +182,8 @@ foreach ($n in @('PocketRolesLauncher.ps1', 'PocketRoles Launcher.cmd')) {
     Copy-Into $p $setupStage
 }
 Copy-Into (Join-Path $root 'assets\PocketRoles.ico') (Join-Path $setupStage 'assets')
-# v0.5.4: Aegis Anti-Cheat (its own app; the launcher starts it)
-foreach ($n in @('Aegis.ps1', 'Aegis.cmd', 'definitions.txt')) {
+# v0.5.4: Aegis Anti-Cheat (its own app; the launcher starts it). v0.5.5: with the definitions' signature (.sig)
+foreach ($n in @('Aegis.ps1', 'Aegis.cmd', 'definitions.txt', 'definitions.txt.sig')) {
     $p = Join-Path $root ('aegis\' + $n)
     if (-not (Test-Path $p)) { throw "見つかりません: $p" }
     Copy-Into $p (Join-Path $setupStage 'aegis')
@@ -119,6 +216,8 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    しばらく部屋が作れなくなることがあります。部屋の作り直しは必要な時だけに。
 ・この説明を見ても導入や遊び方がわからないときは、遠慮なくメールしてください。読んで返事をします。
    質問: pocketroles.report+help@gmail.com （日本語・中文・English どれでも OK）
+・消し方 (アンインストール) は、ここに書いてあります (消すためのボタンはまだありません):
+   https://github.com/wakayamachannel/PocketRoles/blob/main/docs/UNINSTALL.md
 
 【中文 (简体)】
 1. 把这个 zip 和“PocketRoles-<版本>.zip”(模组本体) 一起解压到不会删除的文件夹 (例如 文档\PocketRoles)。
@@ -143,6 +242,8 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    只在必要时重建房间。
 ・看了说明还是不会安装或不会玩的话，请直接发邮件，我们会阅读并回复。
    提问: pocketroles.report+help@gmail.com （日本語・中文・English 均可）
+・删除方法 (卸载) 写在这里 (目前还没有用来删除的按钮):
+   https://github.com/wakayamachannel/PocketRoles/blob/main/docs/UNINSTALL.zh-CN.md
 
 [English]
 1. Extract this zip AND "PocketRoles-<version>.zip" (the mod) into the same folder you will keep
@@ -168,6 +269,8 @@ PocketRoles Launcher — はじめに / 入门 / Getting started
    ban points and block lobby creation for a while. Re-create a lobby only when you must.
 - Still lost after reading this? Just e-mail us; we read every mail and reply.
    Questions: pocketroles.report+help@gmail.com (Japanese, Chinese or English)
+- How to uninstall (there is no uninstall button yet):
+   https://github.com/wakayamachannel/PocketRoles/blob/main/docs/UNINSTALL.en.md
 '@
 [IO.File]::WriteAllText((Join-Path $setupStage 'はじめに.txt'), ($readme -replace "`r?`n", "`r`n"), (New-Object Text.UTF8Encoding($true)))
 $setupZip = Join-Path $dist ('PocketRoles-Setup-' + $ver + '.zip')
@@ -175,11 +278,44 @@ New-ZipFromDir $setupStage $setupZip
 
 [IO.Directory]::Delete($stage, $true)
 
-# ---- checksums / listing ----
+# ---- checksums ----
+#   v0.5.5: この一覧にオーナーが署名します。GitHub が出す digest も、この SHA256SUMS.txt も、zip と同じリリースの中に
+#   あります。つまり zip を差し替えられる相手には、その 2 つも一緒に直せます。署名の鍵だけはこの PC から出ないので、
+#   Client は「鍵で署名された一覧」と照らして zip を確かめます (support\CLIENT-SUMS-VERIFY-SPEC.md)。
+#   先頭の # の行は、ふつうのチェックサムの道具では読み飛ばされます (中身は署名の対象に入っています)。
+$sumsPath = Join-Path $dist 'SHA256SUMS.txt'
+$sumsSig = $sumsPath + '.sig'
+if (Test-Path $sumsSig) { [IO.File]::Delete($sumsSig) }   # 前に作った署名は必ず合わなくなるので、先に消します
 $sums = @()
 foreach ($z in @($modZip, $setupZip)) { $sums += ((Get-FileHash $z -Algorithm SHA256).Hash.ToLower() + '  ' + (Split-Path -Leaf $z)) }
-[IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'), (($sums -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
+#   （PowerShell では「,」が「+」より強く結びつくので、行ごとに ( ) で囲みます）
+$head = @('# PocketRoles のリリースに添付するファイルの SHA-256',
+          '# format=PocketRoles.Release.Sums.v1',
+          ('# release=' + $ver),
+          ('# built=' + [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)))
+[IO.File]::WriteAllText($sumsPath, (((@($head) + @($sums)) -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
+
+# ---- v0.5.5: SHA256SUMS.txt への署名 (この画面でオーナーがパスワードを入れます) ----
+#   このスクリプトは鍵もパスワードも持ちません。tools\sign-definitions.ps1 が本人に聞きます。
+if ($NoSign) {
+    Write-Host ''
+    Write-Host '署名していません (-NoSign)。この dist は公開しないでください。' -ForegroundColor Yellow
+    Write-Host ('  あとで署名する: powershell -NoProfile -ExecutionPolicy Bypass -File tools\sign-definitions.ps1 -SignRelease "' + $sumsPath + '"') -ForegroundColor Yellow
+} else {
+    Write-Host ''
+    Write-Host 'リリースのファイルの一覧に署名します (鍵のパスワードを聞きます)' -ForegroundColor Cyan
+    & $ps51 -NoProfile -ExecutionPolicy Bypass -File $signTool -SignRelease $sumsPath
+    if ($LASTEXITCODE -ne 0) {
+        throw ('dist\SHA256SUMS.txt に署名できませんでした。署名のないまま公開しないでください（あとで署名する: powershell -NoProfile -ExecutionPolicy Bypass -File tools\sign-definitions.ps1 -SignRelease "' + $sumsPath + '"）')
+    }
+}
+
+# ---- listing ----
 Write-Host 'done:'
 Show-Zip $modZip
 Show-Zip $setupZip
-Write-Host ('  SHA256SUMS.txt'); $sums | ForEach-Object { Write-Host ('    ' + $_) }
+Write-Host ('  SHA256SUMS.txt'); (@($head) + @($sums)) | ForEach-Object { Write-Host ('    ' + $_) }
+if (Test-Path $sumsSig) { Write-Host '  SHA256SUMS.txt.sig  (署名済み)' } else { Write-Host '  SHA256SUMS.txt.sig  … ありません (このまま公開しないでください)' -ForegroundColor Yellow }
+Write-Host ''
+Write-Host 'GitHub のリリースに添付するのは 4 つです: PocketRoles-<版>.zip・PocketRoles-Setup-<版>.zip・SHA256SUMS.txt・SHA256SUMS.txt.sig'
+Write-Host '手順は support\RELEASE-SIGNING.md にあります。'

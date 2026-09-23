@@ -1,0 +1,48 @@
+#!/bin/sh
+# PocketRoles: コミットの前に、公開してはいけないもの（秘密鍵・Webhook のアドレス・API キー）が
+#   混ざっていないか確かめます。中身を見るのは tools\check-secrets.ps1 です。
+# 入れ方（この作業コピーで 1 回だけ）:
+#   git config core.hooksPath .githooks
+# やめるとき: git config --unset core.hooksPath
+# 1 回だけ飛ばすとき: git commit --no-verify（事故のもとなので、ふだんは使わないでください）
+#
+# `.githooks` の入っていない枝の作業コピーでは、相対の `.githooks` は見つからず、git は何も言わずに
+# 素通りします。この枝を取り込むまでの間だけ、絶対パスで指しておくと全部の作業コピーで効きます:
+#   git config core.hooksPath <この .githooks フォルダーの絶対パス>
+# そのときは、その作業コピーに tools\check-secrets.ps1 が無いので、この仕掛けの隣にあるほうを使い、
+# 見るリポジトリは -Root でその作業コピーを渡します。
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) || top=.
+script="$top/tools/check-secrets.ps1"
+if [ ! -f "$script" ]; then
+    alt="$(dirname "$0")/../tools/check-secrets.ps1"
+    if [ -f "$alt" ]; then script="$alt"; fi
+fi
+if [ ! -f "$script" ]; then
+    echo "[秘密の見張り] tools/check-secrets.ps1 が見つからないので、確かめられませんでした。" >&2
+    exit 1
+fi
+root="$top"
+if command -v cygpath >/dev/null 2>&1; then
+    script=$(cygpath -w "$script")
+    root=$(cygpath -w "$top")
+fi
+
+ps=$(command -v powershell.exe 2>/dev/null)
+if [ -z "$ps" ]; then ps=$(command -v powershell 2>/dev/null); fi
+if [ -z "$ps" ] && [ -n "$SYSTEMROOT" ]; then
+    sysroot=$(cygpath -u "$SYSTEMROOT" 2>/dev/null) || sysroot=""
+    if [ -n "$sysroot" ] && [ -x "$sysroot/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+        ps="$sysroot/System32/WindowsPowerShell/v1.0/powershell.exe"
+    fi
+fi
+if [ -z "$ps" ] && [ -x "/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+    ps="/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+fi
+if [ -z "$ps" ]; then
+    echo "[秘密の見張り] Windows PowerShell が見つからないので、確かめられませんでした。" >&2
+    echo "[秘密の見張り] どうしても通すときは git commit --no-verify（事故のもとです）。" >&2
+    exit 1
+fi
+
+exec "$ps" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$script" -Root "$root" -Staged

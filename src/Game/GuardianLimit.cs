@@ -76,7 +76,7 @@ namespace PocketRoles.Game
             try
             {
                 Chat.Chat.To(id, Chat.Chat.Title, Lang.TF("guardian.limit",
-                    "守護はこの試合 {0} 回までです。", "Protect is limited to {0} per game.", limit));
+                    "護衛はこの試合 {0} 回までです。", "Protect is limited to {0} per game.", limit));
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogWarning($"GuardianLimit: notice failed: {e.Message}"); }
         }

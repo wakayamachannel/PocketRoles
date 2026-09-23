@@ -1,5 +1,6 @@
 using System;
 using HarmonyLib;
+using Hazel;
 using InnerNet;
 using PocketRoles.Core;
 using UnityEngine;
@@ -10,10 +11,25 @@ namespace PocketRoles.Lobby
     /// Lobby-timer estimate and extension (DESIGN-v0.4 §A).
     /// <para>
     /// The client keeps no timer field: official lobbies live ~600 s and the server only tells the client the remaining
-    /// time through RPC 60 (<see cref="LobbyBehaviour.HandleLobbyTimerExtensionRequest"/>) near the end, optionally
-    /// offering one extension to the host. We start an estimate of 597 s when the lobby scene loads (EHR does the same),
-    /// override it whenever the server sends the real value, and accept the extension with the vanilla
-    /// <see cref="LobbyBehaviour.RpcExtendLobbyTimer"/> (RPC 61) when <see cref="Extend"/> is called.
+    /// time through RPC 60 (LobbyTimeExpiring) near the end, optionally offering one extension to the host. We start an
+    /// estimate of 597 s when the lobby scene loads (EHR does the same), override it whenever the server sends the real
+    /// value, and accept the extension with the vanilla <see cref="LobbyBehaviour.RpcExtendLobbyTimer"/> (RPC 61) when
+    /// <see cref="Extend"/> is called.
+    /// </para>
+    /// <para>
+    /// v0.5.5 (GameAssembly 2026.8.18, checked in the native code): <c>LobbyBehaviour.HandleRpc</c> handles RPC 60 / 61
+    /// inline. RPC 60 = packed seconds left, bool offered[, packed hostId, packed extensionId, packed extraSeconds]; vanilla
+    /// only calls <c>HudManager.ShowLobbyTimer</c> with it and drops the offer (it never sets <c>currentExtensionId</c> and
+    /// never shows the popup). RPC 61 from the server = packed extensionId, bool granted[, byte reason when refused]; vanilla
+    /// calls <c>HudManager.OnLobbyTimerExtended</c> or logs "Lobby extension {0} failed due to reason {1}!".
+    /// <c>HandleLobbyTimerExtensionRequest</c> and <c>LobbyTimerExtended</c> are never called, so their postfixes never
+    /// ran: <see cref="LobbyTimer_HandleRpcPatch"/> reads both RPCs in a HandleRpc prefix (the postfixes stay as a
+    /// harmless fallback; both handlers ignore duplicates). An RPC carries no sender, so for the host both are checked
+    /// against what the real server can send (a client might have the server relay a forged one to LobbyBehaviour):
+    /// RPC 61 only answers an extension request of ours, RPC 60 must name us as the host when it offers an extension and
+    /// fit the estimate (see <see cref="ImplausibleServerTimer"/>). The vanilla popup's accept button
+    /// (<c>LobbyTimerExtensionUI.&lt;Awake&gt;b__7_1</c>) calls <c>RpcExtendLobbyTimer</c>, which sends RPC 61 with
+    /// <c>currentExtensionId</c> (host only, not in freeplay).
     /// </para>
     /// </summary>
     public static class LobbyTimer
@@ -31,10 +47,26 @@ namespace PocketRoles.Lobby
         private static int _offerId;
         private static int _offerSeconds;
         private static float _extendRequestedAt = -1f;
+        private static bool _extendAwaitingAnswer;  // Extend() sent RPC 61 and no answer was taken yet (host)
+        private static bool _estimateAsHost;        // the estimate was started while we were the host (not a host migration)
+
+        // v0.5.5: forged RPC 60 / 61 (host). The real RPC 60 arrived 539.5 s after the lobby scene loaded with 59 s left
+        // (estimate ≈ 57.5 s); the answer to our RPC 61 arrives within a second.
+        private const float ExtendAnswerWindow = 60f;      // RPC 61 counts as the answer only this long after Extend()
+        private const float MaxEarlierThanEstimate = 180f; // RPC 60 more than this below the estimate is ignored (host lingering on the end screen fits)
+        private const float MaxLaterThanEstimate = 60f;    // ... and more than this above it (and above MaxExpiringSeconds) without a request
+        private const int MaxExpiringSeconds = 120;        // "LobbyTimeExpiring": the real one says ~60 s
 
         private static bool _notice120Sent;
         private static bool _notice60Sent;
         private static float _hudShownAt = -1f;
+
+        // v0.5.5: the same RPC may reach OnServerTimer / OnExtended twice (HandleRpc prefix + the old method postfix).
+        private const float DuplicateWindow = 1f;
+        private const float ExtendedDuplicateWindow = 10f;
+        private static float _lastServerTimerAt = -100f;
+        private static int _lastLeft, _lastHostId, _lastExtId, _lastExtra;
+        private static bool _lastAvail;
 
         // ------------------------------------------------------------------ public API
 
@@ -60,6 +92,9 @@ namespace PocketRoles.Lobby
 
         /// <summary>Realtime at which <see cref="Extend"/> last sent RPC 61 (-1 when never).</summary>
         public static float ExtendRequestedAt => _extendRequestedAt;
+
+        /// <summary>Realtime at which the server last refused an extension (RPC 61 with granted = false; -1 when none in this lobby).</summary>
+        public static float LastExtendFailedAt { get; private set; } = -1f;
 
         /// <summary>"mm:ss" for a number of seconds (negative → "--:--").</summary>
         public static string Format(int seconds)
@@ -92,9 +127,12 @@ namespace PocketRoles.Lobby
                 if (client == null || !client.AmHost) return false;
                 var lobby = LobbyBehaviour.Instance;
                 if (lobby == null || !_offerPending) return false;
+                // Same as the vanilla popup's accept button (RpcExtendLobbyTimer sends RPC 61 with currentExtensionId);
+                // 2026.8.18 never sets currentExtensionId itself (HandleRpc drops the offer), so it is set here.
                 lobby.currentExtensionId = _offerId;
                 lobby.RpcExtendLobbyTimer();
                 _extendRequestedAt = Time.realtimeSinceStartup;
+                _extendAwaitingAnswer = true;
                 _offerPending = false;
                 try
                 {
@@ -105,7 +143,7 @@ namespace PocketRoles.Lobby
                 {
                     PocketRolesPlugin.Logger.LogWarning($"LobbyTimer.Extend: HideAll failed: {e.Message}");
                 }
-                PocketRolesPlugin.Logger.LogInfo($"LobbyTimer: extension requested (id={_offerId}, +{_offerSeconds}s, remaining≈{Remaining}s)");
+                PocketRolesPlugin.Logger.LogInfo($"LobbyTimer: extension requested (RPC 61, id={_offerId}, currentExtensionId={lobby.currentExtensionId}, +{_offerSeconds}s, remaining≈{Remaining}s); waiting for the server's answer");
                 return true;
             }
             catch (Exception e)
@@ -137,9 +175,12 @@ namespace PocketRoles.Lobby
             _hasEstimate = true;
             _serverValueSeen = false;
             _deadline = Time.realtimeSinceStartup + DefaultLobbySeconds;
+            _estimateAsHost = client.AmHost;
             _offerPending = false;
             _extendRequestedAt = -1f;
+            _extendAwaitingAnswer = false;
             LastExtendedAt = -1f;
+            LastExtendFailedAt = -1f;
             _notice120Sent = false;
             _notice60Sent = false;
             _hudShownAt = -1f;
@@ -151,9 +192,12 @@ namespace PocketRoles.Lobby
         {
             _hasEstimate = false;
             _serverValueSeen = false;
+            _estimateAsHost = false;
             _offerPending = false;
             _extendRequestedAt = -1f;
+            _extendAwaitingAnswer = false;
             LastExtendedAt = -1f;
+            LastExtendFailedAt = -1f;
             _notice120Sent = false;
             _notice60Sent = false;
             _hudShownAt = -1f;
@@ -181,9 +225,28 @@ namespace PocketRoles.Lobby
             }
         }
 
-        /// <summary>RPC 60 from the server: authoritative remaining time (+ optional extension offer for the host).</summary>
-        internal static void OnServerTimer(int timeRemainingSeconds, bool isExtensionAvailable, int hostId, int extensionId, int extendedTimeSeconds)
+        /// <summary>
+        /// RPC 60 from the server: authoritative remaining time (+ optional extension offer for the host). Idempotent: the
+        /// same values again within <see cref="DuplicateWindow"/> (HandleRpc prefix, then the old method postfix) are ignored.
+        /// </summary>
+        internal static void OnServerTimer(int timeRemainingSeconds, bool isExtensionAvailable, int hostId, int extensionId, int extendedTimeSeconds, string source = "HandleRpc")
         {
+            float now = Time.realtimeSinceStartup;
+            if (now - _lastServerTimerAt < DuplicateWindow && _lastLeft == timeRemainingSeconds && _lastAvail == isExtensionAvailable
+                && _lastHostId == hostId && _lastExtId == extensionId && _lastExtra == extendedTimeSeconds)
+                return;
+            _lastServerTimerAt = now;
+            _lastLeft = timeRemainingSeconds;
+            _lastAvail = isExtensionAvailable;
+            _lastHostId = hostId;
+            _lastExtId = extensionId;
+            _lastExtra = extendedTimeSeconds;
+            string implausible = ImplausibleServerTimer(timeRemainingSeconds, isExtensionAvailable, hostId, now);
+            if (implausible != null)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"LobbyTimer: RPC 60 ignored ({implausible}): {timeRemainingSeconds}s left, extension={(isExtensionAvailable ? $"offered (id {extensionId}, +{extendedTimeSeconds}s, host {hostId})" : "none")} [{source}]");
+                return;
+            }
             _hasEstimate = true;
             _serverValueSeen = true;
             _deadline = Time.realtimeSinceStartup + Math.Max(0, timeRemainingSeconds);
@@ -195,12 +258,68 @@ namespace PocketRoles.Lobby
                 _offerId = extensionId;
                 _offerSeconds = extendedTimeSeconds;
             }
-            PocketRolesPlugin.Logger.LogInfo($"LobbyTimer: server says {timeRemainingSeconds}s left, extension={(isExtensionAvailable ? $"offered (id {extensionId}, +{extendedTimeSeconds}s, host {hostId}, forUs={forUs})" : "none")}");
+            PocketRolesPlugin.Logger.LogInfo($"LobbyTimer: server says {timeRemainingSeconds}s left, extension={(isExtensionAvailable ? $"offered (id {extensionId}, +{extendedTimeSeconds}s, host {hostId}, forUs={forUs})" : "none")} [{source}]");
         }
 
-        /// <summary>RPC 61 confirmation: the server extended the lobby.</summary>
-        internal static void OnExtended()
+        /// <summary>
+        /// v0.5.5 (host): the reason an RPC 60 cannot be the real server's, or null. The sender cannot be checked: the RPC
+        /// comes in a plain GameData message on LobbyBehaviour (net 3, owner -2), exactly as a client's RPC relayed by the
+        /// server would (2026-09-22 wire log), and Hazel / InnerNet carry no sender id for it. AutoStart acts on it (forced
+        /// start / 廃村 / re-creation, or no fallback at all), so the payload is checked instead: an offer must name us
+        /// (the real one carried hostId = our client id), and, while the estimate was started as host, a value far below
+        /// the estimate (the real one fits it within seconds; <see cref="MaxEarlierThanEstimate"/> leaves room for a host
+        /// who stayed on the end screen) or far above it without an extension request of ours is ignored. Non-hosts
+        /// (display only) take every value; a host by migration (estimate from the join) only gets the hostId check.
+        /// </summary>
+        private static string ImplausibleServerTimer(int left, bool offered, int hostId, float now)
         {
+            var client = AmongUsClient.Instance;
+            if (client == null || !client.AmHost) return null;
+            if (offered && hostId != client.ClientId)
+                return $"the extension offer names client {hostId}, the host is {client.ClientId}";
+            if (!_hasEstimate || !_estimateAsHost) return null;
+            float est = _deadline - now; // unclamped: negative once the estimate ran out
+            if (est - left > MaxEarlierThanEstimate)
+                return $"far below the estimate of {est:0}s";
+            bool requested = _extendRequestedAt >= 0f && now - _extendRequestedAt <= ExtendAnswerWindow;
+            if (left > MaxExpiringSeconds && left - est > MaxLaterThanEstimate && !requested)
+                return $"far above the estimate of {est:0}s without an extension request";
+            return null;
+        }
+
+        /// <summary>
+        /// v0.5.5 (host): an RPC 61 answer counts only while our own request (<see cref="Extend"/>) waits for it, at most
+        /// <see cref="ExtendAnswerWindow"/> seconds; the first answer consumes the request. Non-hosts take every answer
+        /// (display only). A different extension id is only logged (the echo of the id is not verified on the wire).
+        /// </summary>
+        private static bool TakeExtendAnswer(string what, int extensionId, string source)
+        {
+            var client = AmongUsClient.Instance;
+            if (client == null || !client.AmHost) return true;
+            float now = Time.realtimeSinceStartup;
+            if (!_extendAwaitingAnswer || _extendRequestedAt < 0f || now - _extendRequestedAt > ExtendAnswerWindow)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"LobbyTimer: RPC 61 ({what}, id {extensionId}) ignored: no extension request of ours is waiting for an answer [{source}]");
+                return false;
+            }
+            _extendAwaitingAnswer = false;
+            if (extensionId >= 0 && extensionId != _offerId)
+                PocketRolesPlugin.Logger.LogWarning($"LobbyTimer: RPC 61 ({what}) for extension {extensionId}, we requested {_offerId}; taken as the answer [{source}]");
+            return true;
+        }
+
+        /// <summary>
+        /// RPC 61 confirmation: the server extended the lobby. Idempotent: a second call within
+        /// <see cref="ExtendedDuplicateWindow"/> (HandleRpc prefix, then the old method postfix) would add the time twice.
+        /// </summary>
+        internal static void OnExtended(string source = "HandleRpc", int extensionId = -1)
+        {
+            if (LastExtendedAt >= 0f && Time.realtimeSinceStartup - LastExtendedAt < ExtendedDuplicateWindow)
+            {
+                PocketRolesPlugin.Logger.LogInfo($"LobbyTimer: extension confirmation already handled, ignored [{source}]");
+                return;
+            }
+            if (!TakeExtendAnswer("granted", extensionId, source)) return;
             int granted = _offerSeconds > 0 ? _offerSeconds : FallbackExtensionSeconds;
             if (!_hasEstimate)
             {
@@ -213,7 +332,7 @@ namespace PocketRoles.Lobby
             LastExtendedAt = Time.realtimeSinceStartup;
             _notice120Sent = false;
             _notice60Sent = false;
-            PocketRolesPlugin.Logger.LogInfo($"LobbyTimer: extended by ≈{granted}s, remaining≈{Remaining}s");
+            PocketRolesPlugin.Logger.LogInfo($"LobbyTimer: extended by ≈{granted}s, remaining≈{Remaining}s [{source}]");
             var client = AmongUsClient.Instance;
             if (client != null && client.AmHost)
             {
@@ -225,6 +344,15 @@ namespace PocketRoles.Lobby
                         "The lobby time was extended (same room). About {0} left", Format(Remaining)));
                 }
             }
+        }
+
+        /// <summary>RPC 61 with granted = false: the server refused the extension (AutoStart falls back at once).</summary>
+        internal static void OnExtendFailed(int extensionId, int reason)
+        {
+            if (!TakeExtendAnswer($"refused, reason {reason}", extensionId, "HandleRpc 61")) return;
+            _offerPending = false;
+            LastExtendFailedAt = Time.realtimeSinceStartup;
+            PocketRolesPlugin.Logger.LogWarning($"LobbyTimer: the server refused extension {extensionId} (reason {reason}), remaining≈{Remaining}s");
         }
 
         /// <summary>Per-frame (throttled by the caller): warning notices at 120 s and 60 s.</summary>
@@ -289,7 +417,73 @@ namespace PocketRoles.Lobby
         }
     }
 
-    /// <summary>RPC 60 (LobbyTimeExpiring): the server's remaining time and extension offer.</summary>
+    /// <summary>
+    /// v0.5.5: RPC 60 (LobbyTimeExpiring) and RPC 61 (ExtendLobbyTimer answer) read in a LobbyBehaviour.HandleRpc prefix.
+    /// 2026.8.18 handles both inline in HandleRpc (native code), so the postfixes on HandleLobbyTimerExtensionRequest /
+    /// LobbyTimerExtended below never run. The reader position is restored so vanilla reads the payload itself.
+    /// </summary>
+    [HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.HandleRpc))]
+    internal static class LobbyTimer_HandleRpcPatch
+    {
+        private const byte LobbyTimeExpiring = 60;
+        private const byte ExtendLobbyTimer = 61;
+
+        private static void Prefix(byte callId, MessageReader reader)
+        {
+            if (callId != LobbyTimeExpiring && callId != ExtendLobbyTimer) return;
+            if (reader == null) return;
+            int pos;
+            try { pos = reader.Position; }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"LobbyTimer_HandleRpcPatch: reader position unavailable ({e.Message})");
+                return;
+            }
+            try
+            {
+                if (callId == LobbyTimeExpiring)
+                {
+                    // Same order as vanilla: packed seconds, bool offered, and only when offered: packed hostId, packed id, packed seconds.
+                    int left = reader.ReadPackedInt32();
+                    bool offered = reader.ReadBoolean();
+                    int hostId = -1, extensionId = -1, extra = 0;
+                    if (offered)
+                    {
+                        hostId = reader.ReadPackedInt32();
+                        extensionId = reader.ReadPackedInt32();
+                        extra = reader.ReadPackedInt32();
+                    }
+                    LobbyTimer.OnServerTimer(left, offered, hostId, extensionId, extra, "HandleRpc 60");
+                }
+                else
+                {
+                    // Server answer to our RPC 61: packed extensionId, bool granted, and only when refused: byte reason.
+                    int extensionId = reader.ReadPackedInt32();
+                    bool granted = reader.ReadBoolean();
+                    if (granted)
+                    {
+                        LobbyTimer.OnExtended("HandleRpc 61", extensionId);
+                    }
+                    else
+                    {
+                        int reason = reader.BytesRemaining > 0 ? reader.ReadByte() : -1;
+                        LobbyTimer.OnExtendFailed(extensionId, reason);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"LobbyTimer_HandleRpcPatch (RPC {callId}): {e}");
+            }
+            finally
+            {
+                try { reader.Position = pos; }
+                catch (Exception e) { PocketRolesPlugin.Logger.LogError($"LobbyTimer_HandleRpcPatch: reader position not restored ({e.Message})"); }
+            }
+        }
+    }
+
+    /// <summary>RPC 60 (LobbyTimeExpiring): the server's remaining time and extension offer (not called on 2026.8.18, see above).</summary>
     [HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.HandleLobbyTimerExtensionRequest))]
     internal static class LobbyTimer_ExtensionRequestPatch
     {
@@ -297,7 +491,7 @@ namespace PocketRoles.Lobby
         {
             try
             {
-                LobbyTimer.OnServerTimer(timeRemainingSeconds, isExtensionAvailable, hostId, extensionId, extendedTimeSeconds);
+                LobbyTimer.OnServerTimer(timeRemainingSeconds, isExtensionAvailable, hostId, extensionId, extendedTimeSeconds, "HandleLobbyTimerExtensionRequest");
             }
             catch (Exception e)
             {
@@ -306,7 +500,7 @@ namespace PocketRoles.Lobby
         }
     }
 
-    /// <summary>RPC 61 echo from the server: the extension was granted.</summary>
+    /// <summary>RPC 61 echo from the server: the extension was granted (not called on 2026.8.18, see LobbyTimer_HandleRpcPatch).</summary>
     [HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.LobbyTimerExtended))]
     internal static class LobbyTimer_ExtendedPatch
     {
@@ -314,7 +508,7 @@ namespace PocketRoles.Lobby
         {
             try
             {
-                LobbyTimer.OnExtended();
+                LobbyTimer.OnExtended("LobbyTimerExtended");
             }
             catch (Exception e)
             {

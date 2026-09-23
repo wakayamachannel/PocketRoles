@@ -84,7 +84,7 @@ namespace PocketRoles.Net
         {
             A("インポ", true), A("アヤシ", true), A("キル", false), A("キラー", false), A("ベント", false),
             A("怪シ", true), A("犯人", true), A("黒幕", true), A("吊", true), A("投票", true), A("殺", true),
-            A("内鬼", true), A("狼", true), A("可疑", true), A("凶手", true), A("杀", true), A("刀", true), A("投", true),
+            A("内鬼", true), A("伪装者", true), A("偽裝者", true), A("狼", true), A("可疑", true), A("凶手", true), A("杀", true), A("刀", true), A("投", true),   // terms-ok: players type 内鬼 (the game says 伪装者)
             A("imp", true), A("imps", true), A("impo", true), A("impostor", true), A("imposter", true), A("impostors", true),
             A("sus", true), A("sussy", true), A("kill", true), A("killed", true), A("kills", true), A("killer", true),
             A("vent", true), A("vented", true), A("venting", true), A("vote", true),
@@ -127,7 +127,7 @@ namespace PocketRoles.Net
         private static readonly string[] Joiner = { "ト", "ヤ", "and", "&", "和", "or", "," };
 
         /// <summary>A kana-less line with one of these is Chinese even without a Chinese-only character: 青 is then ambiguous (cyan in Chinese).</summary>
-        private static readonly string[] ZhHints = { "是", "内鬼", "可疑", "投", "和", "杀", "刀", "我", "他", "她", "了", "的" };
+        private static readonly string[] ZhHints = { "是", "内鬼", "伪装者", "可疑", "投", "和", "杀", "刀", "我", "他", "她", "了", "的" };   // terms-ok
 
         private static readonly string HalfKana = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ";
         private static readonly string FullKana = "ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン";
@@ -207,7 +207,7 @@ namespace PocketRoles.Net
 
             bool hasKana = false;
             foreach (char c in raw) if (IsKana(c) && c != 'ー') { hasKana = true; break; }
-            bool aoUnclear = !zh && !hasKana && ContainsAny(s.Replace("投票", ""), ZhHints);   // "青是内鬼" without a Chinese-only character
+            bool aoUnclear = !zh && !hasKana && ContainsAny(s.Replace("投票", ""), ZhHints);   // "青是内鬼" without a Chinese-only character (terms-ok)
 
             // candidates by colour, and by whole name (normalized, 2+ characters, 3+ when plain ASCII)
             var byColor = new Dictionary<int, int>();

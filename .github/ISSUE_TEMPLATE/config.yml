@@ -9,3 +9,6 @@ contact_links:
   - name: 要望をメールで送る / 用邮件提出建议 / Send a request by mail
     url: mailto:pocketroles.report+request@gmail.com?subject=%5BPocketRoles%5D%20request
     about: 新機能や役職の要望はこちら。/ 新功能或职业建议请发到这里。/ Feature or role requests.
+  - name: チート名・NG 語を作者にそっと知らせる / 私下告知作弊名称或 NG 词 / Report cheat names or NG words privately
+    url: mailto:pocketroles.report+help@gmail.com?subject=%5BPocketRoles%5D%20aegis
+    about: 新しいチートツールの名前や NG 語は、公開の Issue / PR ではなくメール（または Discord の DM）でお知らせください。公開すると相手に知られてしまいます。/ 新的作弊工具名称或 NG 词请通过邮件（或 Discord 私信）告知，不要发在公开的 Issue / PR。/ Tell us new cheat tool names or NG words by mail (or a Discord DM), not in a public issue / PR — a public list warns the cheaters.

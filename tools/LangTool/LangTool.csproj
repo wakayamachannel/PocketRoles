@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Game-free tests and the defaults history of the language tables (see Program.cs). Compiles src/Core/LangCore.cs and src/Core/RoleWords.cs only. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>LangTool</AssemblyName>
+    <RootNamespace>PocketRoles.Tools</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\Core\LangCore.cs" Link="LangCore.cs" />
+    <Compile Include="..\..\src\Core\RoleWords.cs" Link="RoleWords.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,116 @@
+# PocketRoles v0.5.5: shared test vectors for the version-scoped lines ("@mod<=0.5.5") and the required update ([update]
+# minmod) of aegis/definitions.txt. Every copy of these rules runs them: the mod (src/Net/RuleScope.cs, AegisRules.Resolve;
+# the reflection harness), the tray app (aegis/Aegis.ps1, C# 5), tools/sign-definitions.ps1 (and the checker that uses it)
+# and the launcher's version comparison (PocketRolesLauncher.ps1 Compare-ModVersion). Change the rules and these lines
+# together. Fields are separated by TABs; "-" = empty; "?" = a game version not known yet.
+#
+# cond   <conditions after '@'>  <mod>  <game>  <T|F|U>
+#   T = the line applies, F = it does not, U = this version cannot judge it (a [rules] line then only relaxes; a minmod
+#   line never counts). Versions: up to 4 whole numbers, missing parts are 0; a "-suffix" build is a pre-release, below
+#   its base version; the part from '+' is dropped; the game version is the leading numbers of the game's version text.
+cond	mod<=0.5.5	0.5.5	2026.8.18	T
+cond	MOD <= v0.5.5	0.5.5	2026.8.18	T
+cond	mod==0.5.5	0.5.5	2026.8.18	T
+cond	mod=0.5.5	0.5.5	2026.8.18	T
+cond	mod<=0.5.5.0	0.5.5	2026.8.18	T
+cond	mod>=0.5	0.5.5	2026.8.18	T
+cond	mod>0.5.4	0.5.5	2026.8.18	T
+cond	mod<0.5.6	0.5.5	2026.8.18	T
+cond	  mod <= 0.5.5  	0.5.5	2026.8.18	T
+cond	mod<0.5.5	0.5.5	2026.8.18	F
+cond	mod<=0.5	0.5.5	2026.8.18	F
+cond	mod>=0.5.6	0.5.5	2026.8.18	F
+cond	mod>0.5.5	0.5.5	2026.8.18	F
+cond	game>=2026.8.18	0.5.5	2026.8.18	T
+cond	game>=2026.8.18	0.5.5	2026.8.18s	T
+cond	game>=2026.8.18	0.5.5	?	U
+cond	game>=2026.9.1	0.5.5	2026.8.18	F
+cond	game==2026.8.18	0.5.5	2026.8.18a	T
+cond	os=win	0.5.5	2026.8.18	U
+cond	-	0.5.5	2026.8.18	U
+cond	mod<=abc	0.5.5	2026.8.18	U
+cond	mod~0.5	0.5.5	2026.8.18	U
+cond	mod<=0.5.5@x	0.5.5	2026.8.18	U
+cond	mod<=0.5.5.1.2	0.5.5	2026.8.18	U
+cond	mod＜0.5.6	0.5.5	2026.8.18	U
+cond	mod<=0.5.5,	0.5.5	2026.8.18	U
+cond	mod<=0.5.4, os=x	0.5.5	2026.8.18	F
+cond	mod<=0.5.5, os=x	0.5.5	2026.8.18	U
+cond	mod<=0.5.5, game>=2026.8.18	0.5.5	?	U
+cond	mod<=0.5.5, game>=2026.8.18	0.5.5	2026.8.18	T
+cond	mod>=0.5.6, game>=2026.9.1	0.5.6	2026.9.1	T
+cond	mod>=0.5.6	0.5.6-beta	2026.8.18	F
+cond	mod<0.5.6	0.5.6-beta	2026.8.18	T
+cond	mod<=0.5.5	0.5.6-beta	2026.8.18	F
+cond	mod==0.5.6	0.5.6-beta	2026.8.18	F
+cond	mod==0.5.5	0.5.5+abcdef	2026.8.18	T
+#
+# cmp    <a>  <b>  <-1|0|1>   two mod versions (as the launcher compares an installed DLL with a floor or a release tag)
+cmp	0.5.5	0.5.5.0	0
+cmp	0.5.5	0.5.6	-1
+cmp	0.5.6-beta	0.5.6	-1
+cmp	0.5.6-beta	0.5.5.9	1
+cmp	0.10.0	0.9.9	1
+cmp	1.0.0	0.99.99	1
+cmp	v0.5.6	0.5.6	0
+cmp	0.5.5+abcdef	0.5.5	0
+cmp	0.5.6.1	0.5.6	1
+#
+# floor  <minmod lines separated by " | ">  <mod>  <game>  <SimulateMinMod>  <none|ok|below|ignored>  <floor>  <test 0|1>
+#   The floor is the highest minmod whose conditions are surely true (U and F lines never count); a value more than one
+#   major version ahead of the build (or with a part above 999) is ignored as clearly wrong; SimulateMinMod is one more
+#   plain line (it can raise the floor, never lower it). A line that is not a version (abc) is dropped when the file is read.
+floor	0.5.6	0.5.5	2026.8.18	-	below	0.5.6	0
+floor	0.6.0	0.5.5	2026.8.18	-	below	0.6.0	0
+floor	0.7.0	0.5.5	2026.8.18	-	below	0.7.0	0
+floor	1.0.0	0.5.5	2026.8.18	-	below	1.0.0	0
+floor	2.0.0	0.5.5	2026.8.18	-	ignored	-	0
+floor	5.6	0.5.5	2026.8.18	-	ignored	-	0
+floor	0.5.1000	0.5.5	2026.8.18	-	ignored	-	0
+floor	1.0.0	0.9.3	2026.8.18	-	below	1.0.0	0
+floor	0.5.5	0.5.5	2026.8.18	-	ok	0.5.5	0
+floor	0.5.4	0.5.5	2026.8.18	-	ok	0.5.4	0
+floor	abc	0.5.5	2026.8.18	-	none	-	0
+floor	-	0.5.5	2026.8.18	-	none	-	0
+floor	0.5.6 | 0.5.7 @game>=2026.9.1	0.5.5	2026.8.18	-	below	0.5.6	0
+floor	0.5.6 | 0.5.7 @game>=2026.9.1	0.5.5	?	-	below	0.5.6	0
+floor	0.5.6 | 0.5.7 @game>=2026.9.1	0.5.5	2026.9.1	-	below	0.5.7	0
+floor	0.5.6 @os=x	0.5.5	2026.8.18	-	none	-	0
+floor	0.5.6 | 0.7.0	0.5.5	2026.8.18	-	below	0.7.0	0
+floor	0.5.6 | 3.0.0	0.5.5	2026.8.18	-	below	0.5.6	0
+floor	0.5.6 @mod<=0.5.5	0.5.5	2026.8.18	-	below	0.5.6	0
+floor	0.5.6 @mod<=0.5.5	0.5.6	2026.8.18	-	none	-	0
+floor	0.5.6	0.5.6-beta	2026.8.18	-	below	0.5.6	0
+floor	0.5.6	0.5.6	2026.8.18	-	ok	0.5.6	0
+floor	-	0.5.5	2026.8.18	0.5.6	below	0.5.6	1
+floor	0.5.5	0.5.5	2026.8.18	0.5.6	below	0.5.6	1
+floor	0.5.6	0.5.5	2026.8.18	0.5.5	below	0.5.6	0
+floor	-	0.5.5	2026.8.18	0.5.4	ok	0.5.4	1
+floor	-	0.5.5	2026.8.18	9.9.9	ignored	-	1
+#
+# rules  <[rules] lines separated by " | ">  <mod>  <game>  <key>  <expected level or number>
+#   Top to bottom, the last line that applies wins; a U line is used only where it makes the value more lenient than the
+#   one it replaces (levels: off < notice < repeat < certain; numbers: each key's direction); a level stricter than the
+#   built-in one is dropped when the file is read; numbers are clamped to their range; speed.notice stays at most speed.kick.
+rules	level.KillRole = notice @mod<=0.5.5	0.5.5	2026.8.18	level.KillRole	notice
+rules	level.KillRole = notice @mod<=0.5.5	0.5.6	2026.8.18	level.KillRole	certain
+rules	level.SpeedFast = off @os=x	0.5.5	2026.8.18	level.SpeedFast	off
+rules	level.KillRole = repeat @os=x	0.5.5	2026.8.18	level.KillRole	repeat
+rules	level.KillRole = notice | level.KillRole = certain @mod>=0.5.5	0.5.5	2026.8.18	level.KillRole	certain
+rules	level.KillRole = notice | level.KillRole = certain @os=x	0.5.5	2026.8.18	level.KillRole	notice
+rules	level.SpeedFast = certain @mod<=0.5.5	0.5.5	2026.8.18	level.SpeedFast	notice
+rules	level.SpeedFast = off | level.SpeedFast = notice @mod>=0.5.7	0.5.7	2026.8.18	level.SpeedFast	notice
+rules	level.SpeedFast = off | level.SpeedFast = notice @mod>=0.5.7	0.5.5	2026.8.18	level.SpeedFast	off
+rules	level.KillRole = notice @game>=2026.9.1	0.5.5	?	level.KillRole	notice
+rules	level.KillRole = notice @game>=2026.9.1	0.5.5	2026.8.18	level.KillRole	certain
+rules	speed.kick = 3 @mod>=0.5.6, game>=2026.9.1	0.5.6	2026.9.1	speed.kick	3
+rules	speed.kick = 3 @mod>=0.5.6, game>=2026.9.1	0.5.6	2026.8.18	speed.kick	2.5
+rules	speed.kick = 3 @mod>=0.5.6, game>=2026.9.1	0.5.5	2026.9.1	speed.kick	2.5
+rules	speed.kick = 3 @os=x	0.5.5	2026.8.18	speed.kick	3
+rules	speed.kick = 2 @os=x	0.5.5	2026.8.18	speed.kick	2.5
+rules	chatflood.window = 2 @os=x	0.5.5	2026.8.18	chatflood.window	2
+rules	repeat.window = 600 @os=x	0.5.5	2026.8.18	repeat.window	300
+rules	speed.kick = 99 @os=x	0.5.5	2026.8.18	speed.kick	6
+rules	speed.kick = 3 | speed.kick = 2 @os=x	0.5.5	2026.8.18	speed.kick	3
+rules	speed.notice = 3 | speed.kick = 2	0.5.5	2026.8.18	speed.notice	2
+rules	speed.kick = 3 @mod<=0.5.5 | speed.kick = 2.5	0.5.5	2026.8.18	speed.kick	2.5

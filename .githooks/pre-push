@@ -1,0 +1,88 @@
+#!/bin/sh
+# PocketRoles: push の前に、これから送るコミットが足した・変えたファイルを 1 つずつ確かめます。
+#   コミットの前の仕掛け（pre-commit / pre-merge-commit）を通らない道が残っているためです:
+#     - git commit --no-verify で飛ばしたとき
+#     - git cherry-pick / git revert / git rebase（git はコミットの前の仕掛けを呼びません）
+#     - 仕掛けを入れていない別の PC や、別の作業コピーで作ったコミット
+#   一度 push した秘密は取り返せないので、最後の関所はここです。
+# 1 回だけ飛ばすとき: git push --no-verify（事故のもとなので、ふだんは使わないでください）
+# 返り値: 0 = 見つからなかった / 1 = 見つかった（push を止めます） / 1 = 確かめられなかったときも止めます
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) || top=.
+script="$top/tools/check-secrets.ps1"
+if [ ! -f "$script" ]; then
+    # core.hooksPath に絶対パスを指したときは、この作業コピーに tools\ が無いことがあります
+    alt="$(dirname "$0")/../tools/check-secrets.ps1"
+    if [ -f "$alt" ]; then script="$alt"; fi
+fi
+if [ ! -f "$script" ]; then
+    echo "[秘密の見張り] tools/check-secrets.ps1 が見つからないので、確かめられませんでした。" >&2
+    exit 1
+fi
+root="$top"
+if command -v cygpath >/dev/null 2>&1; then
+    script=$(cygpath -w "$script")
+    root=$(cygpath -w "$top")
+fi
+
+ps=$(command -v powershell.exe 2>/dev/null)
+if [ -z "$ps" ]; then ps=$(command -v powershell 2>/dev/null); fi
+if [ -z "$ps" ] && [ -n "$SYSTEMROOT" ]; then
+    sysroot=$(cygpath -u "$SYSTEMROOT" 2>/dev/null) || sysroot=""
+    if [ -n "$sysroot" ] && [ -x "$sysroot/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+        ps="$sysroot/System32/WindowsPowerShell/v1.0/powershell.exe"
+    fi
+fi
+if [ -z "$ps" ] && [ -x "/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]; then
+    ps="/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+fi
+if [ -z "$ps" ]; then
+    echo "[秘密の見張り] Windows PowerShell が見つからないので、確かめられませんでした。" >&2
+    echo "[秘密の見張り] どうしても通すときは git push --no-verify（事故のもとです）。" >&2
+    exit 1
+fi
+
+# すべて 0 の sha は「まだ無い」の印です（長さは sha1 と sha256 で違うので、文字で見ます）
+all_zero() { case "$1" in '') return 1 ;; *[!0]*) return 1 ;; *) return 0 ;; esac; }
+
+revs=""
+while read -r localref localsha remoteref remotesha; do
+    [ -z "$localsha" ] && continue
+    all_zero "$localsha" && continue               # 枝を消す push。送る中身はありません
+    if all_zero "$remotesha"; then
+        add=$(git rev-list --max-count=500 "$localsha" --not --remotes 2>/dev/null)
+    else
+        add=$(git rev-list --max-count=500 "$remotesha..$localsha" 2>/dev/null)
+    fi
+    revs="$revs $add"
+done
+
+revs=$(printf '%s\n' $revs | sort -u)
+if [ -z "$revs" ]; then
+    echo "[秘密の見張り] 送るコミットがありません。"
+    exit 0
+fi
+
+n=$(printf '%s\n' $revs | wc -l | tr -d ' ')
+echo "[秘密の見張り] 送るコミット $n 個を確かめます。"
+rc=0
+for r in $revs; do
+    "$ps" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$script" -Root "$root" -Rev "$r" || rc=1
+done
+
+# NG ワードの一覧に平文が残っていないかの確認（tools\check-hashed-lists.ps1）。
+#   RELEASE-CHECKLIST.md は同じ確認を .git/hooks/pre-push に入れる手順を書いていますが、
+#   core.hooksPath を .githooks にすると git は .git/hooks を見なくなるので、ここから呼びます。
+#   （まだその枝を取り込んでいない作業コピーでは、ファイルが無いので飛ばします）
+hashed="$top/tools/check-hashed-lists.ps1"
+if [ -f "$hashed" ]; then
+    if command -v cygpath >/dev/null 2>&1; then hashed=$(cygpath -w "$hashed"); fi
+    for r in $revs; do
+        "$ps" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$hashed" -RepoRoot "$root" -Commit "$r" || rc=1
+    done
+fi
+if [ "$rc" != 0 ]; then
+    echo "[秘密の見張り] push を止めました。上に出たコミットを直してから、もう一度 push してください。" >&2
+    echo "[秘密の見張り] （履歴の中のコミットは git rebase -i や git filter-repo で作り直す必要があります）" >&2
+fi
+exit $rc

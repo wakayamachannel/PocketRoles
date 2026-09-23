@@ -258,12 +258,12 @@ namespace PocketRoles.UI
             {
                 Options.HostAuthorityMode = v;
                 Popup(Lang.T("ui.gear.register.notice",
-                    "MOD部屋登録（公式ルール・役職に必須）は次に部屋を作った時から適用されます。オフは Innersloth のMODポリシー違反です。",
-                    "Mod-lobby registration (official rule, required for roles) applies to the next lobby you create. Off violates Innersloth's mod policy.",
-                    "MOD房间注册（官方规则・职业必需）从下次创建房间起生效。关闭违反 Innersloth 的模组政策。"));
+                    "MOD部屋登録（公式ルール・追加役職に必須）は次に部屋を作った時から適用されます。オフは Innersloth のMODポリシー違反です。",
+                    "Mod-lobby registration (official rule, needed for mod roles) applies to the next lobby you create. Off violates Innersloth's mod policy.",
+                    "MOD房间注册（官方规则、模组职业必需）从下次创建房间起生效。关闭违反 Innersloth 的模组政策。"));
             });
-            AddCycle(() => Lang.T("ui.gear.lang", "言語", "Language") + ": " + Lang.DisplayName(Options.Language),
-                () => Options.Language = Next(Lang.Supported, Options.Language));
+            AddCycle(() => Lang.T("ui.gear.lang", "言語", "Language") + ": " + Lang.DisplayName(Options.LanguageSetting),
+                () => Options.Language = Next(Options.LanguageChoices, Options.LanguageSetting));
             AddCycle(() => Lang.T("ui.gear.timermode", "ロビー残り時間の動作", "Lobby timer action") + ": " + TimerModeName(Options.TimerMode),
                 () => Options.TimerMode = Next(Options.TimerModeChoices, Options.TimerMode));
             AddToggle(() => Lang.T("ui.gear.hotkeys", "ホットキー有効", "Hotkeys enabled"), () => Options.HotkeysEnabled, v => Options.HotkeysEnabled = v);
@@ -423,14 +423,28 @@ namespace PocketRoles.UI
 
     /// <summary>
     /// Verify finding #20: a changed default never reaches an existing cfg (BepInEx keeps the stored value), so the host
-    /// never learns that [Translate] Enabled is still false in their file. Once per session the effective value is logged
-    /// (a warning when off), and once per new lobby the host gets a chat line with the command that turns it on.
+    /// never learns from the file alone what chat translation is doing. v0.5.5: [Translate] Enabled is OFF by default,
+    /// so this notice is also how a new host finds the feature. Once per session the effective value is logged (a
+    /// warning when off) and the host gets ONE chat line with the command that turns it on.
+    ///
+    /// Once per SESSION, not once per lobby: with the v0.5.5 default the line would otherwise greet every host who
+    /// never uses translation, in every lobby they create, for ever — a host who re-creates public lobbies dozens of
+    /// times a day would read it dozens of times a day. [Translate] OffNotice = false (/opt translate.notice off)
+    /// silences it completely, and <see cref="Chat.Chat.OnTranslationEnabledChanged"/> calls <see cref="ResetNotice"/>
+    /// when a host turns translation off again, so the reminder comes back once for a host who changed their mind.
     /// </summary>
     [HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.Start))]
     internal static class ClientUI_TranslateNoticePatch
     {
         private static bool _loggedThisSession;
-        private static int _noticedGameId = int.MinValue;
+        private static bool _noticedThisSession;
+
+        /// <summary>Arm the notice again (translation was switched off): the next lobby shows it one more time.</summary>
+        internal static void ResetNotice()
+        {
+            _noticedThisSession = false;
+            _loggedThisSession = false;
+        }
 
         private static void Postfix()
         {
@@ -443,20 +457,48 @@ namespace PocketRoles.UI
                 {
                     _loggedThisSession = true;
                     if (on) PocketRolesPlugin.Logger.LogInfo($"Translate: enabled (provider {Options.TranslateEffectiveProvider}, target {Options.TranslateTargetLang})");
-                    else PocketRolesPlugin.Logger.LogWarning("Translate: [Translate] Enabled=false in PocketRoles.cfg — chat translation is off (/opt translate.enabled on, or the settings tab, turns it on)");
+                    else PocketRolesPlugin.Logger.LogWarning("Translate: chat translation is off (the v0.5.5 default; [Translate] Enabled=false in PocketRoles.cfg) — no chat text is sent anywhere. /opt translate.enabled on, or the settings tab, turns it on");
                 }
                 if (on) return;
-                int gameId = client.GameId;
-                if (_noticedGameId == gameId) return;   // play again / same lobby: once is enough
-                _noticedGameId = gameId;
+                if (!Options.TranslateOffNotice) return;   // the host silenced it (/opt translate.notice off)
+                if (_noticedThisSession) return;           // once per game session, not once per lobby
+                _noticedThisSession = true;
                 Chat.Chat.LocalWhenReady(() => Lang.T("translate.disabled.notice",
-                    "翻訳は設定で無効です（/opt translate.enabled on で有効化）",
-                    "Chat translation is disabled in the settings (/opt translate.enabled on enables it)",
-                    "聊天翻译已在设置中关闭（/opt translate.enabled on 可开启）"));
+                    "チャット翻訳はオフです（既定はオフ。/opt translate.enabled on でオン、/opt translate.notice off でこのお知らせを消せます）",
+                    "Chat translation is off (off by default; /opt translate.enabled on turns it on, /opt translate.notice off hides this line)",
+                    "聊天翻译已关闭（默认关闭；/opt translate.enabled on 可开启，/opt translate.notice off 可隐藏此提示）"));
             }
             catch (Exception e)
             {
                 PocketRolesPlugin.Logger.LogError($"ClientUI_TranslateNoticePatch: {e}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// v0.5.5: the ONE notice of the upgrade check (<see cref="Core.OptInUpgrade"/>). A host upgrading from v0.5.4
+    /// keeps <c>[Translate] Enabled = true</c> — the old default — although the README promises the feature starts
+    /// off, and the config file cannot say whether that host chose it or simply inherited it. Nothing is changed for
+    /// them; instead the first lobby after the upgrade carries one line on the HOST's own screen saying what changed,
+    /// what is on right now on this PC, and the one command that turns it off (or keeps it). Shown once ever, not
+    /// once per session: <see cref="Core.OptInUpgrade.ShowNoticeIfDue"/> leaves the recording to
+    /// <c>Chat.LocalWhenReady</c>'s onShown callback, which runs only once the line has really reached the screen, so
+    /// a host whose chat was not ready yet gets it in the next session instead of losing it.
+    /// </summary>
+    [HarmonyPatch(typeof(LobbyBehaviour), nameof(LobbyBehaviour.Start))]
+    internal static class ClientUI_OptInUpgradeNoticePatch
+    {
+        private static void Postfix()
+        {
+            try
+            {
+                var client = AmongUsClient.Instance;
+                if (client == null || !client.AmHost || !Options.ModEnabled) return;
+                OptInUpgrade.ShowNoticeIfDue();
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogError($"ClientUI_OptInUpgradeNoticePatch: {e}");
             }
         }
     }

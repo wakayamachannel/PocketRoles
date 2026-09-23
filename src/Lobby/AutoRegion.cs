@@ -16,9 +16,18 @@ namespace PocketRoles.Lobby
     /// Every entry of <c>ServerManager.DefaultRegions</c> (North America / Europe / Asia, PingServer =
     /// https://matchmaker[-eu|-as].among.us) is probed with HTTPS HEAD requests (UnityWebRequest, 3-s timeout) from a
     /// coroutine on the ServerManager; the median RTT of the successful samples ranks the regions. When
-    /// <see cref="Options.AutoRegion"/> is on the probe runs when the online menu opens (never while connected) and
-    /// <c>ServerManager.SetRegion</c> switches to the best one if it differs from the current region. Results are cached
-    /// for 10 minutes; the table is logged and shown once in the host's next lobby chat.
+    /// <see cref="Options.AutoRegion"/> is on the probe runs the moment the CREATE-GAME screen opens (v0.5.5, design
+    /// review §8; never while connected) and <c>ServerManager.SetRegion</c> switches to the best one if it differs from
+    /// the current region. Opening the online menu, "find game" and joining by code never probe and never switch, so
+    /// somebody who only wants to join a room by its code keeps the region they picked. Results are cached for 10
+    /// minutes; the table is logged and shown once in the host's next lobby chat.
+    /// </para>
+    /// <para>
+    /// A probe takes seconds (3 regions × 4 sequential HTTPS HEADs, 3-s timeout each), so the screen it started from
+    /// is asked for again when the probe ENDS, not only when it began (review 2026-09-23): the switch happens only
+    /// while that create-game screen is still open and nothing is connecting, and never over a region the user picked
+    /// by hand meanwhile. A switch that could not be carried out is remembered and applied — from the cached result,
+    /// with no second probe — the next time the create-game screen opens.
     /// </para>
     /// </summary>
     public static class AutoRegion
@@ -243,6 +252,7 @@ namespace PocketRoles.Lobby
             string table = sb.ToString();
             _lastTable = table;
             _lastBest = best != null ? best.Name : null;
+            _lastBestRegion = best != null ? best.Region : null;
             _lastProbeAt = Time.realtimeSinceStartup;
             PocketRolesPlugin.Logger.LogInfo("AutoRegion: " + table.Replace('\n', ' ') + $" → best={_lastBest ?? "none"}, current={current}");
 
@@ -255,10 +265,25 @@ namespace PocketRoles.Lobby
             {
                 action = Lang.TF("region.keep", "最速は {0}（現在の地域のままです）", "Fastest: {0} (already selected)", best.Name);
             }
-            else if (!CanSelectNow())
+            else if (_autoTriggered && PickedByHandDuringProbe(current))
             {
-                action = Lang.TF("region.later", "最速は {0}（現在: {1}）。接続中は変更しません。次にホストする前に切り替わります。",
-                    "Fastest: {0} (current: {1}). Not changed while connected; it switches before the next hosting.", best.Name, current);
+                // v0.5.5 review: the user picked a region BY HAND in the create-game dropdown while the probe ran.
+                action = Lang.TF("region.manual", "最速は {0}（現在: {1}）。手で選んだ地域はそのままにします。",
+                    "Fastest: {0} (current: {1}). The region you picked by hand is kept.", best.Name, current);
+            }
+            else if (!CanApplyNow())
+            {
+                // v0.5.5 review: the probe takes seconds, so it often ends after the create-game screen is gone — the
+                // user backed out, or is already connecting (AmConnected stays false for the whole connect, which is
+                // exactly the "joined by code" case this feature must never touch). Remember the switch instead and
+                // apply it from the cache the next time the create-game screen opens, which is what region.later says.
+                // With AutoRegion off nothing will ever open that path, so promise nothing there.
+                _switchPending = Options.AutoRegion;
+                action = _switchPending
+                    ? Lang.TF("region.later", "最速は {0}（現在: {1}）。今は切り替えません。次に「部屋を作る」の画面を開いた時に切り替えます。",
+                        "Fastest: {0} (current: {1}). Not switched now; it switches the next time you open the CREATE GAME screen.", best.Name, current)
+                    : Lang.TF("region.notnow", "最速は {0}（現在: {1}）。接続中なので切り替えません（ゲームの地域選択で手で変えられます）。",
+                        "Fastest: {0} (current: {1}). Not switched while connected; you can pick it by hand in the game's region menu.", best.Name, current);
             }
             else if (!Options.AutoRegion && _autoTriggered)
             {
@@ -277,11 +302,89 @@ namespace PocketRoles.Lobby
 
         private static bool _autoTriggered;
 
+        /// <summary>
+        /// Nothing is connecting. <c>AmConnected</c> stays false for the WHOLE duration of a connect, so on its own
+        /// this does not tell a create-game screen from somebody who is joining a room by its code — see
+        /// <see cref="CanApplyNow"/>.
+        /// </summary>
         private static bool CanSelectNow()
         {
             var client = AmongUsClient.Instance;
             if (client == null) return true;
             return !client.AmConnected;
+        }
+
+        /// <summary>The create-game screen the running probe was started from (v0.5.5): its region line is refreshed after a switch.</summary>
+        private static MainMenuManager _createMenu;
+
+        /// <summary>The region selected when the running probe started: a region picked BY HAND meanwhile is never overwritten.</summary>
+        private static string _regionAtProbeStart;
+
+        /// <summary>The region info of the last probe's fastest region (for a switch applied from the cache).</summary>
+        private static IRegionInfo _lastBestRegion;
+
+        /// <summary>A switch the probe could not apply (screen closed / connecting): applied at the next create-game screen.</summary>
+        private static bool _switchPending;
+
+        /// <summary>The create-game screen this probe was started from is still on screen.</summary>
+        private static bool CreateScreenOpen()
+        {
+            try
+            {
+                var menu = _createMenu;
+                if (menu == null) return false;
+                var screen = menu.createGameScreen;
+                if (screen == null) return false;
+                var go = screen.gameObject;
+                return go != null && go.activeInHierarchy;
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"AutoRegion: could not read the create-game screen: {e.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// May the region be switched at THIS moment? v0.5.5 review: the probe is started on the create-game screen
+        /// but takes seconds, so the answer has to be asked again when it ends, not only when it began. An automatic
+        /// switch needs the very create-game screen that started it to be still open — otherwise the user has backed
+        /// out and may already be connecting to somebody else's room by code, where a SetRegion is exactly the bug
+        /// this feature had. A manual /region probe keeps the old rule (not connected).
+        /// </summary>
+        private static bool CanApplyNow()
+        {
+            if (!CanSelectNow()) return false;
+            if (!_autoTriggered) return true;
+            return CreateScreenOpen();
+        }
+
+        /// <summary>The selected region changed while the probe ran, and both names are known ("?" means unreadable).</summary>
+        private static bool PickedByHandDuringProbe(string current)
+        {
+            if (string.IsNullOrEmpty(_regionAtProbeStart) || _regionAtProbeStart == "?") return false;
+            if (string.IsNullOrEmpty(current) || current == "?") return false;
+            return current != _regionAtProbeStart;
+        }
+
+        /// <summary>
+        /// Show the new region on the create-game screen that is still open (the same text vanilla writes when the
+        /// region is chosen in its own dropdown). Best effort: a closed / destroyed screen is simply skipped.
+        /// </summary>
+        private static void RefreshCreateScreen()
+        {
+            try
+            {
+                var menu = _createMenu;
+                if (menu == null) return;
+                var screen = menu.createGameScreen;
+                if (screen == null) return;
+                screen.SetCurrentServer();
+            }
+            catch (Exception e)
+            {
+                PocketRolesPlugin.Logger.LogWarning($"AutoRegion: could not refresh the create-game screen: {e.Message}");
+            }
         }
 
         private static bool ApplyRegion(Probe best)
@@ -303,7 +406,9 @@ namespace PocketRoles.Lobby
                 if (target == null) return false;
                 sm.SetRegion(target);
                 PocketRolesPlugin.Logger.LogInfo($"AutoRegion: SetRegion({best.Name})");
-                return CurrentRegionName() == best.Name;
+                bool ok = CurrentRegionName() == best.Name;
+                if (ok) RefreshCreateScreen();   // v0.5.5: the create-game screen still shows the old region name
+                return ok;
             }
             catch (Exception e)
             {
@@ -323,21 +428,52 @@ namespace PocketRoles.Lobby
                 _autoTriggered = false;
                 _pendingLobbyReport = text;
             }
+            _createMenu = null;   // v0.5.5: never hold the menu of a screen that is long closed
+            _regionAtProbeStart = null;
         }
 
-        /// <summary>Online menu opened (not connected): probe when AutoRegion is on and the cache is stale.</summary>
-        internal static void OnOnlineMenuOpened()
+        /// <summary>
+        /// The CREATE-GAME screen opened (v0.5.5, design review §8): the only moment the region may be switched by
+        /// itself, because this is the one path that ends in hosting a NEW room. Probes when AutoRegion is on, the
+        /// client is not connected and the cache is stale; with a fresh cache it only carries out a switch the last
+        /// probe could not apply. Joining by code, "find game" and the online menu itself never come here.
+        /// </summary>
+        internal static void OnCreateGameOpened(MainMenuManager menu)
         {
             if (!Options.AutoRegion) return;
             if (!CanSelectNow()) return;
+            _createMenu = menu;
             float now = Time.realtimeSinceStartup;
             if (_lastProbeAt >= 0f && now - _lastProbeAt < CacheSeconds && _lastBest != null)
             {
-                // Cached result: still apply it if the region was changed back by hand? No — respect the user's choice.
+                // Fresh result (10 min): no second probe. A switch the last probe could NOT apply is carried out now
+                // from the cache — that is what region.later promises, and it is instant, so no race with Create.
+                // Without a pending switch the cached result is never re-applied: a region the user picked by hand
+                // after the last switch stays.
+                if (_switchPending) ApplyPendingSwitch();
                 return;
             }
             _autoTriggered = true;
+            _switchPending = false;
+            _regionAtProbeStart = CurrentRegionName();
             ProbeAndSelect(null, true);
+        }
+
+        /// <summary>
+        /// The create-game screen opened again and the last probe's switch never happened (v0.5.5 review): apply it
+        /// from the cached result, without probing, and show the outcome in the next lobby like a normal probe.
+        /// </summary>
+        private static void ApplyPendingSwitch()
+        {
+            _switchPending = false;
+            string current = CurrentRegionName();
+            if (string.IsNullOrEmpty(_lastBest) || _lastBest == current) return;
+            bool applied = ApplyRegion(new Probe { Name = _lastBest, Region = _lastBestRegion });
+            string action = applied
+                ? Lang.TF("region.switched", "地域を {0} に切り替えました（{1} → {0}）", "Region switched to {0} ({1} → {0})", _lastBest, current)
+                : Lang.TF("region.failed", "地域 {0} への切り替えに失敗しました。", "Could not switch to region {0}.", _lastBest);
+            PocketRolesPlugin.Logger.LogInfo($"AutoRegion: pending switch from the cached probe: {current} → {_lastBest}, applied={applied}");
+            _pendingLobbyReport = (_lastTable != null ? _lastTable + "\n" : "") + action;
         }
 
         /// <summary>Host's lobby chat: show the table of the probe that ran before hosting (once).</summary>
@@ -353,19 +489,24 @@ namespace PocketRoles.Lobby
 
     // ---------------------------------------------------------------------- patches
 
-    /// <summary>Online menu: probe before the user can host (CoCreateOnlineGame is already connecting).</summary>
-    [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.OpenOnlineMenu))]
-    internal static class AutoRegion_OpenOnlineMenuPatch
+    /// <summary>
+    /// v0.5.5 (design review §8): the create-game screen, i.e. the user is about to host a NEW room — the probe (and
+    /// with it the only automatic <c>SetRegion</c>) runs here and nowhere else, well before CoCreateOnlineGame starts
+    /// connecting. Before v0.5.5 this sat on <c>OpenOnlineMenu</c>, which also runs for somebody who only wants to
+    /// join a room by its code.
+    /// </summary>
+    [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.OpenCreateGame))]
+    internal static class AutoRegion_OpenCreateGamePatch
     {
-        private static void Postfix()
+        private static void Postfix(MainMenuManager __instance)
         {
             try
             {
-                AutoRegion.OnOnlineMenuOpened();
+                AutoRegion.OnCreateGameOpened(__instance);
             }
             catch (Exception e)
             {
-                PocketRolesPlugin.Logger.LogError($"AutoRegion_OpenOnlineMenuPatch: {e}");
+                PocketRolesPlugin.Logger.LogError($"AutoRegion_OpenCreateGamePatch: {e}");
             }
         }
     }

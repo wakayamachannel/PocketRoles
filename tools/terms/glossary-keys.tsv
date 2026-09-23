@@ -1,0 +1,198 @@
+# concept<TAB>StringNames key   (lines starting with # are ignored; edit freely, then re-run TermsExtract)
+# --- teams / roles ---
+Impostor	Impostor
+Impostors (category/plural)	ImpostorsCategory
+Crewmate	Crewmate
+Crewmates (plural)	Crewmates
+Crewmate roles header	CrewmateRolesHeader
+Impostor roles header	ImpostorRolesHeader
+Roles	Roles
+Your role is	YourRoleIs
+Engineer	EngineerRole
+Scientist	ScientistRole
+Guardian Angel (ghost role)	GuardianAngelRole
+Shapeshifter	ShapeshifterRole
+Noisemaker	NoisemakerRole
+Tracker	TrackerRole
+Phantom	PhantomRole
+Detective (2025+)	DetectiveRole
+Viper (2025+)	ViperRole
+Judge (2026)	JudgeRole
+Oracle (string only)	OracleRole
+Ghost	Ghost
+Crewmate blurb	CrewmateBlurb
+Impostor blurb	ImpostorBlurb
+Engineer blurb	EngineerBlurb
+Scientist blurb	ScientistBlurb
+Guardian Angel blurb	GuardianAngelBlurb
+Shapeshifter blurb	ShapeshifterBlurb
+Noisemaker blurb	NoisemakerBlurb
+Tracker blurb	TrackerBlurb
+Phantom blurb	PhantomBlurb
+Detective blurb	DetectiveBlurb
+Viper blurb	ViperBlurb
+Judge blurb	JudgeBlurb
+Impostor count (1)	NumImpostorsS
+Impostor count (n)	NumImpostorsP
+Impostors remain (1)	ImpostorsRemainS
+Impostors remain (n)	ImpostorsRemainP
+# --- HUD buttons / abilities ---
+KILL button	KillLabel
+VENT button	VentLabel
+Vent (ability)	VentAbility
+SABOTAGE button	SabotageLabel
+REPORT button	ReportLabel
+Report (player report button)	ReportButton
+Report (why are you reporting)	ReportWhy
+USE button	UseLabel
+Vitals (ability)	VitalsAbility
+Protect (ability)	ProtectAbility
+Shift (ability)	ShapeshiftAbility
+Unshift (ability)	ShapeshiftAbilityUndo
+Vanish (ability)	PhantomAbility
+Appear (ability)	PhantomAbilityUndo
+Track (ability)	TrackerAbility
+Interrogate (ability)	DetectiveAbility
+Notes (Detective)	DetectiveAbilityNotes
+Acid (ability)	ViperAbility
+Overrule (quick chat)	QCJudgeOverrule
+Judge ability unlocked	JudgeAbilityUnlocked
+# --- body / meeting / vote / eject ---
+DEAD BODY REPORTED	BodyReported
+EMERGENCY MEETING	EmergencyMeeting
+Emergency requested	EmergencyRequested
+DEAD label	DeadLabel
+Has been killed	HasBeenKilled
+Who is the Impostor?	MeetingWhoIsTitle
+Voting ends in	MeetingVotingEnds
+Voting results	MeetingVotingResults
+Has voted	MeetingHasVoted
+SKIP VOTE	SkipVoteLabel
+SKIPPED VOTING	SkippedVoting
+Ejected: was The Impostor	ExileTextSP
+Ejected: was not The Impostor	ExileTextSN
+Ejected: was An Impostor	ExileTextPP
+Ejected: was not An Impostor	ExileTextPN
+Ejected (no confirm)	ExileTextNonConfirm
+No one ejected (skip)	NoExileSkip
+No one ejected (tie)	NoExileTie
+# --- tasks / ghosts ---
+Tasks	Tasks
+Task complete	TaskComplete
+All tasks complete	AllTasksComplete
+Fake tasks	FakeTasks
+Total tasks completed	TotalTasksCompleted
+Impostor task line	ImpostorTask
+Ghost: do tasks	GhostDoTasks
+Ghost: ignore tasks	GhostIgnoreTasks
+Ghost impostor	GhostImpostor
+# --- game end ---
+Victory	Victory
+Defeat	Defeat
+Most crewmates disconnected	CrewmatesDisconnected
+Impostor disconnected	ImpostorDisconnected
+Play again	PlayAgain
+Quit	QuitLabel
+# --- lobby / host / room ---
+Lobby	LobbyLabel
+Player	PlayerName
+Players	MatchInfoGuidePlayersLabel
+Host (header)	HostHeader
+Host: (noun label)	HostNounLabel
+Host (noun, player list)	HostNounEmpty
+Waiting for host	WaitingForHost
+Room code (label)	RoomCodeLabel
+Code (short)	RoomCode
+Room code copied	RoomCodeCopied
+Enter code	EnterCode
+Public	PublicHeader
+Private	PrivateHeader
+START	StartLabel
+Starting in	GameStarting
+Kick	KickButton
+Ban	BanButton
+X was kicked by Y	PlayerWasKickedBy
+X was banned by Y	PlayerWasBannedBy
+You were kicked	ErrorKicked
+You were banned	ErrorBanned
+X left the game	UserLeftGame
+Leave game	LeaveGame
+You disconnected	ErrorDisconnectPacket
+Wrong version	UserVersionError
+# --- chat / friends ---
+Chat	ChatLabel
+Quick Chat	QuickChat
+Free Chat	FreeOrQuickChat
+Quick Chat only	QuickChatOnly
+Free Chat only	FreeChatOnly
+Chat rate limit	ChatRateLimit
+Censor chat	SettingsCensorChat
+Friend Code	FriendCodeLabel
+Friends list	FriendList
+Add friend	AddFriend
+# --- settings used in lobbies ---
+Game settings	GameSettingsLabel
+Role settings	RoleSettingsLabel
+Map	GameMapName
+Max players	MatchMaxPlayers
+No. of Impostors	GameNumImpostors
+No. of emergency meetings	GameNumMeetings
+Emergency cooldown	GameEmergencyCooldown
+Discussion time	GameDiscussTime
+Voting time	GameVotingTime
+Anonymous votes	GameAnonymousVotes
+Confirm ejects	GameConfirmImpostor
+Player speed	GamePlayerSpeed
+Crewmate vision	GameCrewLight
+Impostor vision	GameImpostorLight
+Kill cooldown	GameKillCooldown
+Kill distance	GameKillDistance
+Task bar updates	GameTaskBarMode
+Visual tasks	GameVisualTasks
+No. of common tasks	GameCommonTasks
+No. of long tasks	GameLongTasks
+No. of short tasks	GameShortTasks
+Meetings (category)	MeetingsCategory
+Tasks (category)	TasksCategory
+Role count header	NumberRoleHeader
+Role chance header	ChanceRoleHeader
+Vitals display cooldown	ScientistCooldown
+Battery duration	ScientistBatteryCharge
+Vent use cooldown	EngineerCooldown
+Max time in vents	EngineerInVentCooldown
+Protect cooldown	GuardianAngelCooldown
+Protection duration	GuardianAngelDuration
+Protect visible to Impostors	GuardianAngelImpostorSeeProtect
+Shapeshift cooldown	ShapeshifterCooldown
+Shapeshift duration	ShapeshifterDuration
+Leave shapeshifting evidence	ShapeshifterLeaveSkin
+Impostors get alert	NoisemakerImpostorAlert
+Alert duration	NoisemakerAlertDuration
+Vanish cooldown	PhantomCooldown
+Vanish duration	PhantomDuration
+Tracking cooldown	TrackerCooldown
+Tracking duration	TrackerDuration
+Tracking delay	TrackerDelay
+Suspects per case	DetectiveSuspectLimit
+Dissolve time	ViperDissolveTime
+Judge task unlock %	JudgeTaskRequirement
+Classic mode	GameTypeClassic
+Hide n Seek mode	GameTypeHideAndSeek
+# --- maps / sabotage systems ---
+The Skeld	MapNameSkeld
+Mira HQ	MapNameMira
+Polus	MapNamePolus
+Airship	MapNameAirship
+Fungle	MapNameFungle
+Reactor meltdown	ResetReactorName
+Oxygen depleted	RestoreOxyName
+Lights	FixLightsName
+Comms sabotaged	FixComms
+Doors	DoorsName
+Admin	Admin
+Admin map	AdminMapSystem
+Vitals monitor	VitalsSystem
+Security	Security
+Security cams	SecurityCamsSystem
+Security logs	SecurityLogsSystem
+Vitals	VitalsLabel

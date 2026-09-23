@@ -12,12 +12,13 @@ namespace PocketRoles.Chat
 {
     /// <summary>
     /// Chat command grammar: "/cmd &lt;command&gt; …" or "/&lt;command&gt; …".
-    /// Everyone: h|help [host], n|now|me, r|role|roles [name], s|settings (the settings summary, ≤ 4 messages), l|last, lang, time.
+    /// Everyone: h|help [host], n|now|me, r|role|roles [name], s|settings (the settings summary, ≤ 4 messages), l|last, lang, time,
+    /// id|myid (v0.5.5: the code that erases the sender's records; answered even when commands are gated).
     /// Host only: set &lt;role&gt; &lt;count&gt; [chance], opt &lt;key&gt; &lt;value&gt;, show, reset, reload, mod on|off,
     /// welcome &lt;text&gt;|show|reset|settings on|off, test on|off, assign &lt;name|id&gt; &lt;role&gt;|clear|show, end,
     /// rehost on|off, public on|off|now, start, cancel, autostart on|off|&lt;N&gt;, haison, endmeeting, results, region,
     /// rules &lt;text&gt;|none|show, cos ids|reload|music &lt;mode&gt;, admin add|remove|list|reload, diag [on|off] (v0.4c / v0.4e).
-    /// Guide room (v0.4e, host only): code [on|off] (big room-code overlay), announce|guide (copy "役職部屋 CODE" to the
+    /// Guide room (v0.4e, host only): code [on|off] (big room-code overlay), announce|guide (copy "追加役職部屋 CODE" to the
     /// clipboard + the sub-phone guide-room steps), move|migrate [CODE]|cancel (tell an unregistered 便利ホスト lobby where
     /// the role lobby is; with [Guide] AutoRecreateRegistered re-create this lobby as registered after 30 s).
     /// Permissions (v0.4b, Core.Permissions): mod|vip add|remove|list, kick &lt;name&gt;, ban &lt;name&gt;|list|remove &lt;code&gt;,
@@ -38,8 +39,29 @@ namespace PocketRoles.Chat
         private const int SummaryMessages = 8;
         /// <summary>Minimum seconds between two commands from the same non-host player (anti-spam).</summary>
         private const float PlayerCooldown = 2f;
+        /// <summary>
+        /// v0.5.5 (§5.5): minimum seconds between two answers to the same player for a command that reads the RUNNING
+        /// game (<see cref="RoleCmdCore.ReadsRunningGameState"/>: /cmd n), on top of <see cref="PlayerCooldown"/>.
+        /// The reply is up to <see cref="RoleReplyMessages"/> chat messages, so a modded client asking every 2 s could
+        /// otherwise keep the host's chat queue busy for the whole round.
+        /// </summary>
+        private const float RoleAskCooldown = 10f;
 
         private static readonly Dictionary<byte, float> LastCommandAt = new Dictionary<byte, float>();
+
+        /// <summary>One /cmd n answer per player per <see cref="RoleAskCooldown"/> s (the rest silently dropped).</summary>
+        private static readonly RoleCmdCore.AskLimiter RoleAsk = new RoleCmdCore.AskLimiter(RoleAskCooldown);
+
+        /// <summary>
+        /// A game started or ended (Game.Reset / Game.ResetForNewLobby, next to Chat.ClearLastRoleInfo): the /cmd n
+        /// limiter starts over with the cached role texts. Review 2026-09-23: without this a player who typed
+        /// "/cmd n" in the lobby seconds before the start ("available once the game has started") had their first
+        /// real /cmd n of the game silently dropped.
+        /// </summary>
+        internal static void ClearRoleAskLimiter()
+        {
+            RoleAsk.Clear();
+        }
 
         /// <summary>Players (ids, per lobby) that already received the "commands are disabled" notice.</summary>
         private static readonly HashSet<byte> GatedNoticeSent = new HashSet<byte>();
@@ -49,6 +71,123 @@ namespace PocketRoles.Chat
         {
             LastCommandAt.Clear();
             GatedNoticeSent.Clear();
+            IdAskedAt.Clear();
+            RoleAsk.Clear();
+            _nextCompatIdAt = 0f;
+            _compatIdPending = 0;
+        }
+
+        // ------------------------------------------------------------------ v0.5.5 /id (the erase code)
+
+        /// <summary>/id per player (by erase code, else client id): one answer per <see cref="IdCooldown"/> s, the rest silent.</summary>
+        private static readonly Dictionary<string, float> IdAskedAt = new Dictionary<string, float>(StringComparer.Ordinal);
+        private const float IdCooldown = 60f;
+        /// <summary>Unregistered lobby: the one slow public /id channel (<see cref="AegisPrivacyCore.PlanIdAnswer"/>: one answer per 15 s, up to 4 waiting; a restricted joiner first).</summary>
+        private static float _nextCompatIdAt;
+        private static int _compatIdPending;
+
+        /// <summary>
+        /// /id, /myid (v0.5.5): the sender's erase code (AegisPrivacyCore: from the PUID only), privately in a registered
+        /// lobby, "name: …" publicly in an unregistered one (the only way there), on the host's screen for the host. The code
+        /// is never logged.
+        /// </summary>
+        private static void IdReply(PlayerControl sender, bool isHost)
+        {
+            string puid = null;
+            try { if (sender.Data != null) puid = sender.Data.Puid; } catch (Exception) { }
+            string code = AegisBans.EraseCodeOf(puid);
+            int clientId = sender.OwnerId;
+            float now = Time.time;
+            bool compat = !isHost && Registration.CompatMode;
+            // v0.5.5 (owner 2026-09-22 「他の部屋って言うけどおとなしくやらなくない？見つけるかもわからないし」): a restricted joiner
+            // waiting for their removal in an unregistered lobby is answered like anyone (publicly "name: …", the same text, no
+            // word of the restriction): once per wait, first in line (never dropped, not silenced by the 60 s per code), and the
+            // removal waits for the answer (AegisBans.HoldForIdAnswer; at most AegisPrivacyCore.IdHoldMax s longer). A registered
+            // lobby is unchanged (the code went to them privately with the notice; a private answer is never queued).
+            var waiting = compat ? AegisBans.TakeWaiterId(clientId) : AegisBans.WaiterId.None;
+            if (waiting == AegisBans.WaiterId.Silent)
+            {
+                PocketRolesPlugin.Logger.LogInfo($"Commands: /id of #{sender.PlayerId} (client {clientId}) not answered (a restricted joiner already answered in this wait, or being removed now)");
+                return;
+            }
+            bool waiter = waiting == AegisBans.WaiterId.Answer;
+            if (!isHost)
+            {
+                string key = code.Length > 0 ? code : "c" + clientId;
+                if (!waiter && IdAskedAt.TryGetValue(key, out var last) && now - last < IdCooldown) return;   // silent: once a minute
+                IdAskedAt[key] = now;
+            }
+            // v0.5.5 central unban: the same code erases records and identifies an appeal (worded neutrally: in an unregistered
+            // lobby every answer is public, and asking for it must not read as "I was banned")
+            string text = code.Length > 0
+                ? TF3("cmd.id.reply", "あなたのコード: {0}。記録の削除や問い合わせの時は、これを作者へ（PocketRoles で検索）", "Your code: {0} - for the author (search PocketRoles)", "你的代码: {0}。删除记录或咨询时，请把它发给作者（在 GitHub 搜索 PocketRoles）", AegisPrivacyCore.ShowEraseCode(code))
+                : Lang.T("cmd.id.none", "コードを出せませんでした（オンラインの部屋でだけ使えます）", "No code here (online rooms only)", "无法显示代码（仅限在线房间）");
+            if (compat)
+            {
+                float at = AegisPrivacyCore.PlanIdAnswer(now, true, waiter, ref _nextCompatIdAt, ref _compatIdPending);
+                if (at < 0f)
+                {
+                    PocketRolesPlugin.Logger.LogInfo($"Commands: /id of #{sender.PlayerId} (client {clientId}) dropped ({AegisPrivacyCore.IdAnswerQueue} answers already waiting)");
+                    return;
+                }
+                if (at > now)
+                {
+                    byte pid = sender.PlayerId;
+                    Scheduler.After(at - now, () =>
+                    {
+                        _compatIdPending = Math.Max(0, _compatIdPending - 1);
+                        var pc = Core.Game.Player(pid);
+                        if (pc == null || pc.OwnerId != clientId || pc.Data == null || pc.Data.Disconnected) return;   // left meanwhile: never someone else's
+                        PocketRolesPlugin.Logger.LogInfo($"Commands: /id answered for #{pid} (client {clientId}){(code.Length == 0 ? " (no PUID)" : "")}");
+                        Reply(pc, text);
+                    });
+                    return;
+                }
+            }
+            if (waiter)
+            {
+                // review 2026-09-22: first on the public channel too (translations, other replies and notices already waiting
+                // there move back one message), so a busy room cannot hold the answer past the removal; sent only while they
+                // are still here and not being removed (never to a room they have left), logged and on their evidence trail
+                // only once it really left (AegisBans.IdAnswerSent); the removal waits until it has been out
+                // AegisPrivacyCore.IdReadSeconds s (at most IdHoldMax s past the 30 s)
+                float outAt = ReplyFirst(sender, text, () => AegisBans.IdAnswerSent(clientId));
+                if (outAt < 0f)
+                {
+                    PocketRolesPlugin.Logger.LogInfo($"Commands: /id of #{sender.PlayerId} (client {clientId}) not answered (a restricted joiner who is leaving)");
+                    return;
+                }
+                PocketRolesPlugin.Logger.LogInfo($"Commands: /id of #{sender.PlayerId} (client {clientId}){(code.Length == 0 ? " (no PUID)" : "")}: a restricted joiner, answered first in line (leaves in {Math.Max(0f, outAt - now):0.0} s)");
+                AegisBans.HoldForIdAnswer(clientId, AegisPrivacyCore.IdAnswerHold(true, outAt));
+                return;
+            }
+            PocketRolesPlugin.Logger.LogInfo($"Commands: /id answered for #{sender.PlayerId} (client {clientId}){(code.Length == 0 ? " (no PUID)" : "")}");
+            Reply(sender, text);
+        }
+
+        /// <summary>
+        /// v0.5.5 (owner 2026-09-22): a restricted joiner's /id answer in an unregistered lobby: the same public "name: …" as
+        /// <see cref="Reply(PlayerControl,string)"/>, but in front of the public channel (Chat.SendPublicFirst), and only while
+        /// they are still here and not being removed. Returns when it leaves (Time.time), -1 when it was not queued.
+        /// </summary>
+        private static float ReplyFirst(PlayerControl sender, string text, Action sent)
+        {
+            if (sender == null || string.IsNullOrEmpty(text) || sender.AmOwner || !Registration.CompatMode) return -1f;
+            if (sender.Data == null || sender.Data.Disconnected) return -1f;
+            var chunks = Chat.Split(Chat.AtName(sender.PlayerId) + text);   // the prefix before the split, as Reply does
+            if (chunks.Count == 0) return -1f;
+            if (chunks.Count > MaxReplyMessages)
+            {
+                chunks.RemoveRange(MaxReplyMessages, chunks.Count - MaxReplyMessages);
+                chunks[MaxReplyMessages - 1] = Chat.Truncated(chunks[MaxReplyMessages - 1]);
+            }
+            byte pid = sender.PlayerId;
+            int clientId = sender.OwnerId;
+            return Chat.SendPublicFirst(Chat.Title, chunks, () =>
+            {
+                var pc = Core.Game.Player(pid);
+                return pc != null && pc.OwnerId == clientId && pc.Data != null && !pc.Data.Disconnected && !AegisBans.BeingRemoved(clientId);
+            }, sent);
         }
 
         /// <summary>Returns true when the text was a command and has been handled (the message must not be shown/sent).</summary>
@@ -89,6 +228,10 @@ namespace PocketRoles.Chat
                 // text containing full-width digits still matches as typed. `body` stays as is for the welcome/rules text.
                 for (int i = 0; i < tokens.Length; i++) tokens[i] = HalfWidthNumber(tokens[i]);
                 string cmd = tokens.Length > 0 ? tokens[0].ToLowerInvariant() : null;
+
+                // v0.5.5 privacy: /id answers everyone whatever [Chat] PlayerCommands / AllCommands say (a player must always be
+                // able to get the code that erases their records); arguments are ignored, it never shows another player's code
+                if (cmd == "id" || cmd == "myid") { IdReply(sender, isHost); return true; }
 
                 // ---- command gating (v0.4 §A3). Decided before any reply so a disabled command never answers.
                 if (!Options.AllCommands)
@@ -131,7 +274,7 @@ namespace PocketRoles.Chat
                         ReplyThrottled(sender, isHost, HelpText(isHost, level, hostCmds), HelpMessages);
                         return true;
                     case "n": case "now": case "me": case "役職":
-                        ReplyThrottled(sender, isHost, MyRoleText(sender), RoleReplyMessages);
+                        ReplyRole(sender, isHost, cmd);
                         return true;
                     case "r": case "role": case "roles":
                         ReplyThrottled(sender, isHost, arg1 == null ? RoleListText() : RoleDescText(JoinArgs(tokens, 1)), RoleReplyMessages);
@@ -143,9 +286,9 @@ namespace PocketRoles.Chat
                         if (!isHost && Registration.CompatMode)
                         {
                             ReplyThrottled(sender, isHost, Lang.T("cmd.show.compat.player",
-                                "この部屋は役職なしのふつうのAmong Usです。ルールは部屋の設定画面のとおりです。/cmd time で残り時間が見られます。",
-                                "Normal Among Us, no roles. Rules = lobby settings. /cmd time: time left",
-                                "本房间是没有职业的普通 Among Us。规则即大厅设置。/cmd time 查看剩余时间。"));
+                                "MODの追加役職なしのふつうのAmong Usです。本来の役職もルールも部屋の設定画面のとおり。/cmd time で残り時間が見られます。",
+                                "Roles and rules = lobby settings (no mod roles). /cmd time: time left",
+                                "本房间是普通的Among Us：原版职业和规则以大厅设置为准，没有模组追加职业。/cmd time 查看剩余时间。"));
                             return true;
                         }
                         ReplyThrottled(sender, isHost, ShowText(), SettingsMessages);
@@ -218,9 +361,10 @@ namespace PocketRoles.Chat
                         Reply(sender, ToggleMod(arg1));
                         return true;
                     case "kick": Reply(sender, KickCommand(sender, JoinArgs(tokens, 1), false)); return true;
-                    case "ac": case "anticheat": case "aegis": Reply(sender, Net.CheatDetector.Command(tokens), 8); return true;   // v0.5.3 cheat detection
+                    case "ac": case "anticheat": case "aegis": Reply(sender, Net.CheatDetector.Command(tokens), arg1 != null && arg1.ToLowerInvariant() == "bans" ? Net.AegisBans.ListMessages : 8); return true;   // v0.5.3 cheat detection (v0.5.5: a page of /aegis bans needs more)
+                    case "ng": Reply(sender, NgWords.Command(sender, tokens, body), 8); return true;   // v0.5.5 NG words
                     case "ban": HandleBan(sender, arg1, JoinArgs(tokens, 1), JoinArgs(tokens, 2)); return true;
-                    case "unban": Reply(sender, UnbanText(JoinArgs(tokens, 1))); return true;
+                    case "unban": Reply(sender, UnbanText(sender, JoinArgs(tokens, 1))); return true;
                     case "vset": Reply(sender, VanillaSet(arg1, JoinArgs(tokens, 2))); return true;
                     case "set": Reply(sender, SetRole(arg1, arg2, arg3)); return true;
                     case "opt":
@@ -312,7 +456,7 @@ namespace PocketRoles.Chat
             }
             catch (Exception e)
             {
-                PocketRolesPlugin.Logger.LogError($"Commands.Handle('{text}'): {e}");
+                PocketRolesPlugin.Logger.LogError($"Commands.Handle('{Permissions.LogText(text)}'): {e}");   // v0.5.5: no PUID / friend code the host typed
                 return false;
             }
         }
@@ -332,6 +476,7 @@ namespace PocketRoles.Chat
                 case "admin": case "admins": case "moderator": case "moderators": case "vip": case "vips":
                 case "kick": case "ban": case "unban": case "vset":
                 case "ac": case "anticheat": case "aegis":
+                case "ng":
                 case "code": case "コード": case "announce": case "guide": case "案内": case "move": case "migrate": case "移動":
                 case "backup": case "restore": case "復元":
                 case "who": case "生存":
@@ -355,6 +500,7 @@ namespace PocketRoles.Chat
                 case "time": case "timer": case "時間":
                 case "about": case "info": case "説明": case "关于":
                 case "guess": case "g": case "推理":
+                case "id": case "myid":   // v0.5.5 (answered before the gating, see HandleInScope)
                     return true;
                 default:
                     return false;
@@ -378,6 +524,9 @@ namespace PocketRoles.Chat
                     return Options.AdminLobbyControl; // v0.4.4: lobby control / vanilla settings only with [Permissions] AdminLobbyControl
                 case "mod":
                     return IsListVerb(arg1); // "/mod add|remove|list", never "/mod on|off"
+                case "ng":
+                    // v0.5.5: a moderation list like /ban; switching the filter on / off stays with the host (like /opt ng)
+                    return !(arg1 != null && TryParseOnOff(arg1, out _));
                 default:
                     return false;
             }
@@ -619,7 +768,7 @@ namespace PocketRoles.Chat
             var sb = new StringBuilder();
             if (Registration.CompatMode && !isHost)
             {
-                // Unregistered (compat) lobby, player view: no roles here and every reply is public — two short lines
+                // Unregistered (compat) lobby, player view: no mod roles here (the game's own roles as set) and every reply is public — two short lines
                 // in plain words (2026-09-13: "コマンド", "ja|zh|en" and the like read as jargon to a public lobby).
                 sb.Append(Lang.T("help.compat.1",
                     "チャットで打てるもの: /cmd time（部屋の残り時間） /cmd s（この部屋の設定） /cmd l（前の試合の結果） /cmd about（MODの説明）",
@@ -627,9 +776,11 @@ namespace PocketRoles.Chat
                     "可以输入: /cmd time（房间剩余时间） /cmd s（本房间设置） /cmd l（上局结果） /cmd about（MOD说明）"));
                 sb.Append('\n');
                 sb.Append(Lang.T("help.compat.2",
-                    "この部屋は役職なしのふつうのAmong Usです。返事はみんなに見えます",
-                    "This is normal Among Us (no roles). Replies are visible to everyone",
-                    "本房间是没有职业的普通 Among Us。回复所有人可见"));
+                    "この部屋はふつうのAmong Usです。本来の役職は部屋の設定どおり、MODの追加役職はなし。返事はみんなに見えます",
+                    "Usual roles as set, no mod roles. Replies are public",
+                    "本房间是普通的Among Us：原版职业按房间设置，没有模组追加职业。回复所有人可见"));
+                sb.Append('\n');
+                sb.Append(Lang.T("help.compat.id", "/cmd id（記録を消すためのコード）", "/cmd id: code to erase your records", "/cmd id（删除记录用的代码）"));   // v0.5.5
                 if (Chat.TranslationActive && Options.TranslateBroadcastToAll)
                 {
                     sb.Append('\n');
@@ -650,6 +801,8 @@ namespace PocketRoles.Chat
                 "\"/cmd ...\" reaches only the host in a registered lobby; a plain \"/n\" is visible to everyone."));
             sb.Append('\n');
             sb.Append(Lang.T("help.time", "/cmd time ロビーの残り時間, /cmd s この部屋の設定", "/cmd time = lobby time left, /cmd s = current settings", "/cmd time 房间剩余时间，/cmd s 本房间的设置"));
+            sb.Append('\n');
+            sb.Append(Lang.T("help.id", "/cmd id 記録を消すためのコード", "/cmd id = code to erase your records", "/cmd id 删除记录用的代码"));   // v0.5.5
             sb.Append('\n');
             sb.Append(Lang.TF("help.lang", "案内の言語: {0}（English は /lang en、中文は /lang zh、日本語は /lang ja）", "Language: {0} (/lang en, 中文 /lang zh, 日本語 /lang ja)", Lang.DisplayName(Lang.Current)));
             // v0.4b §K: the translation note shares the /lang line (EN needs 5 messages with it, see HelpMessages) —
@@ -676,13 +829,13 @@ namespace PocketRoles.Chat
             else if (!Lang.IsEn)
             {
                 sb.Append('\n');
-                sb.Append("EN: h=help, n=my role, r [role]=role info, s=settings, l=last game, lang en=English.");
+                sb.Append("EN: h=help, n=my role, r [role]=role info, s=settings, l=last game, id=erase code, lang en=English.");
             }
             return sb.ToString();
         }
 
         /// <summary>Messages allowed for the host help page (8 lines ≤ 100 chars; host screen or a remote admin).</summary>
-        private const int HostHelpMessages = 15;   // 10 lines; four English lines split into two messages each = 14
+        private const int HostHelpMessages = 19;   // 12 lines (v0.5.5 /ng, /aegis); up to six English lines split into two messages each = 18
 
         /// <summary>
         /// Messages allowed for the settings summary a player asks for with /cmd s (one short line per enabled role
@@ -718,15 +871,25 @@ namespace PocketRoles.Chat
                 "権限: /admin|/mod|/vip add|remove|list <名前>, /kick <名前>, /ban <名前>|list|remove <コード>, /vset <キー> <値>",
                 "Perms: /admin|/mod|/vip add|remove|list <name>, /kick <name>, /ban <name>|list|remove <code>, /vset"));
             sb.Append('\n');
+            sb.Append(Lang.T("help.host.ng",
+                "NGワード: /ng 状態, /ng add|del <言葉>, /ng list 自分の一覧, /ng list all [ページ] 全部, /ng test <文> 試す, /ng on|off",
+                "NG words: /ng (state), /ng add|del <word>, /ng list [all [page]], /ng test <text>, /ng on|off",
+                "违禁词: /ng 状态, /ng add|del <词>, /ng list 自己的词表, /ng list all [页码] 全部, /ng test <文字> 测试, /ng on|off"));
+            sb.Append('\n');
+            sb.Append(Lang.T("help.host.aegis",
+                "Aegis: /ac 記録, /aegis bans BAN一覧, /aegis ban <名前|#番号> [日数], /aegis unban <名前|#n|AEG-番号>, /aegis report <名前|#番号> [cheat|chat|harass|name] 公式に通報",
+                "Aegis: /ac (records), /aegis bans, /aegis ban <name|#id> [days], /aegis unban <name|#n|AEG-id>, /aegis report <name|#id> [cheat|chat|harass|name]",
+                "Aegis: /ac 记录, /aegis bans 限制进入名单, /aegis ban <名字|#编号> [天数], /aegis unban <名字|#序号|AEG-编号>, /aegis report <名字|#编号> [cheat|chat|harass|name] 向官方举报"));
+            sb.Append('\n');
             sb.Append(Lang.T("help.host.7",
                 "診断: /diag 開始処理・画面の状態をチャットとログに出力（画面が真っ暗な時など）。F7 は 2 回押しで廃村",
                 "Diag: /diag prints the start / screen state to chat and the log (e.g. on a black screen). F7 twice = haison",
-                "诊断: /diag 将开局与画面状态输出到聊天和日志（例如黑屏时）。按两次 F7 = 废村"));
+                "诊断: /diag 将开局与画面状态输出到聊天和日志（例如黑屏时）。按两次 F7 = 废局"));
             sb.Append('\n');
             sb.Append(Lang.T("help.host.me",
                 "次の試合の役: /next impostor | crew | auto | <本体の役職名> で自分、/next <名前|#番号> impostor | crew | auto で他の人（テストモード不要、登録オフでも可。設定タブ「ホスト」のボタンでも）",
                 "Next game: /next impostor | crew | auto | <vanilla role> for yourself, /next <name|#id> impostor | crew | auto for another player (no test mode, unregistered lobby OK; ホスト page buttons too)",
-                "下一局的职业: /next impostor | crew | auto | <原版职业名> 指定自己，/next <名字|#编号> impostor | crew | auto 指定别人（无需测试模式，未注册房间也可；设置页“主持”的按钮亦可）"));
+                "下一局的职业: /next impostor | crew | auto | <原版职业名> 指定自己，/next <名字|#编号> impostor | crew | auto 指定别人（无需测试模式，未注册房间也可；设置页“房主”的按钮亦可）"));
             sb.Append('\n');
             sb.Append(Lang.T("help.host.9",
                 "観戦: 死亡後は全員の役職一覧が自分の画面だけに出ます（会議ごとに再表示）。/who で再表示、/opt ghostlist off で停止",
@@ -734,9 +897,9 @@ namespace PocketRoles.Chat
                 "观战: 你死亡后，所有玩家的职业只显示在你的屏幕上（每次会议再显示）。/who 再次查看，/opt ghostlist off 关闭"));
             sb.Append('\n');
             sb.Append(Lang.T("help.host.8",
-                "案内: /code コードの大表示, /announce 案内部屋の手順＋コードをコピー, /move [コード]|cancel 役職部屋へ案内, /diag on|off",
+                "案内: /code コード大表示, /announce 案内部屋の手順＋コードをコピー, /move [コード]|cancel 追加役職部屋へ案内, /diag on|off",
                 "Guide: /code (big code overlay), /announce (guide-room steps + copy code), /move [code]|cancel, /diag on|off",
-                "引导: /code 大字显示代码, /announce 引导房步骤＋复制代码, /move [代码]|cancel 引导到职业房, /diag on|off"));
+                "引导: /code 大字显示代码, /announce 引导房步骤＋复制代码, /move [代码]|cancel 引导到模组职业房, /diag on|off"));
             return sb.ToString();
         }
 
@@ -771,16 +934,19 @@ namespace PocketRoles.Chat
         private static string AboutText()
         {
             if (Registration.CompatMode)
-                return Lang.T("about.compat.1", "この部屋(役職なし)でMODがしていること: 入室時の挨拶と案内, チャットの自動翻訳(外国語の人がいる時はその人の言葉にも), 試合後の結果一覧(途中で抜けた人も含む), 部屋の時間切れ防止, Aegisアンチチート(ありえない操作をした人はすぐ退出)", "What the mod does in this room (no roles): welcome and guide lines, chat auto-translation (into a foreign player's language too), the post-game result list (leavers included), keeping the room from timing out, Aegis anti-cheat (players doing impossible things are removed at once)", "本房间(无职业)里MOD做的事: 入房问候和指引, 聊天自动翻译(有外语玩家时也翻译成其语言), 赛后结果一览(包括中途退出的人), 防止房间超时, Aegis反作弊(做出不可能操作的玩家会被立即移出)")
-                       + "\n" + Lang.T("about.compat.2", "ゲームの中身は普通のAmong Usで, 役職や特殊ルールはありません", "The game itself is normal Among Us: no roles, no special rules", "游戏本身就是普通的Among Us, 没有职业和特殊规则");
-            return Lang.T("about.roles", "PocketRoles: ホストだけが入れる役職MOD。参加者は何も入れずに遊べます。Aegisアンチチートを導入しています。役職の一覧は /cmd r、自分の役職は /cmd n", "PocketRoles: a host-only role mod; players install nothing; Aegis anti-cheat running. /cmd r lists the roles, /cmd n shows yours", "PocketRoles: 只需主持安装的职业MOD，玩家无需安装，已启用Aegis反作弊。/cmd r 查看职业列表，/cmd n 查看自己的职业");
+                // v0.5.5: chat translation is off unless the host turned it on, so the list only names it while it runs.
+                return (Chat.TranslationActive
+                        ? Lang.T("about.compat.1", "この部屋(MODの追加役職なし)でMODがしていること: 入室時の挨拶と案内, チャットの自動翻訳(外国語の人がいる時はその人の言葉にも), 試合後の結果一覧(途中で抜けた人も含む), 部屋の時間切れ防止, Aegisアンチチート(ありえない操作をした人はすぐ退出)", "What the mod does in this room (no mod roles): welcome and guide lines, chat auto-translation (into a foreign player's language too), the post-game result list (leavers included), keeping the room from timing out, Aegis anti-cheat (players doing impossible things are removed at once)", "本房间(无模组追加职业)里模组做的事: 入房问候和指引, 聊天自动翻译(有外语玩家时也翻译成其语言), 赛后结果一览(包括中途退出的人), 防止房间超时, Aegis反作弊(做出不可能操作的玩家会被立即移出)")
+                        : Lang.T("about.compat.1.notr", "この部屋(MODの追加役職なし)でMODがしていること: 入室時の挨拶と案内, 試合後の結果一覧(途中で抜けた人も含む), 部屋の時間切れ防止, Aegisアンチチート(ありえない操作をした人はすぐ退出)。チャットの翻訳はしていません", "What the mod does in this room (no mod roles): welcome and guide lines, the post-game result list (leavers included), keeping the room from timing out, Aegis anti-cheat (players doing impossible things are removed at once). Chat is not translated", "本房间(无模组追加职业)里模组做的事: 入房问候和指引, 赛后结果一览(包括中途退出的人), 防止房间超时, Aegis反作弊(做出不可能操作的玩家会被立即移出)。不翻译聊天"))
+                       + "\n" + Lang.T("about.compat.2", "ゲームの中身は普通のAmong Usで, 本来の役職は部屋の設定どおり, MODの追加役職や特殊ルールはありません", "The game itself is normal Among Us: usual roles as set, no mod roles or special rules", "游戏本身就是普通的Among Us, 原版职业按房间设置, 没有模组追加职业和特殊规则");
+            return Lang.T("about.roles", "PocketRoles: ホストだけが入れる役職MOD。参加者は何も入れずに遊べます。Aegisアンチチートを導入しています。役職の一覧は /cmd r、自分の役職は /cmd n", "PocketRoles: a host-only role mod; players install nothing; Aegis anti-cheat running. /cmd r lists the roles, /cmd n shows yours", "PocketRoles: 只需房主安装的职业MOD，玩家无需安装，已启用Aegis反作弊。/cmd r 查看职业列表，/cmd n 查看自己的职业");
         }
 
         private static string LangStateText(PlayerControl sender, bool isHost)
         {
             string mine = Lang.DisplayName(Lang.PlayerLang(sender.PlayerId));
             string s = Lang.TF("cmd.lang.state", "あなたの案内の言語: {0}（English は /lang en、中文は /lang zh、日本語は /lang ja）", "Your language: {0} (English: /lang en, 中文: /lang zh, 日本語: /lang ja)", mine);
-            if (isHost) s += "\n" + Lang.TF("cmd.lang.default", "部屋の既定言語: {0}  /lang default ja|zh|en で変更", "Lobby default: {0}  /lang default ja|zh|en to change", Lang.DisplayName(Lang.Default));
+            if (isHost) s += "\n" + Lang.TF("cmd.lang.default", "部屋の既定言語: {0}  /lang default auto|ja|zh|en で変更", "Lobby default: {0}  /lang default auto|ja|zh|en to change", Lang.DisplayName(Options.LanguageSetting));
             return s;
         }
 
@@ -789,10 +955,19 @@ namespace PocketRoles.Chat
         {
             if (string.IsNullOrEmpty(arg)) return null;
             string a = arg.ToLowerInvariant();
-            if (a == "reset" || a == "default")
+            if (a == "reset" || a == "default" || (!isHost && LangCore.IsAuto(a)))
             {
                 Lang.SetPlayerLang(sender.PlayerId, null);
                 return Lang.T("cmd.lang.reset", "言語を部屋の既定に戻しました。", "Language reset to the lobby default.");
+            }
+            if (isHost && LangCore.IsAuto(a))
+            {
+                // v0.5.5: back to following the game's language (the [General] Language default)
+                Options.Language = LangCore.Auto;
+                Lang.SetPlayerLang(sender.PlayerId, null);
+                PocketRolesPlugin.Logger.LogInfo("Commands: lang auto (host, lobby default follows the game: " + Options.Language + ")");
+                using (Lang.Scope(Options.Language))
+                    return Lang.TF("cmd.lang.set", "言語を {0} に設定しました。", "Language set to {0}.", Lang.DisplayName(LangCore.Auto));
             }
             if (!Lang.TryNormalize(a, out var code))
                 return Lang.T("cmd.lang.usage", "使い方: /lang en（英語） /lang zh（中国語） /lang ja（日本語）", "Usage: /lang en (English), /lang zh (Chinese), /lang ja (Japanese)");
@@ -817,8 +992,16 @@ namespace PocketRoles.Chat
         /// <summary>Host: /lang default &lt;lang&gt; sets the lobby default (Options.Language).</summary>
         private static string SetDefaultLang(string arg)
         {
+            if (!string.IsNullOrEmpty(arg) && LangCore.IsAuto(arg))
+            {
+                Options.Language = LangCore.Auto;   // v0.5.5: follow the game's language
+                Lang.SetPlayerLang(PlayerControl.LocalPlayer != null ? PlayerControl.LocalPlayer.PlayerId : (byte)255, null);
+                PocketRolesPlugin.Logger.LogInfo("Commands: lobby default lang auto (" + Options.Language + ")");
+                using (Lang.Scope(Options.Language))
+                    return Lang.TF("cmd.lang.default.set", "部屋の既定言語を {0} に設定しました（/lang で個別に変更可）。", "Lobby default language set to {0} (players can override with /lang).", Lang.DisplayName(LangCore.Auto));
+            }
             if (string.IsNullOrEmpty(arg) || !Lang.TryNormalize(arg, out var code))
-                return Lang.T("cmd.lang.default.usage", "使い方: /lang default ja|zh|en", "Usage: /lang default ja|zh|en");
+                return Lang.T("cmd.lang.default.usage", "使い方: /lang default auto|ja|zh|en", "Usage: /lang default auto|ja|zh|en");
             Options.Language = code;
             Lang.SetPlayerLang(PlayerControl.LocalPlayer != null ? PlayerControl.LocalPlayer.PlayerId : (byte)255, null);
             PocketRolesPlugin.Logger.LogInfo($"Commands: lobby default lang {code}");
@@ -826,17 +1009,80 @@ namespace PocketRoles.Chat
                 return Lang.TF("cmd.lang.default.set", "部屋の既定言語を {0} に設定しました（/lang で個別に変更可）。", "Lobby default language set to {0} (players can override with /lang).", Lang.DisplayName(code));
         }
 
-        private static string MyRoleText(PlayerControl sender)
+        /// <summary>
+        /// /cmd n, including both rate limits. The 2-second command cooldown decides first whether anything is sent
+        /// at all; only then does an answer really built from the running game spend the 10-second
+        /// <see cref="RoleAsk"/> slot (review 2026-09-23: spending it before the reply path swallowed the slot for a
+        /// reply the 2-second cooldown then dropped, and for the constant answers "the mod is off" / "no mod roles
+        /// here" / "available once the game has started", which read nothing at all).
+        /// </summary>
+        private static void ReplyRole(PlayerControl sender, bool isHost, string cmd)
         {
+            string text = MyRoleText(sender, out bool readsRunningGame);
+            if (!isHost)
+            {
+                if (!PassCooldown(sender.PlayerId)) return;   // handled silently (spam)
+                if (readsRunningGame && RoleCmdCore.ReadsRunningGameState(cmd)
+                    && !RoleAsk.Allow(sender.PlayerId, Time.time)) return;   // silently dropped, like a repeated /id
+            }
+            Reply(sender, text, RoleReplyMessages);
+        }
+
+        /// <summary>
+        /// /cmd n. v0.5.5 (design review §5.5): a LIVING player cannot open the chat outside a meeting in a vanilla
+        /// client, so a modded one must not learn the current state mid-round ("no Jackal is alive", "2 kills left").
+        /// During the round — the intro and the exile screen included — a living player gets the last role text the
+        /// host really sent it (game start, the latest meeting reminder, a Worshipper conversion) unchanged, and, when
+        /// nothing was sent yet, the description without any live line. The host's own screen, a dead player and a
+        /// meeting answer from the current state exactly as before; the lobby and the end screen answer "available
+        /// once the game has started" (Game.InProgress is false in both), exactly as before v0.5.5.
+        /// <paramref name="readsRunningGame"/> is false for the constant answers, which cost no rate-limit slot.
+        /// </summary>
+        private static string MyRoleText(PlayerControl sender, out bool readsRunningGame)
+        {
+            readsRunningGame = false;
             if (!Options.ModEnabled)
                 return Lang.T("cmd.modoff", "MODは現在オフです（バニラの試合）。", "The mod is currently off (vanilla game).");
             // Unregistered (便利ホスト) lobby: no custom roles at all (findings #21/#22).
             if (Registration.CompatMode)
-                return Lang.T("compat.norole", "この部屋は役職なしの普通のAmong Usです。そのまま遊んでください", "This lobby has no roles: it is normal Among Us, just play.", "本房间没有职业，就是普通的Among Us，直接玩即可。");
+                return Lang.T("compat.norole", "あなたの役職はAmong Usの画面の表示どおりです(この部屋はMODの追加役職なし)", "No mod roles here: your role is the one Among Us shows you.", "本房间没有模组追加职业，就是普通的Among Us。你的职业以游戏本身的显示为准。");
+            // The end screen lands here too: WinConditions sets Ending = true and InProgress = false in the same breath.
             if (!Core.Game.InProgress)
                 return Lang.T("cmd.nogame", "試合が始まってから使えます。", "Available once the game has started.");
-            string text = Chat.RoleInfoText(sender.PlayerId, false);
+            readsRunningGame = true;
+            byte id = sender.PlayerId;
+            string lastSent = Chat.LastRoleInfo(id);
+            var answer = RoleCmdCore.Decide(sender.AmOwner, Core.Game.IsAlive(id), InMeeting(), lastSent != null);
+            if (answer != RoleCmdCore.Answer.Live)
+            {
+                // Only a modded client can send this (the vanilla chat is closed for a living player during the round).
+                PocketRolesPlugin.Logger.LogInfo($"Commands: /cmd n of #{id} {Core.Game.NameOf(id)} answered with the {(answer == RoleCmdCore.Answer.LastSent ? "last role text sent" : "role description only")} (alive, outside a meeting)");
+                if (answer == RoleCmdCore.Answer.LastSent) return lastSent;
+            }
+            string text = Chat.RoleInfoText(id, false, answer == RoleCmdCore.Answer.Live);
             return text ?? Lang.T("cmd.norole", "あなたは通常の役職です。", "You have a regular role.");
+        }
+
+        /// <summary>
+        /// A meeting is really open (vote or result screen): everybody, living players included, can chat there.
+        /// <para>
+        /// The intro and the exile screen must count as "the round", where the chat is closed for the living too, and
+        /// the owner named both explicitly. Vanilla destroys the MeetingHud before the ExileController appears, but
+        /// the rest of the mod never relies on that (Kills, SerialKiller and CheatDetector all test the three
+        /// separately), so neither does this: a MeetingHud that lingered into the ejection would otherwise let a
+        /// Jackal Friends learn on the ejection screen that its Jackal was just voted out (review 2026-09-23).
+        /// </para>
+        /// </summary>
+        private static bool InMeeting()
+        {
+            try
+            {
+                if (MeetingHud.Instance == null) return false;
+                if (ExileController.Instance != null) return false;
+                if (IntroCutscene.Instance != null) return false;
+                return true;
+            }
+            catch (Exception) { return false; }
         }
 
         private static string RoleListText()
@@ -857,10 +1103,21 @@ namespace PocketRoles.Chat
             return string.Join(Lang.ListSep, names);
         }
 
+        /// <summary>
+        /// The reply to a role text Roles.TryParse did not know. v0.5.5: a vanilla role word (伪装者, インポスター, impostor …)
+        /// says so, instead of "unknown role" (and never names a mod role: RoleWords).
+        /// </summary>
+        private static string BadRole(string text)
+        {
+            if (RoleWords.IsVanilla(text))
+                return Lang.TF("cmd.badrole.vanilla", "「{0}」は本体の役職です（MOD の役職ではありません）。MOD の役職は /cmd r で一覧", "{0} is a vanilla role, not a mod role (/cmd r lists the mod roles)", text.Trim());
+            return Lang.TF("cmd.badrole", "役職が見つかりません: {0}（/cmd r で一覧）", "Unknown role: {0} (/cmd r lists them)", text);
+        }
+
         private static string RoleDescText(string name)
         {
             if (!Roles.TryParse(name, out var role) || role == CustomRole.None)
-                return Lang.TF("cmd.badrole", "役職が見つかりません: {0}（/cmd r で一覧）", "Unknown role: {0} (/cmd r lists them)", name);
+                return BadRole(name);
             var info = Roles.Info(role);
             string head = info.ColoredName + " [" + Roles.TeamName(info.Team) + "]";
             string line = head + Lang.T("roleinfo.sep", " — ", " - ") + info.Desc;
@@ -946,7 +1203,7 @@ namespace PocketRoles.Chat
             string usage = Lang.T("cmd.set.usage", "使い方: /set <役職> <人数> [確率%]  例: /set sheriff 1 50", "Usage: /set <role> <count> [chance%]  e.g. /set sheriff 1 50");
             if (string.IsNullOrEmpty(roleText) || string.IsNullOrEmpty(countText)) return usage;
             if (!Roles.TryParse(roleText, out var role) || role == CustomRole.None)
-                return Lang.TF("cmd.badrole", "役職が見つかりません: {0}（/cmd r で一覧）", "Unknown role: {0} (/cmd r lists them)", roleText);
+                return BadRole(roleText);
             if (!int.TryParse(countText, out var count)) return usage;
             Options.SetCount(role, count);
             if (!string.IsNullOrEmpty(chanceText))
@@ -1192,7 +1449,7 @@ namespace PocketRoles.Chat
                 || roleText == "なし" || roleText == "解除" || roleText == "无";
             CustomRole role = CustomRole.None;
             if (!clear && (!Roles.TryParse(roleText, out role) || role == CustomRole.None))
-                return Lang.TF("cmd.badrole", "役職が見つかりません: {0}（/cmd r で一覧）", "Unknown role: {0} (/cmd r lists them)", roleText);
+                return BadRole(roleText);
             bool ok = TestMode.TryAssign(who.ToString(), clear ? CustomRole.None : role, out var message);
             string s = message ?? "";
             if (ok && !clear)
@@ -1499,22 +1756,25 @@ namespace PocketRoles.Chat
             sb.Append('\n');
             if (string.IsNullOrWhiteSpace(table))
             {
-                sb.Append(Lang.T("cmd.region.notable", "応答時間はまだ計測していません（オンラインメニューを開いた時に計測します）。", "No latency measured yet (it is measured when the online menu opens)."));
+                sb.Append(Lang.T("cmd.region.notable", "応答時間はまだ計測していません（「部屋を作る」の画面を開いた時に計測します）。", "No latency measured yet (it is measured when the create-game screen opens)."));
             }
             else
             {
                 sb.Append(Lang.T("cmd.region.table", "応答時間（中央値）:", "Latency (median):")).Append('\n').Append(table.Trim());
             }
             sb.Append('\n');
-            sb.Append(Lang.TF("cmd.region.auto", "自動で最速の地域を選ぶ: {0}（/opt lobby.autoregion on|off。部屋を作る前にだけ切り替わります）",
-                "Auto lowest-ping region: {0} (/opt lobby.autoregion on|off; only applied before a lobby is created)", OnOff(Options.AutoRegion)));
+            sb.Append(Lang.TF("cmd.region.auto", "自動で最速の地域を選ぶ: {0}（/opt lobby.autoregion on|off。「部屋を作る」の画面を開いた時にだけ切り替わります）",
+                "Auto lowest-ping region: {0} (/opt lobby.autoregion on|off; only when the create-game screen opens)", OnOff(Options.AutoRegion)));
             return sb.ToString();
         }
 
         // ------------------------------------------------------------------ v0.4c: /diag
 
-        /// <summary>Messages allowed for the diagnostics page (host screen).</summary>
-        private const int DiagMessages = 10;
+        /// <summary>
+        /// Messages allowed for the diagnostics page (host screen; v0.5.5 review: +3 for the server / wireRTT lines, then +3
+        /// for the self-scan line and its first finding; more findings are cut here but stay in the log).
+        /// </summary>
+        private const int DiagMessages = 16;
 
         /// <summary>
         /// /diag: the start-trace module's snapshot of the game / screen state (<see cref="Game.Diagnostics.Describe"/>:
@@ -1613,7 +1873,7 @@ namespace PocketRoles.Chat
         private const int AnnounceMessages = 8;
 
         /// <summary>
-        /// /announce (alias /guide): copies "役職部屋 CODE" to the clipboard and prints the sub-phone guide-room steps.
+        /// /announce (alias /guide): copies "追加役職部屋 CODE" to the clipboard and prints the sub-phone guide-room steps.
         /// The code is this lobby's when it is registered, else [Guide] RoleRoomCode (the role lobby a 便利ホスト room
         /// points to), else this lobby's anyway.
         /// </summary>
@@ -1626,7 +1886,7 @@ namespace PocketRoles.Chat
             string code = registered ? here : (Options.RoleRoomCode.Length > 0 ? Options.RoleRoomCode : here);
             if (string.IsNullOrEmpty(code))
                 return Lang.T("cmd.announce.nocode", "部屋コードがまだ分かりません。", "The room code is not known yet.", "还不知道房间代码。");
-            string clip = TF3("guide.clip", "役職部屋 {0}", "Role room {0}", "职业房 {0}", code);
+            string clip = TF3("guide.clip", "追加役職部屋 {0}", "Mod-roles room {0}", "模组职业房 {0}", code);
             bool copied = CopyToClipboard(clip);
             PocketRolesPlugin.Logger.LogInfo($"Commands: /announce code {code} (registered={registered}, copied={copied})");
             var sb = new StringBuilder();
@@ -1637,8 +1897,8 @@ namespace PocketRoles.Chat
             {
                 sb.Append('\n');
                 sb.Append(Options.RoleRoomCode.Length > 0
-                    ? TF3("cmd.announce.compat", "この部屋は登録オフ（便利ホスト）です。案内するのは役職部屋 {0} のコードです（/move <コード> で変更）。", "This lobby is unregistered (便利ホスト); the announced code is the role lobby {0} (/move <code> changes it).", "本房间未注册（便利房）；引导的是职业房 {0} 的代码（/move <代码> 可更改）。", code)
-                    : Lang.T("cmd.announce.compat.self", "この部屋は登録オフ（便利ホスト）です。役職部屋のコードは /move <コード> で設定できます。", "This lobby is unregistered (便利ホスト); /move <code> sets the role lobby's code.", "本房间未注册（便利房）；用 /move <代码> 设置职业房代码。"));
+                    ? TF3("cmd.announce.compat", "この部屋は登録オフ（便利ホスト）です。案内するのは追加役職部屋 {0} のコードです（/move <コード> で変更）。", "This lobby is unregistered (便利ホスト); the announced code is the mod-roles lobby {0} (/move <code> changes it).", "本房间未注册（简易房）；引导的是模组职业房 {0} 的代码（/move <代码> 可更改）。", code)
+                    : Lang.T("cmd.announce.compat.self", "この部屋は登録オフ（便利ホスト）です。追加役職部屋のコードは /move <コード> で設定できます。", "This lobby is unregistered (便利ホスト); /move <code> sets the mod-roles lobby's code.", "本房间未注册（简易房）；用 /move <代码> 设置模组职业房代码。"));
             }
             sb.Append('\n');
             sb.Append(Lang.T("cmd.announce.head", "【案内部屋の作り方（サブスマホ）】", "[Guide room on the sub-phone]", "【引导房的做法（副手机）】"));
@@ -1647,9 +1907,9 @@ namespace PocketRoles.Chat
             sb.Append('\n');
             sb.Append(Lang.T("cmd.announce.step2", "②バニラのまま公開部屋を作る（MODなし）", "2) Create a PUBLIC vanilla lobby there (no mod)", "②用原版创建一个公开房间（无模组）"));
             sb.Append('\n');
-            sb.Append(TF3("cmd.announce.step3", "③チャットに『役職ありは {0}』と書く", "3) Write \"Roles: {0}\" in that lobby's chat", "③在聊天里写“有职业的房间是 {0}”", code));
+            sb.Append(TF3("cmd.announce.step3", "③チャットに『追加役職部屋 {0}』と書く", "3) Write \"Mod-roles room {0}\" in that lobby's chat", "③在聊天里写“模组职业房 {0}”", code));
             sb.Append('\n');
-            sb.Append(Lang.T("cmd.announce.step4", "④コードが変わったら（再ホスト・廃村後）名前を直す。/announce でまたコピーできます", "4) When the code changes (re-host / haison) fix the name; /announce copies it again", "④代码变了（重开房间、废村后）就改名字；/announce 可再次复制"));
+            sb.Append(Lang.T("cmd.announce.step4", "④コードが変わったら（再ホスト・廃村後）名前を直す。/announce でまたコピーできます", "4) When the code changes (re-host / haison) fix the name; /announce copies it again", "④代码变了（重开房间、废局后）就改名字；/announce 可再次复制"));
             return sb.ToString();
         }
 
@@ -1681,13 +1941,13 @@ namespace PocketRoles.Chat
             {
                 string set = Options.NormalizeRoomCode(a);
                 if (set.Length == 0)
-                    return Lang.T("cmd.move.usage", "使い方: /move（案内を流す）, /move <役職部屋のコード>, /move cancel", "Usage: /move (announce), /move <role lobby code>, /move cancel", "用法: /move（发送引导）, /move <职业房代码>, /move cancel");
+                    return Lang.T("cmd.move.usage", "使い方: /move（案内を流す）, /move <追加役職部屋のコード>, /move cancel", "Usage: /move (announce), /move <mod-roles lobby code>, /move cancel", "用法: /move（发送引导）, /move <模组职业房代码>, /move cancel");
                 Options.RoleRoomCode = set;
                 PocketRolesPlugin.Logger.LogInfo($"Commands: role room code set to {set}");
             }
             string here = Rehost.CurrentRoomCode();
             if (LobbyRegistered())
-                return TF3("cmd.move.registered", "この部屋はすでに MOD 登録ありの役職部屋です（コード {0}）。案内部屋の手順は /announce で表示します。", "This lobby already is the registered role lobby (code {0}); /announce shows the guide-room steps.", "本房间已经是已注册的职业房（代码 {0}）；/announce 显示引导房步骤。", here);
+                return TF3("cmd.move.registered", "この部屋はすでに MOD 登録ありの追加役職部屋です（コード {0}）。案内部屋の手順は /announce で表示します。", "This lobby already is the registered mod-roles lobby (code {0}); /announce shows the guide-room steps.", "本房间已经是已注册的模组职业房（代码 {0}）；/announce 显示引导房步骤。", here);
             string role = Options.RoleRoomCode;
             bool auto = Options.AutoRecreateRegistered;
 
@@ -1695,29 +1955,29 @@ namespace PocketRoles.Chat
             var msg = new StringBuilder();
             if (role.Length > 0)
             {
-                msg.Append(TF3("guide.move.code.ja", "役職ありの部屋は {0} です。コードを入力して入ってください。", "役職ありの部屋は {0} です。コードを入力して入ってください。", "役職ありの部屋は {0} です。コードを入力して入ってください。", role)).Append('\n');
-                msg.Append(TF3("guide.move.code.zh", "有职业的房间是 {0}，请输入代码加入。", "有职业的房间是 {0}，请输入代码加入。", "有职业的房间是 {0}，请输入代码加入。", role)).Append('\n');
-                msg.Append(TF3("guide.move.code.en", "The lobby with roles is {0}: enter the code to join it.", "The lobby with roles is {0}: enter the code to join it.", "The lobby with roles is {0}: enter the code to join it.", role));
+                msg.Append(TF3("guide.move.code.ja", "追加役職ありの部屋は {0} です。コードを入力して入ってください。", "追加役職ありの部屋は {0} です。コードを入力して入ってください。", "追加役職ありの部屋は {0} です。コードを入力して入ってください。", role)).Append('\n');
+                msg.Append(TF3("guide.move.code.zh", "有模组追加职业的房间是 {0}，请输入代码加入。", "有模组追加职业的房间是 {0}，请输入代码加入。", "有模组追加职业的房间是 {0}，请输入代码加入。", role)).Append('\n');
+                msg.Append(TF3("guide.move.code.en", "The lobby with mod roles is {0}: enter the code to join it.", "The lobby with mod roles is {0}: enter the code to join it.", "The lobby with mod roles is {0}: enter the code to join it.", role));
             }
             else
             {
-                msg.Append(Lang.T("guide.move.name.ja", "役職ありの部屋のコードは案内部屋のホストの名前に表示しています。", "役職ありの部屋のコードは案内部屋のホストの名前に表示しています。", "役職ありの部屋のコードは案内部屋のホストの名前に表示しています。")).Append('\n');
-                msg.Append(Lang.T("guide.move.name.zh", "有职业的房间代码显示在引导房房主的名字上。", "有职业的房间代码显示在引导房房主的名字上。", "有职业的房间代码显示在引导房房主的名字上。")).Append('\n');
-                msg.Append(Lang.T("guide.move.name.en", "The code of the lobby with roles is shown in the guide room host's name.", "The code of the lobby with roles is shown in the guide room host's name.", "The code of the lobby with roles is shown in the guide room host's name."));
+                msg.Append(Lang.T("guide.move.name.ja", "追加役職ありの部屋のコードは案内部屋のホストの名前に表示しています。", "追加役職ありの部屋のコードは案内部屋のホストの名前に表示しています。", "追加役職ありの部屋のコードは案内部屋のホストの名前に表示しています。")).Append('\n');
+                msg.Append(Lang.T("guide.move.name.zh", "有模组追加职业的房间代码显示在引导房房主的名字上。", "有模组追加职业的房间代码显示在引导房房主的名字上。", "有模组追加职业的房间代码显示在引导房房主的名字上。")).Append('\n');
+                msg.Append(Lang.T("guide.move.name.en", "The code of the lobby with mod roles is shown in the guide room host's name.", "The code of the lobby with mod roles is shown in the guide room host's name.", "The code of the lobby with mod roles is shown in the guide room host's name."));
             }
             if (auto)
             {
                 msg.Append('\n');
-                msg.Append(TF3("guide.move.auto.ja", "{0}秒後にこの部屋を役職ありの部屋として作り直します。新しいコードで入り直してください。", "{0}秒後にこの部屋を役職ありの部屋として作り直します。新しいコードで入り直してください。", "{0}秒後にこの部屋を役職ありの部屋として作り直します。新しいコードで入り直してください。", (int)MoveDelay)).Append('\n');
-                msg.Append(TF3("guide.move.auto.zh", "{0} 秒后本房间将重建为有职业的房间，请用新代码重新加入。", "{0} 秒后本房间将重建为有职业的房间，请用新代码重新加入。", "{0} 秒后本房间将重建为有职业的房间，请用新代码重新加入。", (int)MoveDelay)).Append('\n');
-                msg.Append(TF3("guide.move.auto.en", "In {0} s this lobby is re-created as the lobby with roles; rejoin with the new code.", "In {0} s this lobby is re-created as the lobby with roles; rejoin with the new code.", "In {0} s this lobby is re-created as the lobby with roles; rejoin with the new code.", (int)MoveDelay));
+                msg.Append(TF3("guide.move.auto.ja", "{0}秒後にこの部屋を追加役職ありの部屋として作り直します。新しいコードで入り直してください。", "{0}秒後にこの部屋を追加役職ありの部屋として作り直します。新しいコードで入り直してください。", "{0}秒後にこの部屋を追加役職ありの部屋として作り直します。新しいコードで入り直してください。", (int)MoveDelay)).Append('\n');
+                msg.Append(TF3("guide.move.auto.zh", "{0} 秒后本房间将重建为有模组追加职业的房间，请用新代码重新加入。", "{0} 秒后本房间将重建为有模组追加职业的房间，请用新代码重新加入。", "{0} 秒后本房间将重建为有模组追加职业的房间，请用新代码重新加入。", (int)MoveDelay)).Append('\n');
+                msg.Append(TF3("guide.move.auto.en", "In {0} s this lobby is re-created with mod roles; rejoin with the new code.", "In {0} s this lobby is re-created with mod roles; rejoin with the new code.", "In {0} s this lobby is re-created with mod roles; rejoin with the new code.", (int)MoveDelay));
             }
             Chat.All(Chat.Title, msg.ToString());
             PocketRolesPlugin.Logger.LogInfo($"Commands: /move announced (role code {(role.Length > 0 ? role : "none")}, auto re-create={auto}, here {here})");
 
             var reply = new StringBuilder();
             reply.Append(role.Length > 0
-                ? TF3("cmd.move.sent", "全員に案内を送りました（役職部屋 {0}、3 言語）。", "Announcement sent to everyone (role lobby {0}, 3 languages).", "已向所有人发送引导（职业房 {0}，3 种语言）。", role)
+                ? TF3("cmd.move.sent", "全員に案内を送りました（追加役職部屋 {0}、3 言語）。", "Announcement sent to everyone (mod-roles lobby {0}, 3 languages).", "已向所有人发送引导（模组职业房 {0}，3 种语言）。", role)
                 : Lang.T("cmd.move.sent.name", "全員に案内を送りました（コードは案内部屋のホスト名を見てもらう）。/move <コード> でコードも流せます。", "Announcement sent (players look at the guide room host's name for the code). /move <code> announces a code too.", "已向所有人发送引导（让玩家看引导房房主的名字）。/move <代码> 也可直接发送代码。"));
             if (auto)
             {
@@ -1753,7 +2013,7 @@ namespace PocketRoles.Chat
                     }
                 }, MoveTag);
                 reply.Append('\n');
-                reply.Append(TF3("cmd.move.auto", "{0} 秒後に MOD 登録ありの役職部屋として作り直します（全員がコードで入り直し）。/move cancel で中止。", "In {0} s the lobby is re-created as a registered role lobby; everyone rejoins with the new code. /move cancel aborts.", "{0} 秒后将重建为已注册的职业房（所有人用新代码重新加入）。/move cancel 可取消。", (int)MoveDelay));
+                reply.Append(TF3("cmd.move.auto", "{0} 秒後に MOD 登録ありの追加役職部屋として作り直します（全員がコードで入り直し）。/move cancel で中止。", "In {0} s the lobby is re-created as a registered mod-roles lobby; everyone rejoins with the new code. /move cancel aborts.", "{0} 秒后将重建为已注册的模组职业房（所有人用新代码重新加入）。/move cancel 可取消。", (int)MoveDelay));
             }
             else
             {
@@ -1913,15 +2173,18 @@ namespace PocketRoles.Chat
             Reply(sender, m);
         }
 
-        /// <summary>/kick &lt;name&gt; and /ban &lt;name&gt; (Permissions.Kick checks the ranks and does the kick).</summary>
-        private static string KickCommand(PlayerControl sender, string who, bool ban)
+        /// <summary>
+        /// /kick &lt;name&gt; and /ban &lt;name&gt; [days] (Permissions.Kick checks the ranks and does the kick; v0.5.5: a ban is also
+        /// recorded in the Aegis ban file, for <paramref name="days"/> days, 0 = permanent).
+        /// </summary>
+        private static string KickCommand(PlayerControl sender, string who, bool ban, int days = 0, bool confirmed = false)
         {
             if (string.IsNullOrWhiteSpace(who))
                 return ban
-                    ? Lang.T("cmd.ban.usage", "使い方: /ban <名前|番号>（キック＋Banlist.txt に登録）, /ban list, /ban remove <名前|コード>", "Usage: /ban <name|id> (kick + Banlist.txt), /ban list, /ban remove <name|code>")
+                    ? Lang.T("cmd.ban.usage", "使い方: /ban <名前|番号> [日数]（キック＋Banlist.txt に登録。日数を付けるとその日数だけ）, /ban list, /ban remove <名前|コード>", "Usage: /ban <name|id> [days] (kick + Banlist.txt; with days: for that many days), /ban list, /ban remove <name|code>")
                     : Lang.T("cmd.kick.usage", "使い方: /kick <名前|番号>", "Usage: /kick <name|id>");
             if (!InLobbyOrGame()) return Lang.T("cmd.kick.nolobby", "部屋にいる時だけ使えます。", "Only available while in a lobby or game.");
-            Permissions.Kick(sender, who, ban, out var msg);
+            Permissions.Kick(sender, who, ban, days, confirmed, out var msg);
             return msg;
         }
 
@@ -1936,17 +2199,36 @@ namespace PocketRoles.Chat
         {
             string a = arg1 == null ? "" : arg1.ToLowerInvariant();
             if (a == "list" || a == "ls" || a == "show" || a == "一覧") { Reply(sender, Permissions.ListText(Permissions.ListKind.Ban)); return; }
-            if (a == "remove" || a == "rm" || a == "del" || a == "delete" || a == "削除" || a == "unban") { Reply(sender, UnbanText(rest)); return; }
+            if (a == "remove" || a == "rm" || a == "del" || a == "delete" || a == "削除" || a == "unban") { Reply(sender, UnbanText(sender, rest)); return; }
             if (a == "reload") { Permissions.Reload(); Reply(sender, Permissions.ListText(Permissions.ListKind.Ban)); return; }
-            if (a == "add" || a == "追加") { Reply(sender, KickCommand(sender, rest, true)); return; }
-            Reply(sender, KickCommand(sender, all, true));
+            // v0.5.5: "/ban Taro 30" = 30 days (the whole text still wins when it names a player in the room or one who left
+            // this lobby: "Player 2" who left is not Player for 2 days; Permissions.Kick then needs the exact name with days)
+            Func<string, bool> names = t => Permissions.FindPlayer(t) != null || AegisBans.NamesSomeone(t);
+            string text = a == "add" || a == "追加" ? rest : all;
+            // v0.5.5 central unban: "… confirm" answers the question about a player the author cleared on appeal
+            string plain = AegisPrivacyCore.StripConfirm(text, names, out bool confirm);
+            AegisBans.SplitDays(plain, names, out string who, out int days);
+            bool host = sender == null || sender.AmOwner;
+            // that player already left the room (the question removed them with a room ban): the lasting ban is /aegis ban
+            if (confirm && host && Permissions.FindPlayer(who, false) == null) { Reply(sender, AegisBans.BanCommandText(text)); return; }
+            Reply(sender, KickCommand(sender, who, true, days, confirm && host));
         }
 
-        private static string UnbanText(string who)
+        private static string UnbanText(PlayerControl sender, string who)
         {
             if (string.IsNullOrWhiteSpace(who)) return Lang.T("cmd.unban.usage", "使い方: /ban remove <名前|コード>（/ban list で一覧）", "Usage: /ban remove <name|code> (/ban list shows them)");
-            Permissions.Remove(Permissions.ListKind.Ban, who, out var msg);
-            return msg;
+            bool listed = Permissions.Remove(Permissions.ListKind.Ban, who, out var msg);
+            // v0.5.5: the same person's Aegis ban (/aegis bans) is lifted too; a remote admin lifts only a ban a person made
+            // (Aegis's own bans stay with the host), and the history keeps who did it
+            bool host = sender == null || sender.AmOwner;
+            string by = host ? "host" : Core.Game.NameOf(sender.PlayerId);
+            var aegis = AegisBans.UnbanFromBanlist(who, by, !host);
+            if (aegis == AegisBans.BanlistUnban.HostOnly)
+                return msg + Lang.T("aegis.unban.hostonly", "（Aegis が自動で記録した BAN はホストだけが解除できます: /aegis unban）", " (a ban Aegis recorded itself is lifted by the host only: /aegis unban)", "（Aegis 自动记录的限制进入只有房主能解除：/aegis unban）");
+            if (aegis != AegisBans.BanlistUnban.Lifted) return msg;
+            return listed
+                ? msg + Lang.T("aegis.unban.also", "（Aegis の BAN も解除しました）", " (the Aegis ban was lifted too)", "（Aegis 的限制进入也已解除）")
+                : TF3("aegis.unban.aegisonly", "{0} の Aegis の BAN を解除しました（Banlist.txt にはありませんでした）。", "Lifted the Aegis ban of {0} (not on Banlist.txt).", "已解除 {0} 的 Aegis 限制进入（不在 Banlist.txt 中）。", who);
         }
 
         /// <summary>/vset &lt;key&gt; &lt;value&gt;: a vanilla option beyond the menu's range (Game.VanillaRanges).</summary>

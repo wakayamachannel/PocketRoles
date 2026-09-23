@@ -178,6 +178,12 @@ namespace PocketRoles.Core
 
         // ---- notices
 
+        /// <summary>v0.5.5: "Hotkeys: HH:mm:ss.fff 123.456s …" — the same stamp as the wire / lag log lines, so a key press can be placed among them.</summary>
+        private static void Log(string what)
+        {
+            PocketRolesPlugin.Logger.LogInfo("Hotkeys: " + Net.WireLog.Stamp() + " " + what);
+        }
+
         /// <summary>HUD toast (when the HUD exists); with <paramref name="alsoChat"/> the same text as a host-local chat line.</summary>
         private static void Notify(string text, bool alsoChat)
         {
@@ -216,7 +222,7 @@ namespace PocketRoles.Core
             }
             _pendingKey = key;
             _pendingUntil = now + ConfirmWindow;
-            PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {keyName} first press (waiting for confirm, {ConfirmWindow:0}s)");
+            Log($"{keyName} first press (waiting for confirm, {ConfirmWindow:0}s)");
             string text = Lang.T("hotkey.confirm.again", "もう一度 {0} を押すと{1}（{2} 秒以内）", "Press {0} again within {2} s to {1}", "在 {2} 秒内再按一次 {0} 即可{1}");
             try { text = string.Format(text, keyName, actionLabel, (int)ConfirmWindow); }
             catch (FormatException) { text = keyName + ": " + actionLabel; }
@@ -240,7 +246,7 @@ namespace PocketRoles.Core
             bool typing = Typing();
             if (Input.GetKeyDown(cancelKey) && countdown && IsFunctionKey(cancelKey))
             {
-                PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {cancelKey} → cancel start countdown (typing={typing})");
+                Log($"{cancelKey} → cancel start countdown (typing={typing})");
                 ClearPending();
                 Lobby.AutoStart.CancelStart();
                 return;
@@ -252,7 +258,7 @@ namespace PocketRoles.Core
             {
                 if (countdown)
                 {
-                    PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {(cancelDown ? cancelKey : KeyCode.Escape)} → cancel start countdown");
+                    Log($"{(cancelDown ? cancelKey : KeyCode.Escape)} → cancel start countdown");
                     ClearPending();
                     Lobby.AutoStart.CancelStart();
                 }
@@ -265,11 +271,11 @@ namespace PocketRoles.Core
             {
                 if (!Game.IsHostActive || !MeetingVoting())
                 {
-                    PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {endKey} ignored (hostActive={Game.IsHostActive}, meetingVoting={MeetingVoting()})");
+                    Log($"{endKey} ignored (hostActive={Game.IsHostActive}, meetingVoting={MeetingVoting()})");
                     return; // nothing to end
                 }
                 if (!Confirm(endKey, endKey.ToString(), Lang.T("hotkey.endmeeting", "会議を終了", "end the meeting", "结束会议"))) return;
-                PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {endKey} ×2 → end meeting");
+                Log($"{endKey} ×2 → end meeting");
                 MeetingTools.EndMeetingNow();
                 return;
             }
@@ -281,37 +287,37 @@ namespace PocketRoles.Core
             {
                 if (!Game.IsHostActive)
                 {
-                    PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {haisonKey} ignored (mod inactive: enabled={Options.ModEnabled}, mismatch={Game.VersionMismatch})");
+                    Log($"{haisonKey} ignored (mod inactive: enabled={Options.ModEnabled}, mismatch={Game.VersionMismatch})");
                     return;
                 }
                 if (client.NetworkMode != NetworkModes.OnlineGame)
                 {
-                    PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {haisonKey} ignored (not an online lobby)");
+                    Log($"{haisonKey} ignored (not an online lobby)");
                     return; // a local lobby has no timer: nothing to refresh
                 }
                 bool inGame = client.IsGameStarted;
                 if (!inGame && !InLobby())
                 {
-                    PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {haisonKey} ignored (main menu / end screen)");
+                    Log($"{haisonKey} ignored (main menu / end screen)");
                     return; // main menu: nothing to do
                 }
                 string why;
                 if (inGame && GameStuck(out why))
                 {
-                    PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {haisonKey} → haison immediately, game stuck ({why})");
+                    Log($"{haisonKey} → haison immediately, game stuck ({why})");
                     Diagnostics.DumpBuffer("game stuck: " + why);
                     ClearPending();
                     if (!Lobby.Haison.Run())
                         Notify(Lang.T("cmd.haison.busy", "今は実行できません（開始処理中か、すでに廃村中です）。", "Not possible now (a start is in progress or a haison is already running)."), true);
                     else
-                        Notify(Lang.T("hotkey.haison.stuck", "画面が出ないので試合を終了します（廃村）。", "The game never came up: ending it (haison).", "画面未显示，正在结束本局（废村）。"), true);
+                        Notify(Lang.T("hotkey.haison.stuck", "画面が出ないので試合を終了します（廃村）。", "The game never came up: ending it (haison).", "画面未显示，正在结束本局（废局）。"), true);
                     return;
                 }
                 string label = inGame
-                    ? Lang.T("hotkey.haison.game", "試合を終了（廃村）", "end the game (haison)", "结束本局（废村）")
-                    : Lang.T("hotkey.haison.lobby", "廃村（ロビーを更新）", "haison (refresh the lobby)", "废村（刷新房间）");
+                    ? Lang.T("hotkey.haison.game", "試合を終了（廃村）", "end the game (haison)", "结束游戏（废局）")
+                    : Lang.T("hotkey.haison.lobby", "廃村（ロビーを更新）", "haison (refresh the lobby)", "废局（刷新房间）");
                 if (!Confirm(haisonKey, haisonKey.ToString(), label)) return;
-                PocketRolesPlugin.Logger.LogInfo($"Hotkeys: {haisonKey} ×2 → haison (inGame={inGame})");
+                Log($"{haisonKey} ×2 → haison (inGame={inGame})");
                 if (!Lobby.Haison.Run())
                     Notify(Lang.T("cmd.haison.busy", "今は実行できません（開始処理中か、すでに廃村中です）。", "Not possible now (a start is in progress or a haison is already running)."), true);
             }

@@ -90,9 +90,9 @@ namespace PocketRoles.Net
                     "Registration off: the lobby is listed publicly, but this violates the mod policy and the anti-cheat may kick you (/opt register on restores it)"));
                 // What the compat mode changes for the host (the policy warning above stays).
                 Chat.Chat.LocalWhenReady(() => Lang.T("compat.on.public",
-                    "便利ホスト（登録オフ）: 役職なし・個別メッセージなし（挨拶や /cmd の返信も全員に見えます）・翻訳は全体流しのみ",
-                    "Helper-host (unregistered) lobby: no roles, no private messages (the welcome and /cmd replies are public), translation is broadcast only",
-                    "便利房（未注册）：无职业、无私信（欢迎语和 /cmd 回复所有人可见）、翻译仅全体广播"));
+                    "便利ホスト（登録オフ）: MODの追加役職なし（本来の役職は設定どおり）・個別メッセージなし（挨拶や /cmd の返信も全員に見えます）・翻訳は全体流しのみ",
+                    "Helper-host (unregistered) lobby: no mod roles (usual roles as set), no private messages (the welcome and /cmd replies are public), translation is broadcast only",
+                    "简易房（未注册）：无模组追加职业（原版职业按房间设置）、无私信（欢迎语和 /cmd 回复所有人可见）、翻译仅全体广播"));
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"Registration_LobbyStartPatch: {e}"); }
         }

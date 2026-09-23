@@ -81,7 +81,7 @@ namespace PocketRoles.Game
                 byte id = info.PlayerId;
                 // 2 s after the exile screen, not inside it: chat from a dead host opens Rpc.TempReviveHostForChat (an
                 // urgent Data(IsDead=false)) while clients still run their own exile end check → black screen.
-                Scheduler.After(2f, () => Announce(id, "reveal.exiled", "追放された {0} は {1} でした。", "Ejected {0} was {1}.", "被放逐的 {0} 是 {1}。"), "reveal.exiled");
+                Scheduler.After(2f, () => Announce(id, "reveal.exiled", "追放された {0} は {1} でした。", "Ejected {0} was {1}.", "被驱逐的 {0} 是 {1}。"), "reveal.exiled");
                 FlushDeferred(2.6f);
             }
             catch (Exception e) { PocketRolesPlugin.Logger.LogError($"RoleReveal.OnExiled: {e}"); }
@@ -232,17 +232,17 @@ namespace PocketRoles.Game
             switch (type)
             {
                 // ghost roles (CrewmateGhost / ImpostorGhost / Guardian Angel) are only ever assigned after a death: name the living side
-                case RoleTypes.Crewmate: case RoleTypes.CrewmateGhost: case RoleTypes.GuardianAngel: return Lang.T("vanrole.crewmate", "クルーメイト", "Crewmate", "船员");
-                case RoleTypes.Impostor: case RoleTypes.ImpostorGhost: return Lang.T("vanrole.impostor", "インポスター", "Impostor", "内鬼");
-                case RoleTypes.Scientist: return Lang.T("vanrole.scientist", "サイエンティスト", "Scientist", "科学家");
+                case RoleTypes.Crewmate: case RoleTypes.CrewmateGhost: case RoleTypes.GuardianAngel: return Lang.T("vanrole.crewmate", "クルー", "Crewmate", "船员");
+                case RoleTypes.Impostor: case RoleTypes.ImpostorGhost: return Lang.T("vanrole.impostor", "インポスター", "Impostor", "伪装者");
+                case RoleTypes.Scientist: return Lang.T("vanrole.scientist", "科学者", "Scientist", "科学家");
                 case RoleTypes.Engineer: return Lang.T("vanrole.engineer", "エンジニア", "Engineer", "工程师");
                 case RoleTypes.Shapeshifter: return Lang.T("vanrole.shapeshifter", "シェイプシフター", "Shapeshifter", "变形者");
-                case RoleTypes.Noisemaker: return Lang.T("vanrole.noisemaker", "ノイズメーカー", "Noisemaker", "噪音制造者");
-                case RoleTypes.Phantom: return Lang.T("vanrole.phantom", "ファントム", "Phantom", "幻影");
-                case RoleTypes.Tracker: return Lang.T("vanrole.tracker", "トラッカー", "Tracker", "追踪者");
+                case RoleTypes.Noisemaker: return Lang.T("vanrole.noisemaker", "ノイズメーカー", "Noisemaker", "大嗓门");
+                case RoleTypes.Phantom: return Lang.T("vanrole.phantom", "ファントム", "Phantom", "幻象师");
+                case RoleTypes.Tracker: return Lang.T("vanrole.tracker", "トラッカー", "Tracker", "侦察员");
                 case RoleTypes.Detective: return Lang.T("vanrole.detective", "探偵", "Detective", "侦探");
-                case RoleTypes.Viper: return Lang.T("vanrole.viper", "ヴァイパー", "Viper", "毒蛇");
-                case RoleTypes.Judge: return Lang.T("vanrole.judge", "ジャッジ", "Judge", "审判官");
+                case RoleTypes.Viper: return Lang.T("vanrole.viper", "バイパー", "Viper", "毒蛇");
+                case RoleTypes.Judge: return Lang.T("vanrole.judge", "ジャッジ", "Judge", "法官");
                 default: return null;
             }
         }
